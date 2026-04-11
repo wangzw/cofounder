@@ -1,0 +1,36 @@
+name: Lint Commits
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  lint-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate commit messages
+        run: |
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,72}$'
+          ERRORS=""
+
+          while IFS= read -r msg; do
+            if ! echo "$msg" | grep -qE "$PATTERN"; then
+              ERRORS="${ERRORS}\n  - ${msg}"
+            fi
+          done < <(git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%s")
+
+          if [ -n "$ERRORS" ]; then
+            echo "::error::The following commit messages do not follow Conventional Commits format:${ERRORS}"
+            echo ""
+            echo "Expected format: <type>(<scope>): <description>"
+            echo "Allowed types: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+            echo "Max subject length: 72 characters"
+            exit 1
+          fi
+
+          echo "All commit messages are compliant."
