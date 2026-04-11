@@ -1,0 +1,26 @@
+name: Documentation
+description: Report a documentation issue or suggest an improvement
+title: "[Documentation] "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What documentation needs to be added or changed?
+    validations:
+      required: true
+  - type: textarea
+    id: affected-sections
+    attributes:
+      label: Affected Sections
+      description: Which parts of the documentation are affected?
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other context or references.
+    validations:
+      required: false
