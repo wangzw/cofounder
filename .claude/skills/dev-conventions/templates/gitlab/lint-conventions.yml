@@ -1,0 +1,111 @@
+stages:
+  - lint
+
+lint-issue:
+  stage: lint
+  image: node:22
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $LINT_TARGET == "issue"
+  before_script:
+    - npm install -g @anthropic-ai/claude-code
+    - apt-get update && apt-get install -y glab
+  script:
+    - |
+      ISSUE_CONTENT=$(glab issue view "$ISSUE_IID" --output json)
+      CONVENTIONS=$(cat CONTRIBUTING.md)
+
+      RESULT=$(claude -p "You are a dev conventions linter. You MUST output valid JSON only, no other text.
+
+      Given the following conventions:
+      ${CONVENTIONS}
+
+      And the following issue content:
+      ${ISSUE_CONTENT}
+
+      Check if the issue complies with the conventions (title format, required fields).
+      If non-compliant, output corrected JSON: {\"compliant\": false, \"title\": \"corrected title\", \"body\": \"corrected body\", \"labels\": [\"label\"], \"corrections\": [\"list of corrections made\"]}
+      If compliant, output: {\"compliant\": true}")
+
+      echo "${RESULT}" > /tmp/result.json
+      COMPLIANT=$(jq -r '.compliant' /tmp/result.json)
+
+      if [ "$COMPLIANT" = "false" ]; then
+        TITLE=$(jq -r '.title' /tmp/result.json)
+        BODY=$(jq -r '.body' /tmp/result.json)
+        CORRECTIONS=$(jq -r '.corrections | join("\n- ")' /tmp/result.json)
+
+        glab issue update "$ISSUE_IID" --title "${TITLE}" --description "${BODY}"
+        glab issue note "$ISSUE_IID" --message "**Auto-formatted by conventions linter:**
+
+      - ${CORRECTIONS}
+
+      See CONTRIBUTING.md for the full conventions guide."
+      fi
+
+lint-mr:
+  stage: lint
+  image: node:22
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  before_script:
+    - npm install -g @anthropic-ai/claude-code
+    - apt-get update && apt-get install -y glab
+  script:
+    - |
+      MR_CONTENT=$(glab mr view "$CI_MERGE_REQUEST_IID" --output json)
+      CONVENTIONS=$(cat CONTRIBUTING.md)
+
+      RESULT=$(claude -p "You are a dev conventions linter. You MUST output valid JSON only, no other text.
+
+      Given the following conventions:
+      ${CONVENTIONS}
+
+      And the following merge request content:
+      ${MR_CONTENT}
+
+      Check if the MR complies with the conventions (title format, required sections: Summary, Related Issues, Changes, Test Plan).
+      If non-compliant, output corrected JSON: {\"compliant\": false, \"title\": \"corrected title\", \"body\": \"corrected body\", \"corrections\": [\"list of corrections made\"]}
+      If compliant, output: {\"compliant\": true}")
+
+      echo "${RESULT}" > /tmp/result.json
+      COMPLIANT=$(jq -r '.compliant' /tmp/result.json)
+
+      if [ "$COMPLIANT" = "false" ]; then
+        TITLE=$(jq -r '.title' /tmp/result.json)
+        BODY=$(jq -r '.body' /tmp/result.json)
+        CORRECTIONS=$(jq -r '.corrections | join("\n- ")' /tmp/result.json)
+
+        glab mr update "$CI_MERGE_REQUEST_IID" --title "${TITLE}" --description "${BODY}"
+        glab mr note "$CI_MERGE_REQUEST_IID" --message "**Auto-formatted by conventions linter:**
+
+      - ${CORRECTIONS}
+
+      See CONTRIBUTING.md for the full conventions guide."
+      fi
+
+lint-commits:
+  stage: lint
+  image: alpine:latest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - |
+      PATTERN='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,72}$'
+      ERRORS=""
+
+      while IFS= read -r msg; do
+        if ! echo "$msg" | grep -qE "$PATTERN"; then
+          ERRORS="${ERRORS}\n  - ${msg}"
+        fi
+      done < <(git log "origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}..HEAD" --pretty=format:"%s")
+
+      if [ -n "$ERRORS" ]; then
+        echo "ERROR: The following commit messages do not follow Conventional Commits format:${ERRORS}"
+        echo ""
+        echo "Expected format: <type>(<scope>): <description>"
+        echo "Allowed types: feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+        echo "Max subject length: 72 characters"
+        exit 1
+      fi
+
+      echo "All commit messages are compliant."
