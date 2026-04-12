@@ -960,22 +960,45 @@ After committing the revision, check for downstream consumers and print applicab
 
 ```
 {output-dir}/YYYY-MM-DD-{product-name}/
-├── README.md           # Product overview + journey index + feature index + roadmap
+├── README.md                # Product overview + journey index + feature index + roadmap
 ├── journeys/
-│   ├── J-001-{slug}.md # Individual journey spec
+│   ├── J-001-{slug}.md      # Individual journey spec
 │   └── ...
-├── architecture.md     # Architecture, tech stack, design tokens, nav, a11y, i18n, data model, NFRs
+├── architecture.md          # INDEX ONLY (~50-80 lines) — diagram + links to topic files
+├── architecture/            # Topic files — each standalone, independently readable
+│   ├── tech-stack.md
+│   ├── design-tokens.md     # (omit if no UI)
+│   ├── navigation.md        # (omit if no UI)
+│   ├── accessibility.md     # (omit if no UI)
+│   ├── i18n.md
+│   ├── data-model.md
+│   ├── external-deps.md
+│   ├── coding-conventions.md
+│   ├── test-isolation.md
+│   ├── security.md
+│   ├── dev-workflow.md
+│   ├── git-strategy.md
+│   ├── code-review.md
+│   ├── observability.md
+│   ├── performance.md
+│   ├── backward-compat.md   # (omit for v1)
+│   ├── ai-agent-config.md
+│   ├── deployment.md
+│   ├── shared-conventions.md
+│   ├── auth-model.md        # (omit if single-role)
+│   ├── privacy.md           # (omit if no personal data)
+│   └── nfr.md
 ├── features/
-│   ├── F-001-{slug}.md # Self-contained feature spec
+│   ├── F-001-{slug}.md      # Self-contained feature spec
 │   └── ...
-├── prototypes/         # Interactive prototypes (seed code for production)
-│   ├── src/            # Runnable prototype source
-│   └── screenshots/    # Key state screenshots per feature
+├── prototypes/              # Interactive prototypes (seed code for production)
+│   ├── src/                 # Runnable prototype source
+│   └── screenshots/         # Key state screenshots per feature
 ```
 
-Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture), and `feature-template.md` (feature specs).
+Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture index + topic files), and `feature-template.md` (feature specs).
 
-**Agent consumption:** read README.md (~concise overview) → read one feature file → implement. Each feature file copies all needed context inline (data models, conventions, journey context), so the feature file alone is sufficient for implementation.
+**Agent consumption:** read README.md (~concise overview) → read one feature file → implement. Each feature file copies all needed context inline (data models, conventions, journey context), so the feature file alone is sufficient for implementation. Agents do NOT need to read architecture.md or architecture/ files — those are source-of-truth for the PRD author, not for coding agents. The feature file is the coding agent's only input.
 
 ## Output Path
 
