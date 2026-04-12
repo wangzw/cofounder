@@ -19,7 +19,7 @@ The feature file follows this structure. Omit any section that has no useful con
 **Product:** {one sentence}
 **Relevant architecture:** {only parts this feature touches, 3-5 lines}
 **Relevant data models:** {copy entity definitions this feature reads/writes}
-**Relevant conventions:** {copy applicable Shared Conventions from architecture.md — API format, auth, error handling, testing framework. Omit conventions this feature doesn't touch (e.g. no API conventions for a pure background-job feature)}
+**Relevant conventions:** {copy applicable conventions from architecture.md — Coding Conventions (error handling, logging, concurrency policies relevant to this feature), Test Isolation policies (resource isolation, parallel safety rules relevant to this feature's tests), Security Coding Policy (input validation, secret handling, auth enforcement relevant to this feature), Shared Conventions (API format, auth, error handling, testing framework), Code Review Policy (review dimensions applicable to this feature), Performance Testing (budgets applicable to this feature), Backward Compatibility (API versioning, schema evolution relevant to this feature's API contracts or data models), Observability Requirements (mandatory logging events, health checks, metrics relevant to this feature), AI Agent Configuration (instruction file references, maintenance triggers relevant to this feature). Omit conventions this feature doesn't touch (e.g. no API conventions for a pure background-job feature; no concurrency policy for a stateless utility; no backward compatibility for internal-only features with no API)}
 **Permission:** {which roles can access this feature and at what level — e.g. "Admin: full, Member: read-only, Viewer: no access". Copy from architecture.md Authorization Model. Omit for single-role products or features with no access restrictions}
 
 ### User Stories
@@ -89,7 +89,7 @@ Response (error — {status code}):
 #### Screen & Layout
 
 **Screen/View:** {which screen(s) this feature appears on — must match Screen/View names from journey touchpoints}
-**Route:** {URL pattern from architecture.md Navigation Architecture — must match Route Definitions table}
+**Route:** {**Web**: URL pattern from architecture.md Navigation Architecture — must match Route Definitions table. **TUI**: command/screen identifier from architecture.md Command Structure, or omit if screen is implicit}
 **Layout:** {describe the visual structure using design token references — e.g. "two-column layout, sidebar width spacing.64, main content area with spacing.6 padding, cards with radius.lg and shadow.md"}
 
 #### Component Contracts
@@ -183,7 +183,9 @@ stateDiagram-v2
 - After form submit success: focus moves to {success message / next logical element}
 - After inline error: focus moves to {first invalid field}
 
-#### Internationalization
+#### Internationalization (Frontend)
+
+{For user-facing features. Omit for backend-only features.}
 
 **Supported Languages:** {from architecture.md — e.g. en, zh-CN, ja}
 **RTL Support:** {yes / no}
@@ -204,9 +206,24 @@ stateDiagram-v2
 | Currency | {e.g. symbol + locale formatting} | {e.g. Intl.NumberFormat with currency} |
 | Pluralization | {e.g. ICU MessageFormat} | {per i18n library} |
 
+#### Internationalization (Backend)
+
+{For backend features that return user-visible text (API errors, validation messages, notifications, emails). Omit for single-language backends or features with no locale-dependent output.}
+
+**Locale Resolution:** {from architecture.md — e.g. Accept-Language header → user preference → default}
+
+**Locale-Dependent Messages:**
+
+| Message / Response | Localized? | How Locale Is Determined | Notes |
+|--------------------|-----------|------------------------|-------|
+| {e.g. API validation errors} | {yes / no — error codes only} | {e.g. Accept-Language header} | {e.g. client formats from code} |
+| {e.g. email notification body} | {yes / no} | {e.g. recipient user preference} | {e.g. template per locale} |
+
+**Timezone Handling:** {from architecture.md — e.g. store UTC, convert per user timezone on API output}
+
 #### Responsive Behavior
 
-{Reference breakpoint tokens from architecture.md Design Token System.}
+**Web** — {Reference breakpoint tokens from architecture.md Design Token System.}
 
 | Breakpoint | Layout Change | Component Change |
 |------------|--------------|-----------------|
@@ -214,12 +231,19 @@ stateDiagram-v2
 | sm – md (tablet) | {e.g. two-column, collapsible sidebar} | {e.g. sidebar as overlay} |
 | >= lg (desktop) | {e.g. three-column, fixed sidebar} | {e.g. full sidebar visible} |
 
+**TUI** — {Reference terminal size tokens from architecture.md Design Token System. Replace the web breakpoint table above with:}
+
+| Terminal Width | Layout Change | Component Change |
+|---------------|--------------|-----------------|
+| < {breakpoint.sidebar.collapse} | {e.g. sidebar hidden, content full-width} | {e.g. Ctrl+B toggles sidebar} |
+| >= {breakpoint.sidebar.collapse} | {e.g. sidebar visible at fixed width} | {e.g. sidebar always shown} |
+
 #### Prototype Reference
 
-{Populated after PRD Phase 5 prototype validation. Omit during initial feature writing.}
+{Populated after PRD Phase 5 prototype validation. Omit during initial feature writing. Must be filled for every user-facing feature after Phase 5 completes.}
 
 - **Prototype path:** `../prototypes/src/{feature-slug}/`
-- **Screenshots:** `../prototypes/screenshots/{feature-slug}/`
+- **Screenshots:** `../prototypes/screenshots/{feature-slug}/` {browser screenshots for web; teatest `.golden` files or terminal screenshots for TUI}
 - **Confirmed:** {YYYY-MM-DD}
 
 ### State Flow
@@ -296,6 +320,6 @@ stateDiagram-v2
 ## Rules
 
 - **Context = minimal but sufficient**: only architecture/models this feature touches. Copy inline, never say "see architecture.md".
-- **Omit empty sections**: no API Contract for pure UI features, no Interaction Design for backend-only features (background jobs, pure API, infrastructure). **All user-facing features must include Interaction Design.**
+- **Omit empty sections**: no API Contract for pure UI features, no Interaction Design for backend-only features (background jobs, pure API, infrastructure). **All user-facing features must include Interaction Design.** No frontend i18n for backend-only features; no backend i18n for pure UI features or single-language backends.
 - **Precise language**: "must", "returns", "rejects" — not "should consider", "might want to".
 - **Testable criteria**: every acceptance criterion and edge case maps to an automated test. Edge cases use Given/When/Then, same as acceptance criteria.

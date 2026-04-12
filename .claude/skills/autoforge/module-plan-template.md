@@ -10,8 +10,8 @@
 | Source Features | {F-001, F-003, ...} |
 | Phase | {n} |
 | Dependencies | {M-xxx, M-yyy or "None"} |
-| Complexity | {S / M / L / XL} |
-| Worktree Branch | `autoforge/{plan-id}/p{n}/M-{id}-{slug}` |
+| Prototype | {Action: Reuse / Refactor / None — from design spec Prototype Reuse Guide} |
+| Prototype Source | {`{prd-dir}/prototypes/src/{feature-slug}/` or "—"} |
 
 ## Prerequisites
 

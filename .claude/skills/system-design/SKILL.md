@@ -23,12 +23,13 @@ Generate system design documents as a **multi-file directory**. Each module spec
 
 ### Phase 1 — Design Generation
 
-1. **Parse input & confirm scope** — read PRD directory (README.md + journeys/*.md + architecture.md + features/*.md), parse existing design draft/notes file, or gather info interactively. Extract and note: journey flows (end-to-end data paths), cross-journey patterns (shared pain points, repeated touchpoints, handoff points, shared infrastructure needs — from README.md's Cross-Journey Patterns section), external dependencies (services, timeouts, failure modes), deployment architecture, observability requirements, shared conventions, testing conventions (frameworks, coverage targets, test infrastructure), authorization model (roles, permission matrix), privacy & compliance requirements (personal data entities, user rights, retention), notification requirements (from feature Notifications sections), NFRs (with IDs), risks, glossary, and feature analytics events. Summarize understanding back to user, confirm scope before proceeding. **If the project has an existing codebase** (source files, package manifests, or architecture docs present), **enter Incremental Design Mode** (see below) to assess current architecture before continuing.
+1. **Parse input & confirm scope** — read PRD directory (README.md + journeys/*.md + architecture.md + features/*.md), parse existing design draft/notes file, or gather info interactively. Extract and note: journey flows (end-to-end data paths), cross-journey patterns (shared pain points, repeated touchpoints, handoff points, shared infrastructure needs — from README.md's Cross-Journey Patterns section), external dependencies (services, timeouts, failure modes), deployment architecture, observability requirements, shared conventions, testing conventions (frameworks, coverage targets, test infrastructure), authorization model (roles, permission matrix), privacy & compliance requirements (personal data entities, user rights, retention), notification requirements (from feature Notifications sections), NFRs (with IDs), risks, glossary, feature analytics events, and developer convention policies (coding conventions, test isolation, development workflow, security coding policy, backward compatibility, git & branch strategy, code review policy, observability requirements policy, performance testing, AI agent configuration (instruction files, structure policy, convention references, maintenance policy)). Summarize understanding back to user, confirm scope before proceeding. **If the project has an existing codebase** (source files, package manifests, or architecture docs present), **enter Incremental Design Mode** (see below) to assess current architecture before continuing.
 2. **Module decomposition** — propose module breakdown based on architecture, features, and cross-journey patterns (shared infrastructure needs like search, notification, progress tracking suggest shared/common modules), present to user for confirmation
 3. **Interactive refinement** (one question at a time, prefer multiple choice). Cover these topics in order, skip any that are already clear from the input:
    - **Architecture:** key technical choices, infrastructure decisions, dependency layering (forward-only layer order for modules — see Architecture Refinement deep-dive), ambiguities with multiple implementation paths → present options
    - **Modules:** boundary definition, responsibility split, interface protocols between modules
    - **UI / Frontend implementation architecture:** (skip if no user-facing interface) prototype assessment, view-to-module mapping, routing implementation, state management implementation, form strategy, frontend performance budget, design token implementation, component structure, frontend-backend data flow (see Frontend Implementation Architecture deep-dive below)
+   - **Backend i18n implementation:** (skip if single-language backend) locale resolution middleware placement, message catalog structure, error/notification localization mechanism, timezone conversion approach (see Backend i18n Implementation deep-dive below)
    - **Data flow:** cross-module interactions, state management, error propagation
    - **NFR decomposition:** take PRD-level NFRs and decompose to module-level constraints — which modules bear the performance/security/scalability load?
    - **Testing:** test pyramid allocation, module test isolation strategy, external dependency test approach, test data management (see Testing Deep-Dive below)
@@ -75,10 +76,10 @@ The design tracks status at two levels: **design-level** (`Design Input > Status
 
 - **Step 1 → 2:** Scope confirmed, input fully parsed, user agrees with understanding summary
 - **Step 2 → 3:** Module breakdown proposed and confirmed — each module has a name, type (backend/frontend/shared), one-sentence responsibility, and rough complexity estimate
-- **Step 3 → 4:** All architecture ambiguities resolved (no "TBD"), dependency layering defined and confirmed, module boundaries validated, critical data flows traced, NFR budget allocated to modules, frontend implementation architecture decided (if applicable — including prototype assessment, routing, state management, form implementation strategy, performance budget, design token implementation, component structure sketch, frontend-backend data flow mapping, a11y implementation strategy, i18n implementation strategy, Design System Conventions approach), test strategy decided (pyramid allocation, isolation approach, external dependency test method)
+- **Step 3 → 4:** All architecture ambiguities resolved (no "TBD"), dependency layering defined and confirmed, module boundaries validated, critical data flows traced, NFR budget allocated to modules, frontend implementation architecture decided (if applicable — including prototype assessment, routing, state management, form implementation strategy, performance budget, design token implementation, component structure sketch, frontend-backend data flow mapping, a11y implementation strategy, i18n implementation strategy, Design System Conventions approach), backend i18n implementation decided (if multi-locale backend — locale resolution middleware, message catalog, timezone conversion), test strategy decided (pyramid allocation, isolation approach, external dependency test method), developer convention policies translated to stack-specific implementation patterns (coding conventions mapped to language idioms, test isolation mapped to framework config, security policies mapped to tools, CI gates mapped to pipeline config)
 - **Step 4 → 5:** Key technical decisions summarized in table form, user confirms all choices
 - **Step 5 → 6:** Feature-Module mapping complete, no orphan features, user confirms
-- **Step 6 → 7:** All module specs generated; each module has interface definition, responsibility, data model (if applicable), Testing section (if applicable — skip for trivial S-complexity modules with no dependencies), and Boundary Enforcement section (if the project has linting/CI infrastructure — skip for trivial S-complexity modules); frontend modules have UI Architecture section complete (component tree, routing, state management, key interactions, performance, a11y implementation, i18n implementation); frontend modules with forms use consistent form patterns per Design System Conventions
+- **Step 6 → 7:** All module specs generated; each module has interface definition, responsibility, data model (if applicable), Testing section (if applicable — skip for trivial S-complexity modules with no dependencies), and Boundary Enforcement section (if the project has linting/CI infrastructure — skip for trivial S-complexity modules); frontend modules have UI Architecture section complete (component tree, routing, state management, key interactions, performance, a11y implementation, i18n implementation); frontend modules with forms use consistent form patterns per Design System Conventions; backend modules that return locale-dependent text have Backend i18n Implementation section (locale resolution, message catalog, timezone conversion)
 - **Step 7 → 8:** All API contracts generated (if applicable); endpoint definitions match module interfaces; all endpoints include error codes, Authentication & Permissions, and Constraints sections; Test Scenarios included for non-trivial APIs
 
 #### Module Complexity Guide
@@ -92,7 +93,7 @@ The design tracks status at two levels: **design-level** (`Design Input > Status
 
 #### Step 3 Deep-Dive: Architecture Refinement
 
-**Start from PRD:** If the PRD's architecture.md already specifies deployment architecture, observability, or tech stack decisions, use those as the baseline — only ask about gaps or ambiguities, don't re-ask what's already decided.
+**Start from PRD:** If the PRD's architecture.md already specifies deployment architecture, observability, tech stack decisions, or developer convention policies (coding conventions, test isolation, security coding policy, development workflow, git & branch strategy, code review policy, observability requirements, performance testing, backward compatibility), use those as the baseline — only ask about gaps or ambiguities, don't re-ask what's already decided.
 
 For each ambiguous technical choice, evaluate along these dimensions:
 
@@ -142,11 +143,12 @@ For each PRD-level NFR, decompose to module-level budgets:
 
 Skip this section entirely if the project has no user-facing interface (pure API, background service). For projects with a UI (web, mobile, desktop, TUI):
 
-1. **Prototype assessment** — read the PRD's `prototypes/src/` directory (if it exists). For each prototype component, assess:
-   - Can it be used directly in production? (code quality, structure, patterns)
-   - Does it need refactoring? (what specifically — e.g. extract API calls to service layer, add error boundary)
-   - Must it be rewritten? (why — e.g. prototype only mocked API, needs real integration)
-   Record assessment in README's Prototype-to-Production Mapping section.
+1. **Prototype assessment** — read the PRD's `prototypes/src/` directory (if it exists). Prototypes are **production-seed code**, not throwaway mockups — treat them as the starting point for implementation. Prototypes may be web (React/Vue/etc.) or TUI (bubbletea/Ink/etc.) — assess both the same way. For each prototype component:
+   - **Classify:** Can it be used directly (Reuse)? Needs improvement (Refactor)? Must be rewritten (Rewrite)? TUI prototypes in compiled languages like Go are often closer to production-ready
+   - **For Reuse/Refactor — extract reuse details:** list specific files to copy, patterns to preserve (state machines, styling approach, component structure), and adaptations needed (mock data → real API, placeholder → real integration)
+   - Record classification in README's Prototype-to-Production Mapping table
+   - Record per-file reuse details in each target module's **Prototype Reuse Guide** section (module-template.md UI Architecture) — this is what coding agents read to know which files to copy and how to adapt them
+   - Review `prototypes/screenshots/` (browser screenshots or teatest golden files) to verify state coverage
 2. **View inventory & module mapping** — collect all Screen/View names from PRD journey touchpoints. Each unique view becomes an entry in the README's View / Screen Index. For each view, determine which frontend module owns it. Ask user to confirm.
 3. **Routing implementation** — based on PRD's Navigation Architecture:
    - Route configuration approach (file-based routing / config-based / framework convention)
@@ -180,6 +182,22 @@ Skip this section entirely if the project has no user-facing interface (pure API
 - Module Index in README must include a Type column (`backend` | `frontend` | `shared`)
 - **PRD owns the interaction design (what + behavior); system-design owns the implementation architecture (how)**
 - Do NOT redefine design tokens, component contracts, state machines, a11y requirements, or i18n requirements — these are authoritative in the PRD. System-design references them and specifies how to implement them
+
+#### Step 3 Deep-Dive: Backend i18n Implementation
+
+Skip if the PRD's Internationalization Baseline has no Backend sub-section (single-language backend). Otherwise, design how to implement the PRD's backend i18n requirements:
+
+1. **Locale resolution middleware** — where in the request pipeline is the user's locale determined? Which module owns this logic? How does it flow to downstream modules (context parameter, thread-local, request header)?
+2. **Message catalog structure** — how are localized messages stored and loaded? (embedded files, external JSON/YAML per locale, database-backed, third-party service). Which module owns the catalog? How do other modules access it?
+3. **Error & validation message localization** — how do modules produce locale-aware error messages? (error codes + client-side formatting, server-side message lookup, hybrid). What's the interface — `Localize(code string, locale string) string` or similar?
+4. **Notification content localization** — how are email/push/SMS templates localized? (template-per-locale files, template engine with locale parameter, external service). Which module owns template rendering?
+5. **Timezone conversion** — which module converts stored UTC timestamps to user-local time? At the API serialization layer, or deeper? What format is used in API responses?
+
+Record decisions in README's Key Technical Decisions table (backend i18n rows). Per-module details go in each module's Backend i18n Implementation section.
+
+**Rules:**
+- **PRD owns the i18n requirements (what); system-design owns the implementation architecture (how)** — do NOT redefine supported languages, locale resolution strategy, or which messages are localized. Reference the PRD and specify the implementation mechanism
+- Backend i18n decisions feed into the same Key Technical Decisions table as other architecture choices
 
 #### Step 3 Deep-Dive: Testing
 
@@ -216,6 +234,24 @@ Establish the project-level test strategy that will be recorded in README's Test
    - **Environment requirements**: which stages need external services (database, message queue)?
    - Skip if the project has no CI pipeline or if CI is already fully specified in PRD architecture.md
 
+#### Step 3 Deep-Dive: Developer Convention Translation
+
+For each PRD convention policy section, translate technology-agnostic policies into stack-specific implementation patterns for the chosen tech stack. This is the core contract between PRD and system-design.
+
+1. **Coding Conventions** — translate code organization, naming, interface design, dependency wiring, error handling, logging, config access, and concurrency policies into concrete language/framework idioms (e.g. PRD "errors must include context" → Go `fmt.Errorf("doing X: %w", err)` or TypeScript `new AppError("doing X", { cause })`)
+2. **Test Isolation** — translate resource isolation, port binding, file system, race detection, timeout policies into framework-specific test configuration and helper patterns (e.g. PRD "use random ports" → Go `net.Listen("tcp", ":0")` or Jest `getPort()`)
+3. **Security Coding Policy** — translate input validation, injection prevention, secret handling, auth enforcement into concrete middleware/library choices (e.g. PRD "validate at boundaries" → Go `validate` struct tags at handler layer or Express `express-validator` middleware)
+4. **Development Workflow** — translate CI gates, prerequisites, release process into concrete pipeline configuration (e.g. PRD "race detection in CI" → `go test -race ./...` in GitHub Actions)
+5. **Git & Branch Strategy** — confirm PRD's git policies apply to the chosen stack, add stack-specific hooks if needed (e.g. pre-commit hooks for linting)
+6. **Code Review Policy** — translate review dimensions into concrete automated checks (e.g. PRD "security review" → CodeQL/gosec in CI, PRD "convention compliance" → golangci-lint rules)
+7. **Observability Requirements** — translate mandatory events, health checks, metrics into concrete logging library config, health endpoint design, metrics export format (e.g. PRD "structured logging" → Go `slog` with JSON handler)
+8. **Performance Testing** — translate budgets and regression detection into concrete benchmark harness and CI gate configuration (e.g. PRD "p95 < 200ms" → Go benchmark with `benchstat` comparison in CI)
+9. **Backward Compatibility** — translate API versioning and schema evolution into concrete version negotiation and migration patterns
+10. **AI Agent Configuration** — translate instruction file policies into concrete file decisions: which files to generate (CLAUDE.md, AGENTS.md), content structure following the PRD's structure policy (concise index with references), what conventions to reference from generated config files, maintenance triggers mapped to CI/git hooks
+11. **Deployment Architecture** — translate deployment policies into concrete tooling decisions: local dev environment setup (e.g. Docker Compose, devcontainer, Nix flake), CD pipeline implementation (e.g. GitHub Actions deploy workflow, ArgoCD config), container/infrastructure definitions (e.g. Dockerfile, K8s manifests, Terraform modules), environment isolation approach (e.g. Docker network per agent, database schema prefix), configuration management (e.g. dotenv files, Vault integration), data migration tool choice (e.g. golang-migrate, Flyway, Alembic)
+
+Record translated patterns in README's Implementation Conventions section.
+
 ### Design Review
 
 Applied as step 10 of Phase 1 (self-review, after writing, before user review and commit), or triggered independently via `--review` on existing files.
@@ -232,10 +268,11 @@ Applied as step 10 of Phase 1 (self-review, after writing, before user review an
 | PRD traceability | Every module traces back to at least one Feature; every cross-journey pattern from the PRD (shared infrastructure needs, repeated touchpoints) is addressed by at least one module (or section omitted in PRD for single-journey products) |
 | NFR coverage | Every PRD NFR is decomposed to at least one module's NFR section with concrete, measurable constraints; README's NFR Allocation table is consistent with module-level NFR sections |
 | Interaction completeness | Every cross-module dependency in module files has a corresponding entry in README's Module Interaction Protocols; sync/async and error strategy are specified |
-| UI coverage | (Skip if no user-facing interface) Every PRD journey Screen/View appears in README's View / Screen Index; every frontend module has a UI Architecture section with component tree, routing, state management, key interactions, frontend performance, a11y implementation, and i18n implementation; Design System Conventions references PRD design tokens and specifies token-to-code implementation, responsive approach (sidebar behavior, grid system, mobile considerations), dark mode/theming strategy (if applicable), and component patterns (loading, error, empty, toast, modal, form) |
-| Prototype coverage | (Skip if PRD has no prototypes) Every PRD prototype component is accounted for in Prototype-to-Production Mapping; each entry has an Action (Reuse/Refactor/Rewrite) and Gap Description for non-Reuse items |
-| Frontend performance | (Skip if no user-facing interface) Every frontend module has performance targets (LCP, INP, CLS, bundle size); targets are consistent with PRD NFRs; optimization strategies are specified |
+| UI coverage | (Skip if no user-facing interface) Every PRD journey Screen/View appears in README's View / Screen Index; every frontend module has a UI Architecture section with component tree, routing, state management, key interactions, frontend performance, a11y implementation, and i18n implementation; Design System Conventions references PRD design tokens and specifies token-to-code implementation, responsive approach (**web**: sidebar behavior, grid system, mobile considerations; **TUI**: terminal width detection, sidebar auto-hide, minimum terminal size), dark mode/theming strategy (if applicable), and component patterns (loading, error, empty, toast/notification, modal/overlay, form/input) |
+| Prototype coverage | (Skip if PRD has no prototypes) Every PRD prototype component (web or TUI) is accounted for in Prototype-to-Production Mapping; each entry has an Action (Reuse/Refactor/Rewrite) and Gap Description for non-Reuse items; every frontend module with Action = Reuse or Refactor has a Prototype Reuse Guide in its UI Architecture section listing specific files to copy and adaptations needed; prototype visual records (browser screenshots or teatest golden files) have been reviewed against state machines |
+| Frontend performance | (Skip if no user-facing interface) Every frontend module has performance targets (**web**: LCP, INP, CLS, bundle size; **TUI**: render latency, input-response time, memory); targets are consistent with PRD NFRs; optimization strategies are specified |
 | PRD interaction design alignment | (Skip if no user-facing interface) System-design does not redefine what PRD owns (design tokens, component contracts, state machines, a11y specs, i18n specs); frontend modules reference PRD feature specs for interaction design and specify how to implement them |
+| Backend i18n coverage | (Skip if single-language backend) Every backend module that returns locale-dependent text (API errors, validation messages, notifications) has a Backend i18n Implementation section specifying locale resolution, message catalog access, and timezone conversion; decisions are consistent with README Key Technical Decisions (backend i18n rows); module interfaces that return user-visible text include a locale parameter or document how locale context is propagated |
 | Analytics coverage | (Skip if no features define analytics events) Every PRD feature analytics event is mapped to a responsible module in README's Analytics Coverage; no events are orphaned |
 | API completeness | (Skip if no APIs) Every API contract has request/response examples, error codes, Authentication & Permissions (derived from PRD Authorization Model for external APIs), and Constraints (rate limiting, size limits, idempotency where applicable) |
 | Testability | Every module can be tested in isolation (dependencies are injectable or replaceable); README's Test Strategy section exists and is consistent with module-level Testing sections; every module with external dependencies specifies a test double strategy; every Module Interaction Protocol has a contract test approach; NFR verification methods are specified for runtime-verifiable NFRs |
@@ -245,6 +282,9 @@ Applied as step 10 of Phase 1 (self-review, after writing, before user review an
 | Task entry points | README's Test Strategy or a dedicated section lists concrete build / test / lint commands — an agent knows exactly how to validate its changes without guessing |
 | Form implementation consistency | (Skip if no forms) Every frontend module with forms uses the same form library, validation framework, and error display pattern as specified in Design System Conventions; form implementation strategy is consistent across views |
 | Frontend-backend contract alignment | (Skip if no user-facing interface) Every frontend module's state management (API call entries) corresponds to an API contract in API Index; endpoint signatures match, error handling covers contract error codes, response parsing matches schema |
+| Convention translation | Every PRD architecture.md convention section (Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration) has corresponding stack-specific implementation patterns in README's Implementation Conventions; module-level Relevant Conventions reference implementation patterns, not raw PRD policies; no PRD convention section is silently ignored |
+| Infrastructure module coverage | A "Development Infrastructure" module spec exists covering convention enforcement artifacts (linter config, CI pipeline, test helpers, pre-commit hooks, CLAUDE.md, security scanning, benchmark harness) from the PRD's Development Infrastructure feature; a "Deployment Infrastructure" module spec exists (if PRD has Deployment Infrastructure feature) covering deployment artifacts; Deployment Architecture sub-sections from PRD (environments, local dev setup, environment parity, config management, data migration, CD pipeline, environment isolation, IaC) have corresponding concrete tooling decisions in the design |
+| PRD-Design freshness | If a source PRD exists: compare PRD directory's latest modification date (or Revision History latest entry date) against this design's creation/revision date; if PRD is newer, flag as "PRD may have been revised since this design was created — consider running --revise to check for upstream changes" |
 | Enforcement coverage | Every Dependency Layering rule and every convention in Key Technical Decisions or module-level Relevant Conventions specifies how it is enforced (lint rule, structural test, type system, CI check); unenforced conventions are flagged as findings |
 
 **Review flow:**
@@ -347,6 +387,7 @@ Changes come from three sources: PRD changes (Step 2), review findings (`--revie
 | NFR reallocation | Change performance budgets, security requirements, or scalability targets across modules | Which NFR? Current budget allocation? Why is it wrong? Proposed new allocation? |
 | Add module | New module for new requirements or extracted from existing module | What responsibility? Which features does it serve? What type (backend/frontend/shared)? Dependencies? |
 | Remove module | Module no longer needed — responsibilities absorbed elsewhere or feature deprecated | Which module? Where do its responsibilities go? What about its callers? |
+| Upstream PRD convention change | PRD architecture.md convention policies were updated (via prd-analysis --revise); need to re-translate Implementation Conventions to match updated policies | Which PRD convention sections changed? (read PRD's Revision History to identify). For each changed section: does the current Implementation Conventions translation still match the updated policy? Which modules reference the affected Implementation Conventions patterns? Do any module Relevant Conventions sections need updating? |
 
 For each change, ask one question at a time. Confirm each change before moving to the next.
 
@@ -373,8 +414,10 @@ For each change, ask one question at a time. Confirm each change before moving t
 | Frontend-backend contracts | Do API endpoint calls, payloads, or response parsing change in affected frontend modules? | Cross-reference changed frontend modules' State Management (source: API call entries) with API Index; verify endpoint signatures match and consumers are updated |
 | Key interactions | Does the change affect UI interaction flows (triggers, side effects, optimistic updates)? | Read Key Interactions tables in affected frontend modules; check if interaction flows are still consistent with module interfaces and state management |
 | Accessibility implementation | Does the change affect a11y implementation (tab order, ARIA, testing approach) in frontend modules? | Read Accessibility Implementation sections in affected frontend modules; verify tab order, ARIA roles, and testing approach still valid after changes |
-| i18n implementation | Does the change affect i18n strategy (namespace, lazy loading, fallback) in frontend modules? | Read i18n Implementation sections in affected frontend modules; verify namespace mappings and lazy loading still align with routing and module structure |
+| i18n implementation (frontend) | Does the change affect i18n strategy (namespace, lazy loading, fallback) in frontend modules? | Read i18n Implementation sections in affected frontend modules; verify namespace mappings and lazy loading still align with routing and module structure |
+| i18n implementation (backend) | Does the change affect backend i18n (locale resolution, message catalog, timezone conversion)? | Read Backend i18n Implementation sections in affected backend modules; verify locale context propagation still works across changed module boundaries; check if message catalog access pattern is consistent |
 | Analytics coverage | Does the change affect which module is responsible for analytics events? | Read README's Analytics Coverage table; verify events mapped to changed modules still have a responsible owner after restructuring |
+| Implementation conventions | Does the technology decision change affect convention translation patterns? If so, read README's Implementation Conventions section; verify all patterns still valid for the changed stack; update module Relevant Conventions accordingly | Read README's Implementation Conventions table; cross-reference with changed technology decisions; verify each pattern's Implementation Pattern and Enforcement columns are still valid; check all module-level Relevant Conventions that reference affected patterns |
 
 **Module mutability check** — after tracing impact, collect all affected modules (directly changed + impacted). Cross-reference each with the module implementation map from Step 1:
 
@@ -436,8 +479,10 @@ Run the full Design Review checklist on the result, with extra attention to:
 - **Frontend consistency:** are form patterns, state management, and routing still consistent across changed frontend modules? Do Design System Conventions and component structures reflect the new boundaries?
 - **Frontend-backend alignment:** do frontend modules' API call entries still match API contracts after changes?
 - **Accessibility consistency:** are a11y implementation strategies (tab order, ARIA, testing approach) still consistent across changed frontend modules?
-- **i18n consistency:** are i18n implementation strategies (namespace mapping, lazy loading, fallback behavior) still consistent across changed frontend modules?
+- **i18n consistency (frontend):** are i18n implementation strategies (namespace mapping, lazy loading, fallback behavior) still consistent across changed frontend modules?
+- **i18n consistency (backend):** are backend i18n implementation strategies (locale resolution, message catalog access, timezone conversion) still consistent across changed backend modules? Does locale context propagation still work across module boundaries?
 - **Analytics coverage:** are all PRD feature analytics events still mapped to a responsible module after restructuring?
+- **Convention translation validity:** are README's Implementation Conventions patterns still valid for the changed stack? Do module-level Relevant Conventions still reference correct implementation patterns (not stale patterns from the pre-change stack)?
 
 Fix any issues found. Present change summary to user.
 
@@ -449,12 +494,28 @@ User reviews the changed files, confirms or requests further changes.
 
 Commit with a descriptive message (e.g. "Revise design: restructure M-001/M-002 boundary, update API-002 contract").
 
+**Post-revise cascade notification:**
+
+After committing the revision, check for downstream implementation and print applicable next steps:
+
+1. **If implementation exists** (detected in Revise Step 1 via design Status field = "Implementing" or "Implemented"): print:
+   ```
+   ⚠ Implementation exists for this design.
+   The following modules changed: {list of changed module specs}
+   
+   Next step: re-run autoforge for affected modules
+     - If autoforge supports --revise: autoforge --revise {design path}
+     - Otherwise: autoforge --cleanup && autoforge {design path} (full re-run)
+   ```
+
+2. **If no implementation exists**: print only the standard next steps hint.
+
 ### Interactive Mode (no PRD input)
 
 When invoked without a PRD path, gather context interactively:
 - Product/project background and problem being solved
 - Architecture constraints and tech stack
-- Shared conventions (API format, error handling, testing strategy) — needed as data source for module specs' Relevant Conventions section
+- Shared conventions (API format, error handling, testing strategy) and developer convention policies (coding conventions, test isolation, security policies, development workflow, git strategy, code review, observability, performance testing, backward compatibility, AI agent configuration (instruction files, structure policy)) — needed as data source for README's Implementation Conventions and module specs' Relevant Conventions sections
 - Key features to design for
 
 **Enter step 2 when:** problem is clear, tech stack decided, and at least 3 features identified with enough detail to decompose into modules. If the user's description is too vague, ask clarifying questions before proceeding.
@@ -483,12 +544,16 @@ Read document → summarize understanding → check gaps against checklist below
 - [ ] State management implementation detailed (store structure, async patterns, persistence)?
 - [ ] Design token implementation approach defined (CSS vars, Tailwind config, theme object)?
 - [ ] Accessibility and i18n implementation strategies specified for frontend modules?
+- [ ] Backend i18n implementation specified (locale resolution middleware, message catalog, timezone conversion) for multi-locale backends?
 - [ ] Form implementation strategy defined (library, validation approach, error display, multi-step pattern)?
 - [ ] Frontend-backend data flow traced for each view (load fetches, mutations, local-only state)?
 - [ ] Design System Conventions complete (responsive approach, dark mode/theming, component patterns)?
 - [ ] Analytics events mapped to responsible modules (if PRD defines analytics events)?
 - [ ] API contracts include error codes, Authentication & Permissions, and Constraints?
 - [ ] Test strategy defined? Test pyramid allocation, module isolation approach, external dependency test method, test data management?
+- [ ] Developer convention policies present (coding conventions, test isolation, security, development workflow, git strategy, code review, observability, performance testing, backward compatibility)?
+- [ ] AI agent configuration defined (instruction files, structure policy, convention references, maintenance policy)?
+- [ ] Convention policies translated to stack-specific implementation patterns (not left as technology-agnostic policies)?
 
 ### Incremental Design Mode
 

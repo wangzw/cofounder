@@ -15,11 +15,12 @@ The README.md is the navigational entry point for the PRD directory. Omit any se
 │   ├── F-001-{slug}.md    # Self-contained feature spec
 │   └── ...
 ├── prototypes/            # Interactive prototypes (seed code for production)
-│   ├── src/               # Runnable prototype source code
-│   │   ├── package.json
+│   ├── src/               # Runnable prototype source code, organized per feature
+│   │   ├── F-001-{slug}/  # Prototype for F-001
+│   │   ├── F-006-{slug}/  # Prototype for F-006
 │   │   └── ...
-│   └── screenshots/       # Key state screenshots per feature
-│       ├── F-001-{slug}/
+│   └── screenshots/       # Key state screenshots/snapshots per feature
+│       ├── F-001-{slug}/  # Browser screenshots (web) or teatest golden files (TUI)
 │       └── ...
 ```
 

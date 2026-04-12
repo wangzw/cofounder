@@ -149,9 +149,13 @@ The architecture.md follows this structure:
 
 ### Navigation Architecture
 
-{Omit if the product has no user-facing interface or has only a single view.}
+{Omit if the product has no user-facing interface or has only a single view. Use the Web section for web/desktop apps, or the TUI section for terminal apps — not both.}
 
-#### Site Map
+#### Web Navigation
+
+{Omit for TUI products.}
+
+**Site Map:**
 
 {Mermaid diagram showing page hierarchy derived from journey Screen/View names.}
 
@@ -164,7 +168,7 @@ graph TD
 
 {Replace with actual product structure.}
 
-#### Navigation Layers
+**Navigation Layers:**
 
 | Layer | Type | Content | Behavior |
 |-------|------|---------|----------|
@@ -172,21 +176,51 @@ graph TD
 | Section | {tabs / sub-nav / breadcrumb} | {context-dependent items} | {appears within specific views} |
 | Contextual | {inline links / action menus} | {in-content navigation} | {embedded in page content} |
 
-#### Route Definitions
+**Route Definitions:**
 
 | View (from journeys) | Route Pattern | Params | Query Params | Auth | Layout |
 |----------------------|--------------|--------|-------------|------|--------|
 | {view name} | {/path/:param} | {param: type} | {?key=default} | {required / public} | {main / minimal / none} |
 
-#### Deep Linking & State Restoration
+**Deep Linking & State Restoration:**
 
 | View | Shareable URL | State in URL | Restoration Behavior |
 |------|-------------|-------------|---------------------|
 | {view name} | Yes / No | {what state is encoded in URL} | {how state is restored on direct access} |
 
-#### Breadcrumb Strategy
+**Breadcrumb Strategy:** {auto-generated from route hierarchy / manual per-view / none}
 
-{auto-generated from route hierarchy / manual per-view / none}
+#### TUI Navigation
+
+{Omit for web products.}
+
+**Screen Flow:**
+
+{Mermaid diagram showing CLI entry points and TUI screen transitions.}
+
+```mermaid
+graph TD
+    CLI[CLI entry] --> |command A| TUI[TUI Main Screen]
+    CLI --> |command B| Other[Other Screen]
+    TUI --> |Ctrl+P| Modal[Modal Overlay]
+    Modal --> |Esc| TUI
+```
+
+{Replace with actual product structure.}
+
+**Command Structure:**
+
+| Command | Entry Point | Screen/View | Exit |
+|---------|-------------|-------------|------|
+| {e.g. `app run --input <path>`} | CLI | {TUI screen name} | {Ctrl+C / completion} |
+
+**TUI Internal Navigation:**
+
+| From | Action | To | Notes |
+|------|--------|----|-------|
+| {screen/panel} | {key or action} | {target screen/panel} | {e.g. focus changes, content swaps} |
+
+**Focus Order:** {e.g. main area → input → sidebar (Tab cycle)}
 
 ### Accessibility Baseline
 
@@ -209,23 +243,314 @@ graph TD
 
 {Omit if the product is single-language only and explicitly confirmed as such.}
 
+#### Shared (applies to both frontend and backend)
+
 | Aspect | Requirement |
 |--------|------------|
 | Supported Languages | {e.g. en, zh-CN, ja} |
 | Default Language | {e.g. en} |
-| RTL Support | {required / not required} |
-| Text Externalization | All user-visible strings use i18n keys; no hardcoded text in components |
-| Key Convention | {e.g. `{feature}.{section}.{element}` — e.g. `dashboard.header.title`} |
 | Date/Time Format | {locale-aware via Intl.DateTimeFormat / date-fns with locale} |
 | Number Format | {locale-aware via Intl.NumberFormat} |
 | Pluralization | {ICU MessageFormat / library-specific} |
+
+#### Frontend (omit if no user-facing interface)
+
+| Aspect | Requirement |
+|--------|------------|
+| RTL Support | {required / not required} |
+| Text Externalization | All user-visible strings use i18n keys; no hardcoded text in components |
+| Key Convention | {e.g. `{feature}.{section}.{element}` — e.g. `dashboard.header.title`} |
 | Content Direction | {LTR-only / bidirectional — use CSS logical properties if bidirectional} |
+
+#### Backend (omit if single-language backend with no multi-locale API consumers)
+
+| Aspect | Requirement |
+|--------|------------|
+| Locale Resolution | {e.g. Accept-Language header → user profile preference → default} |
+| API Error Messages | {localized per request locale / fixed language (e.g. always English)} |
+| Validation Messages | {localized per request locale / error codes only (client formats)} |
+| Notification Content | {localized per recipient preference / fixed language} |
+| Timezone Handling | {e.g. store UTC, convert per user timezone on output / always UTC} |
+| Locale-Aware Formatting | {API returns formatted values per locale / raw values (client formats)} |
 
 ### External Dependencies
 
 | Service | Purpose | API Style | Timeout | Failure Mode | Fallback |
 |---------|---------|-----------|---------|-------------|----------|
 | {name} | {what it does for us} | REST / gRPC / SDK | {ms} | {what happens when down} | {degraded behavior or retry strategy} |
+
+### Coding Conventions
+
+These are technology-agnostic policies that ensure consistency when multiple agents or developers implement features in parallel. The system-design phase translates these policies into concrete patterns for the chosen tech stack.
+
+#### Code Organization
+
+| Aspect | Policy |
+|--------|--------|
+| Layering strategy | {e.g. domain/service/infrastructure separation — domain has no external dependencies; service orchestrates domain; infrastructure handles I/O} |
+| Module/package structure | {e.g. one package per bounded context; packages named as nouns (e.g. `scheduler`, `agent`, `git`), not verbs} |
+| File organization | {e.g. one primary type per file; file named after the type; tests in `_test` suffix files alongside source} |
+
+#### Naming Conventions
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Modules/packages | {e.g. lowercase, singular nouns} | {e.g. `scheduler`, `agent`} |
+| Types/classes | {e.g. PascalCase, descriptive nouns} | {e.g. `TaskScheduler`, `WorkSession`} |
+| Interfaces | {e.g. behavior-describing names, no "I" prefix} | {e.g. `Scheduler`, `Store`} |
+| Functions/methods | {e.g. verb-first for actions, noun for getters} | {e.g. `CreateWorktree()`, `Status()`} |
+| Constants | {e.g. ALL_CAPS or PascalCase per language convention} | — |
+| Files | {e.g. snake_case matching primary type} | {e.g. `task_scheduler.go`} |
+
+#### Interface & Abstraction Design
+
+| Aspect | Policy |
+|--------|--------|
+| When to define interfaces | {e.g. at module boundaries and for external dependencies; not for internal implementation details} |
+| Interface location | {e.g. defined by the consumer (caller), not the provider — enables loose coupling} |
+| Interface size | {e.g. prefer small, focused interfaces (1-3 methods); split large interfaces into composable parts} |
+| Concrete vs abstract | {e.g. start with concrete types; extract interface only when a second consumer needs it or for testability} |
+
+#### Dependency Wiring
+
+| Aspect | Policy |
+|--------|--------|
+| Injection method | {e.g. constructor injection — all dependencies passed as parameters to constructors/factory functions} |
+| Global mutable state | {e.g. prohibited — all state must be owned by a specific component and passed explicitly; no package-level variables that change after init} |
+| Initialization order | {e.g. main/entry point constructs the dependency graph; components do not construct their own dependencies} |
+
+#### Error Handling & Propagation
+
+| Aspect | Policy |
+|--------|--------|
+| Error context | {e.g. all errors must include context describing what was being done when the failure occurred} |
+| Error categories | {e.g. validation errors (user input), domain errors (business rule violations), infrastructure errors (I/O, network), transient errors (retry-eligible)} |
+| Cross-boundary translation | {e.g. infrastructure errors are translated to domain-level errors at layer boundaries; internal details are not leaked to callers} |
+| Panic / unhandled exception policy | {e.g. panics/crashes recovered at goroutine/thread entry points; converted to error returns; never propagated to callers} |
+
+#### Logging
+
+| Aspect | Policy |
+|--------|--------|
+| Format | {e.g. structured key-value pairs, not free-form strings} |
+| Levels | {e.g. ERROR = requires human action; WARN = degraded but functional; INFO = key business events and state transitions; DEBUG = troubleshooting detail} |
+| Sensitive data | {e.g. secrets, tokens, PII, and credentials must never appear in logs; use redaction or reference IDs instead} |
+| Per-component logging | {e.g. each component logs with a component identifier for filtering} |
+
+#### Configuration Access
+
+| Aspect | Policy |
+|--------|--------|
+| Access pattern | {e.g. configuration injected at construction time; components receive only the config they need, not the entire config tree} |
+| Validation | {e.g. all configuration validated at startup; fail fast with clear error message on invalid config} |
+| Defaults | {e.g. every config key has a sensible default; config file is optional for getting started} |
+
+#### Concurrency
+
+| Aspect | Policy |
+|--------|--------|
+| Lifecycle management | {e.g. all long-running tasks accept a context/cancellation token; support graceful shutdown within a configurable timeout} |
+| Shared state | {e.g. prefer message-passing (channels/events) over shared memory with locks; when locks are necessary, document the lock ordering} |
+| Resource cleanup | {e.g. all acquired resources (file handles, processes, network connections) must be released in a cleanup/defer/finally path, even on error} |
+
+#### Frontend Conventions
+
+{Omit if the product has no user-facing interface.}
+
+| Aspect | Policy |
+|--------|--------|
+| Component structure | {e.g. one component per file; container components separated from presentational components} |
+| State management scope | {e.g. local state for UI-only concerns; shared state only for data needed by multiple components} |
+| Styling approach | {e.g. all visual values reference design tokens; no inline raw values; component-scoped styles preferred over global} |
+
+### Test Isolation
+
+Policies ensuring tests are reliable when run in parallel, across worktrees, or in CI. Critical for multi-agent development.
+
+| Aspect | Policy |
+|--------|--------|
+| Resource isolation | {e.g. every test creates its own temporary resources (dirs, repos, DBs); no test depends on resources created by another test} |
+| Global mutable state | {Prohibited — tests must not read or modify module/package-level mutable state; all state passed as parameters or created in test scope} |
+| Port binding | {e.g. tests that start servers must bind to port 0 (random available port); hardcoded ports are forbidden} |
+| File system | {e.g. tests must use the test framework's temp directory facility; writing to working directory or project root is forbidden} |
+| External processes | {e.g. tests that spawn child processes must register cleanup to terminate them on test completion, including on failure/timeout} |
+| Race detection | {e.g. data race detection must be enabled in CI (e.g. `-race` flag, ThreadSanitizer); this is a CI gate, not optional} |
+| Timeouts | {e.g. unit tests: max 30s; integration tests: max 5m; no test may run without a timeout bound} |
+| Directory independence | {Tests must not assume any specific working directory or absolute path; must work from any worktree or checkout location} |
+| Parallel classification | {e.g. tests are parallel-safe by default; tests requiring exclusive resources (shared locks, specific ports) are explicitly marked as serial and documented why} |
+
+### Development Workflow
+
+| Aspect | Specification |
+|--------|---------------|
+| Prerequisites | {e.g. Go 1.23+, Git 2.20+, Claude Code latest — list runtime versions and tools} |
+| Local setup | {e.g. `make setup` — one-command bootstrap that installs tools and verifies prerequisites} |
+| CI gates (blocking) | {e.g. lint → build → test with race detection → benchmark regression check; all must pass before merge} |
+| CI gates (non-blocking) | {e.g. coverage report, dependency audit — informational only} |
+| Build matrix | {e.g. Linux amd64 + macOS arm64; CI tests on both} |
+| Versioning | {e.g. semver; tags trigger release builds} |
+| Changelog | {e.g. conventional commits → auto-generated changelog; or manual CHANGELOG.md} |
+| Release testing | {e.g. full test suite + E2E on release candidate before tagging} |
+| Dependency policy | {e.g. new dependencies require review; license must be MIT/Apache/BSD; automated dependency update PRs reviewed weekly} |
+
+### Security Coding Policy
+
+Technology-agnostic security policies that every feature must follow.
+
+| Aspect | Policy |
+|--------|--------|
+| Input validation | {e.g. all external input validated at system boundaries (API handlers, CLI parsers, file readers); internal layers trust validated data} |
+| Boundary definition | {e.g. boundaries are: HTTP handlers, CLI argument parsers, file/config readers, message queue consumers, webhook receivers} |
+| Secret handling | {e.g. secrets, tokens, credentials never in source code, logs, error messages, or VCS history; provided via environment variables / secret manager} |
+| Dependency scanning | {e.g. vulnerability scanning in CI; critical/high CVEs block merge; known vulnerabilities must be fixed or documented within 7 days} |
+| Injection prevention | {e.g. never concatenate user input into commands, queries, or templates; use parameterized queries, shell escaping, template sandboxing} |
+| Auth enforcement | {e.g. every entry point independently verifies permissions; internal calls do not bypass auth checks} |
+| Sensitive data in transit | {e.g. all external connections use TLS; no plaintext transmission of credentials or PII} |
+| Sensitive data at rest | {e.g. passwords hashed with bcrypt/argon2; encryption for PII at rest — or N/A if no sensitive data stored} |
+
+### Backward Compatibility
+
+{Omit for v1/MVP with no existing consumers. Note the intended future versioning strategy.}
+
+| Aspect | Policy |
+|--------|--------|
+| API versioning | {e.g. URL prefix `/v1/`; new version when breaking changes are unavoidable; old version maintained for 6 months after deprecation notice} |
+| Breaking change definition | {e.g. removing/renaming fields, changing types, altering default behavior, removing endpoints — all are breaking} |
+| Breaking change process | {e.g. deprecation notice in changelog + 2 release cycles before removal; migration guide required} |
+| Data schema evolution | {e.g. additive-only changes preferred; destructive changes require migration scripts; old data must remain readable after upgrade} |
+| Config file evolution | {e.g. new keys with defaults (backward compatible); removed keys ignored with warning; format changes require migration tool} |
+
+### Git & Branch Strategy
+
+| Aspect | Policy |
+|--------|--------|
+| Branch naming | {e.g. `feature/{task-id}-{slug}`, `fix/{issue-id}-{slug}`, `agent/{task-id}` for AI agents} |
+| Merge strategy | {e.g. rebase + fast-forward only; enforced via branch protection} |
+| Branch protection | {e.g. main branch protected: require PR, require CI pass, require N approvals} |
+| PR conventions | {e.g. one PR per feature/task; body must include summary + test plan; PR should be reviewable in < 30 minutes (guideline, not hard limit)} |
+| Commit message format | {e.g. Conventional Commits: `feat:`, `fix:`, `chore:`, `test:`, `docs:`; must reference task/issue ID} |
+| Stale branch cleanup | {e.g. merged branches deleted automatically; unmerged branches older than 30 days flagged for review} |
+
+### Code Review Policy
+
+| Aspect | Policy |
+|--------|--------|
+| Review dimensions | {e.g. correctness, security implications, test coverage, performance impact, readability, convention compliance} |
+| Approval requirements | {e.g. 1 approval for standard changes; 2 approvals for security-sensitive or architecture changes} |
+| Review SLA | {e.g. review started within 1 business day; blocking feedback resolved within 2 days} |
+| Automated checks | {e.g. lint, type check, test pass, coverage threshold, vulnerability scan — must all pass before human review} |
+| Human review focus | {e.g. architecture fit, business logic correctness, edge case coverage, naming quality — things automation cannot verify} |
+| Feedback severity | {e.g. blocker = must fix; suggestion = recommended but optional; nit = style preference, author decides} |
+| AI agent self-review | {e.g. AI agents must run lint + test + build before requesting review; self-review checklist: no debug code, no hardcoded secrets, no TODO without issue link} |
+
+### Observability Requirements
+
+Policy-level observability requirements — what must be observable, not what tools to use. The tool-focused Observability section (below) specifies tooling.
+
+#### Mandatory Logging Events
+
+| Event Category | What Must Be Logged | Required Fields |
+|---------------|--------------------|-----------------| 
+| State transitions | {e.g. every domain entity state change (task status, agent status)} | {e.g. timestamp, component, entity_id, from_state, to_state, trigger} |
+| External calls | {e.g. every call to external service or CLI} | {e.g. timestamp, service, operation, duration_ms, success, error_code} |
+| Authentication | {e.g. every auth attempt (success and failure)} | {e.g. timestamp, identity, action, result, source_ip} |
+| Errors | {e.g. every error at ERROR level or above} | {e.g. timestamp, component, error_type, message, stack_trace (internal only)} |
+
+#### Health Checks
+
+| Component | Health Definition | Check Interval |
+|-----------|------------------|---------------|
+| {e.g. each long-running service/process} | {e.g. can accept requests, dependencies reachable, no stuck operations} | {e.g. 30s} |
+
+#### Key Metrics & SLOs
+
+| Metric | Description | SLO Target |
+|--------|-------------|-----------|
+| {e.g. task_completion_rate} | {percentage of tasks completing successfully} | {e.g. > 90%} |
+| {e.g. merge_latency_p95} | {p95 time from merge request to completion} | {e.g. < 30s} |
+
+#### Alerting Rules
+
+| Condition | Severity | Recipient | Escalation |
+|-----------|----------|-----------|-----------|
+| {e.g. error rate > 5% for 5 minutes} | {critical / warning} | {e.g. on-call / TUI notification} | {e.g. if unacknowledged for 15m, escalate to...} |
+
+#### Audit Trail
+
+{Omit if no operations require immutable audit logging.}
+
+| Operation | What Is Recorded | Retention |
+|-----------|-----------------|-----------|
+| {e.g. configuration change} | {e.g. who, what changed, old value, new value, timestamp} | {e.g. 1 year} |
+
+### Performance Testing
+
+| Aspect | Policy |
+|--------|--------|
+| Regression detection | {e.g. benchmark suite run in CI on every PR; merge blocked if p95 latency degrades > 10% from baseline} |
+| Performance budgets | {e.g. API endpoint p95 < 200ms; TUI render < 16ms/frame; startup < 3s; per-operation memory < 50MB} |
+| Load testing | {e.g. required before each release; scenarios: N concurrent agents × M tasks; pass criteria: no errors, p95 within budget, memory stable} |
+| Profiling | {e.g. required before merging any P0 feature; CPU and memory profile must be reviewed; no obvious O(n²) or memory leak} |
+| Resource limits | {e.g. total memory for 5 agents < 2GB; per-worktree disk < 110% of repo; CI job peak memory < 4GB} |
+
+### AI Agent Configuration
+
+Policies for how AI coding agents discover and follow project conventions. The agent instruction file (e.g. `CLAUDE.md`) is the AI agent's "onboarding document" — its quality directly determines agent effectiveness.
+
+#### Instruction Files
+
+| File | Purpose | Maintained By |
+|------|---------|---------------|
+| {e.g. `CLAUDE.md`} | {Primary agent instruction file for Claude Code} | {e.g. updated on convention changes, reviewed in PRs} |
+| {e.g. `AGENTS.md`} | {Multi-agent coordination instructions} | {e.g. updated when agent roles change} |
+
+#### Structure Policy
+
+Agent instruction files must be **concise indexes** (~200 lines max), not monolithic documents. Content strategy:
+
+| Content Type | Placement | Example |
+|-------------|-----------|---------|
+| Project overview & purpose | Direct in instruction file | "This is a TUI app for multi-agent development collaboration" |
+| Key commands (build, test, lint) | Direct in instruction file | `go build ./...`, `go test -race ./...` |
+| Directory structure summary | Direct in instruction file | Brief tree of top-level dirs with purpose |
+| Coding conventions | **Reference** to convention files | "See `.golangci-lint.yml` for lint rules" |
+| Test isolation rules | **Reference** to test helpers | "See `internal/testutil/` for test helpers" |
+| Security policies | **Reference** to security config | "See `.github/workflows/security.yml`" |
+| Architecture details | **Reference** to docs | "See `docs/` for architecture docs" |
+| CI pipeline details | **Reference** to workflow files | "See `.github/workflows/ci.yml`" |
+| Git workflow | **Reference** or brief inline | "Rebase + ff-only; see branch protection rules" |
+
+{The principle: anything that changes frequently or is already defined in a config file should be **referenced**, not duplicated. This prevents staleness.}
+
+#### Maintenance Policy
+
+| Trigger | Action |
+|---------|--------|
+| Convention change (linter rule, CI gate, test policy) | Update references in instruction file if file paths changed; no update needed if convention file content changed (reference stays valid) |
+| Project structure change (new module, renamed directory) | Update directory structure summary in instruction file |
+| New tooling adopted | Add command + reference to instruction file |
+| New agent role introduced | Add role-specific section or create role-specific instruction file |
+
+#### Multi-Agent Coordination
+
+{Omit for single-agent projects.}
+
+| Aspect | Policy |
+|--------|--------|
+| Shared instructions | {e.g. all agents read the same `CLAUDE.md` for project-wide conventions} |
+| Role-specific instructions | {e.g. reviewer agents get additional security checklist; tester agents get test isolation rules} |
+| Convention discovery | {e.g. agents discover conventions via `CLAUDE.md` → convention file references → read referenced files} |
+
+#### Context Budget Priority
+
+AI agents have limited context. Instruction file content is prioritized by error-prevention impact:
+
+1. **Build/test/lint commands** — wrong commands waste entire agent cycles
+2. **File/directory structure** — wrong placement causes import errors and confusion
+3. **Naming conventions** — inconsistency is the most visible agent quality issue
+4. **Import patterns** — wrong imports cause build failures
+5. **Error handling patterns** — affects code review pass rate
+6. **Architecture constraints** — prevents structural violations
 
 ### Shared Conventions
 
@@ -304,11 +629,83 @@ These conventions ensure consistency across all features. Coding agents should f
 
 ### Deployment Architecture
 
-| Environment | Infrastructure | URL / Access | Notes |
-|-------------|---------------|-------------|-------|
-| Development | {local / Docker / cloud} | {URL or N/A} | {hot reload, seed data, etc.} |
-| Staging | {infra description} | {URL} | {mirrors prod, data policy} |
-| Production | {infra description} | {URL} | {scaling, regions} |
+#### Environments
+
+| Environment | Purpose | Users | Infrastructure | URL / Access | Notes |
+|-------------|---------|-------|---------------|-------------|-------|
+| Development | {local development and debugging} | {developers, AI agents} | {e.g. local / Docker / devcontainer} | {URL or N/A} | {e.g. hot reload, seed data} |
+| Testing / CI | {automated testing in isolated environment} | {CI system} | {e.g. ephemeral containers per PR} | {N/A — headless} | {e.g. clean state per run} |
+| Staging | {pre-production validation} | {QA, stakeholders} | {e.g. mirrors production at smaller scale} | {URL} | {e.g. anonymized data} |
+| Production | {live user-facing service} | {end users} | {e.g. cloud, on-prem, CDN} | {URL} | {e.g. multi-region, autoscaling} |
+
+{Omit environments that don't apply. A local-only CLI tool may only need Development.}
+
+#### Local Development Setup
+
+| Aspect | Policy |
+|--------|--------|
+| Reproducibility | {e.g. single-command setup (`make dev`, `./scripts/dev.sh`); must work from clean checkout} |
+| Service dependencies | {e.g. database, cache, message queue — how are they provided locally? containerized services / in-memory stubs / external shared instance} |
+| Environment variables | {e.g. `.env.example` template committed to VCS with documented defaults; real secrets never in VCS} |
+| Data seeding | {e.g. seed script populates minimal working dataset; idempotent (safe to run multiple times)} |
+
+#### Environment Parity
+
+| Aspect | Policy |
+|--------|--------|
+| Parity level | {e.g. staging mirrors production infrastructure at smaller scale; dev uses local equivalents for external services} |
+| Acceptable differences | {e.g. dev uses SQLite instead of PostgreSQL for simplicity; staging has no autoscaling} |
+| Configuration consistency | {e.g. same configuration keys across all environments; only values differ} |
+
+#### Configuration Management
+
+| Aspect | Policy |
+|--------|--------|
+| Configuration source | {e.g. environment variables for all environments; config files per environment for complex settings} |
+| Secret management | {e.g. secrets via environment variables or secret manager; never in VCS; placeholder references in config templates} |
+| Validation | {e.g. application validates all required configuration at startup; fails fast with clear error on missing/invalid config} |
+| Template | {e.g. `.env.example` or `config.example.yaml` committed to VCS; documents every config key with purpose and default} |
+
+#### Data Migration
+
+{Omit if the product has no persistent data that evolves over time.}
+
+| Aspect | Policy |
+|--------|--------|
+| Migration tool | {e.g. versioned migration scripts; framework-managed or standalone tool} |
+| Reversibility | {e.g. every migration must have a corresponding rollback; rollback tested before merge} |
+| Seed data | {e.g. dev/test environments use seed script; staging uses anonymized production snapshot or synthetic data} |
+
+#### Deployment Pipeline (CD)
+
+{Omit for local-only tools with no deployment target.}
+
+| Aspect | Policy |
+|--------|--------|
+| Deployment trigger | {e.g. staging: auto-deploy on merge to main; production: manual approval + tag} |
+| Deployment strategy | {e.g. rolling update / blue-green / canary — or N/A for CLI tools} |
+| Rollback strategy | {e.g. redeploy previous version; database rollback via migration tool; feature flag toggle for instant rollback} |
+| Zero-downtime | {e.g. required for production; not required for staging} |
+| Smoke tests | {e.g. automated health check + critical path test after deployment} |
+
+#### Environment Isolation
+
+| Aspect | Policy |
+|--------|--------|
+| Multi-instance isolation | {e.g. multiple developers/agents can run independent local environments without port or data conflicts} |
+| Port allocation | {e.g. configurable ports via environment variables; no hardcoded port numbers} |
+| Database isolation | {e.g. each developer/agent uses separate database instance or schema; CI creates ephemeral database per test run} |
+| Namespace separation | {e.g. container names prefixed with developer/agent ID to avoid collision} |
+
+#### Infrastructure as Code
+
+{Omit if infrastructure is trivially simple (e.g. single-binary CLI tool) or manually provisioned for MVP.}
+
+| Aspect | Policy |
+|--------|--------|
+| IaC requirement | {e.g. all infrastructure defined declaratively; no manual provisioning in production} |
+| Scope | {e.g. container definitions, orchestration config, cloud resource declarations, networking} |
+| Environment parameterization | {e.g. same IaC templates for all environments; differences expressed as parameter values} |
 
 **CI/CD:** {pipeline tool + trigger rules, e.g. "GitHub Actions: PR → test → staging auto-deploy; tag → prod deploy"}
 **Containerization:** {Docker / K8s / serverless — if applicable}
@@ -343,6 +740,12 @@ These conventions ensure consistency across all features. Coding agents should f
 - architecture.md holds all **shared technical context** that feature files may reference
 - Feature files **copy relevant data models inline** — don't point agents back to architecture.md
 - No section should exist if it has nothing useful to say — omit empty sections
-- Frontend Stack, Design Token System, Navigation Architecture, Accessibility Baseline, and Internationalization Baseline are **omitted** for products with no user-facing interface
+- Frontend Stack, Design Token System, Navigation Architecture, and Accessibility Baseline are **omitted** for products with no user-facing interface
+- Internationalization Baseline: Frontend sub-section is omitted for products with no user-facing interface; Backend sub-section is omitted for single-language backends; Shared sub-section is omitted only if the product is single-language AND has no multi-locale consumers
 - Design Token values are defaults — replace during PRD Phase 3 (Frontend Foundation). If using an established component library, extract its token values as baseline
 - Feature files reference design tokens by **semantic name** (e.g. `color.primary.500`), never by raw values
+- **Coding Conventions**, **Test Isolation**, **Development Workflow**, **Security Coding Policy**, **Git & Branch Strategy**, **Code Review Policy**, **Observability Requirements**, **Performance Testing**, and **AI Agent Configuration** sections are always present — they are technology-agnostic policies applicable to any project. Frontend Conventions sub-section is omitted for products with no user-facing interface
+- **Backward Compatibility** is omitted for v1/MVP with no existing consumers — but the intended future versioning strategy should be noted
+- **Observability Requirements** (policy-level) is distinct from **Observability** (tool-level) — the former defines WHAT must be observable, the latter defines WHICH tools to use
+- All developer convention sections contain **policies** (e.g. "errors must include context", "all input validated at boundaries"), not **implementation patterns** (e.g. "use `fmt.Errorf`", "use express-validator") — the system-design phase translates policies into stack-specific patterns
+- Feature files copy relevant policies into their "Relevant conventions" section, the same way they copy data models — including security policies, test isolation rules, and review standards that apply to the feature

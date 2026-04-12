@@ -62,6 +62,27 @@ graph LR
 | Decision | Options | Conclusion | Rationale |
 |----------|---------|------------|-----------|
 | {e.g. state management} | A: in-memory / B: SQLite / C: JSON files | C | {why} |
+| {e.g. locale resolution} | A: Accept-Language middleware / B: user profile field / C: URL path prefix | A | {why — omit row if single-language backend} |
+| {e.g. message catalog} | A: embedded JSON per locale / B: database-backed / C: third-party service | A | {why — omit row if single-language backend} |
+
+### Implementation Conventions
+
+{Stack-specific implementation patterns translated from PRD architecture.md's technology-agnostic policies. Module-level Relevant Conventions reference these patterns. Omit if PRD has no developer convention sections.}
+
+| Category | PRD Policy | Implementation Pattern | Enforcement |
+|----------|-----------|----------------------|-------------|
+| Error handling | {e.g. errors must include context} | {e.g. `fmt.Errorf("doing X: %w", err)`} | {e.g. golangci-lint errcheck + wrapcheck} |
+| Logging | {e.g. structured key-value, ERROR/WARN/INFO/DEBUG levels} | {e.g. `slog.Info("event", "key", val)` with JSON handler} | {e.g. lint rule banning fmt.Println in non-test code} |
+| Input validation | {e.g. validate at system boundaries} | {e.g. `validate` struct tags at HTTP handler layer} | {e.g. code review checklist item} |
+| Test isolation | {e.g. temp dirs, random ports, no global state} | {e.g. `t.TempDir()`, `net.Listen("tcp", ":0")`, no package-level vars in tests} | {e.g. `go test -race`, CI gate} |
+| Dependency injection | {e.g. constructor injection, no global mutable state} | {e.g. `func NewService(deps Deps) *Service`} | {e.g. lint rule banning package-level `var`} |
+| Concurrency | {e.g. context propagation, graceful cancellation} | {e.g. `context.Context` first parameter, `errgroup` for goroutine lifecycle} | {e.g. `go vet` copylocks check} |
+| Security | {e.g. injection prevention, secret handling} | {e.g. parameterized queries, `os.Getenv` for secrets, never log tokens} | {e.g. gosec in CI, secret scanning} |
+| CI gates | {e.g. lint → build → test with race → benchmark} | {e.g. GitHub Actions workflow with 4 sequential jobs} | {e.g. branch protection requiring CI pass} |
+| Git workflow | {e.g. rebase + ff-only, conventional commits} | {e.g. branch protection: require rebase, commitlint pre-commit hook} | {e.g. CI commit message lint} |
+| Performance | {e.g. p95 < 200ms, regression < 10%} | {e.g. Go benchmarks with `benchstat`, CI gate comparing against baseline} | {e.g. benchmark CI job with threshold check} |
+| AI agent config | {e.g. CLAUDE.md as concise index, ~200 lines, references convention files} | {e.g. generate CLAUDE.md with project overview + key commands + references to .golangci-lint.yml, .github/workflows/, etc.} | {e.g. CI check that CLAUDE.md exists and is under 200 lines} |
+| Deployment | {e.g. reproducible local env, CD pipeline, config management, environment isolation} | {e.g. docker-compose for local dev, GitHub Actions for CD, .env.example for config, per-agent Docker network for isolation} | {e.g. CI validates docker-compose up succeeds, CD requires manual approval for prod} |
 
 ### Module Index
 
@@ -160,7 +181,8 @@ sequenceDiagram
 
 | Prototype Component | Source Path (PRD) | Target Module | Action | Gap Description |
 |--------------------|--------------------|---------------|--------|-----------------|
-| {e.g. TaskList} | {prototypes/src/components/TaskList.tsx} | M-{NNN} | {Reuse / Refactor / Rewrite} | {what needs to change for production — omit for Reuse} |
+| {e.g. TaskList} | {prototypes/src/F-001-tasks/TaskList.tsx} | M-{NNN} | {Reuse / Refactor / Rewrite} | {what needs to change for production — omit for Reuse} |
+| {e.g. SidebarModel (TUI)} | {prototypes/src/F-006-tui/sidebar.go} | M-{NNN} | {Reuse / Refactor / Rewrite} | {e.g. replace mock data with real agent state} |
 
 **Action legend:**
 - **Reuse** — prototype code is production-ready; copy to module with minimal changes (e.g. add route guard, swap mock data for real API)
@@ -173,7 +195,9 @@ sequenceDiagram
 
 **Design Token Source:** [{PRD name} architecture.md]({path to PRD architecture.md}#design-token-system)
 
-**Token Implementation:**
+**Token Implementation (Web):**
+
+{Use this table for web/desktop UI. For TUI, use the TUI table below.}
 
 | Token Category | Implementation | File/Config |
 |---------------|---------------|-------------|
@@ -182,7 +206,18 @@ sequenceDiagram
 | Spacing | {e.g. Tailwind spacing scale (default matches PRD tokens)} | {e.g. no config needed / custom config} |
 | Motion | {e.g. CSS transitions referencing custom properties} | {e.g. globals.css :root variables} |
 
-**Component patterns:**
+**Token Implementation (TUI):**
+
+{Use this table for TUI products. Omit the Web table above.}
+
+| Token Category | Implementation | File/Config |
+|---------------|---------------|-------------|
+| Colors | {e.g. lipgloss.Color constants referencing ANSI 256 values} | {e.g. internal/tui/theme.go} |
+| Typography | {e.g. lipgloss.Bold / lipgloss.Italic styles} | {e.g. internal/tui/theme.go} |
+| Spacing | {e.g. lipgloss.Padding / lipgloss.Margin in character units} | {e.g. internal/tui/theme.go} |
+| Borders | {e.g. lipgloss.RoundedBorder / NormalBorder} | {e.g. internal/tui/theme.go} |
+
+**Component patterns (Web):**
 - **Loading states:** {e.g. skeleton components; duration from motion.duration tokens}
 - **Error states:** {e.g. inline ErrorBanner with retry; uses color.semantic.error token}
 - **Empty states:** {e.g. centered illustration + CTA; reusable EmptyState component}
@@ -190,12 +225,24 @@ sequenceDiagram
 - **Modal dialogs:** {e.g. Shadcn Dialog, focus-trapped, Escape to close}
 - **Form patterns:** {e.g. React Hook Form with Zod schema; inline error display per PRD form specs}
 
-**Responsive implementation:**
+**Component patterns (TUI):**
+- **Loading states:** {e.g. spinner model (⠋⠙⠹⠸⠼⠴⠦⠧); interval from motion.spinner.interval token}
+- **Error states:** {e.g. error card with color.accent.error + ✗ icon; dual-channel (color + icon)}
+- **Empty states:** {e.g. centered dim text message}
+- **Modal/overlay:** {e.g. Command Center overlay with focus trap; Esc to close}
+- **Input patterns:** {e.g. bubbles textinput; prefix shows current context}
+
+**Responsive implementation (Web):**
 - **Approach:** {e.g. mobile-first with Tailwind breakpoint prefixes}
 - **Sidebar behavior:** {e.g. Sheet component on mobile (< md), fixed sidebar on desktop}
 - **Grid system:** {e.g. CSS Grid with Tailwind grid classes; 12-column on desktop, single-column on mobile}
 
-**Dark mode / theming:** {e.g. CSS class-based with next-themes / not supported}
+**Responsive implementation (TUI):**
+- **Approach:** {e.g. terminal width detection via WindowSizeMsg}
+- **Sidebar behavior:** {e.g. auto-hide below breakpoint.sidebar.collapse chars, Ctrl+B toggle}
+- **Minimum terminal size:** {e.g. 80x24 — show warning if smaller}
+
+**Dark mode / theming:** {e.g. CSS class-based with next-themes / terminal-dependent (ANSI colors adapt to terminal theme) / not supported}
 
 ### API Index
 
@@ -238,6 +285,7 @@ sequenceDiagram
 - `Design System Conventions` captures shared UI **implementation** patterns — references PRD's Design Token System for visual values and specifies how tokens map to code. Omit if no user-facing interface
 - `Prototype-to-Production Mapping` connects PRD prototypes to production modules — each prototype component gets an Action (Reuse / Refactor / Rewrite) and a Gap Description. Omit if PRD has no prototypes
 - `Dependency Layering` defines the forward-only dependency order — modules depend only on same-layer or leftward layers; reverse dependencies are design violations that must be resolved before implementation
+- `Implementation Conventions` captures stack-specific patterns translated from PRD architecture.md's technology-agnostic developer convention policies — module-level Relevant Conventions reference these patterns instead of raw PRD policies. Omit if PRD has no developer convention sections
 - `Analytics Coverage` bridges PRD feature analytics to module ownership — ensures the planning phase doesn't lose track of analytics implementation. Omit if no features define analytics events
 - API Index only appears when the project has APIs — omit if not applicable
 - No section should exist if it has nothing useful to say — omit empty sections

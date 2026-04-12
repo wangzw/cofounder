@@ -10,12 +10,13 @@
 | Source PRD | `{path to PRD directory}` |
 | Date | {YYYY-MM-DD} |
 | Feature Branch | `autoforge/{design-dir-name}-{hash4}` |
+| Worktree Root | `{project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}/` |
 | Acceptance Threshold | 80% (PARTIAL if >= threshold, FAIL if below) |
 
 ## Dependency Graph
 
 ```mermaid
-graph LR
+graph TD
   %% Phase 1 — no dependencies
   M-001[M-001: {name}]
   M-008[M-008: {name}]
@@ -60,7 +61,7 @@ graph LR
 | M-001  | 1     | —    | —   | —    | —      | —      | — |
 | M-008  | 1     | —    | —   | —    | —      | —      | — |
 
-Legend: `—` = not started, `Done` = complete, `Retry {n}/{max}` = in retry cycle, `Escalated` = waiting for human, `Skipped` = human decided to skip
+Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip
 
 ## Phase Status
 
