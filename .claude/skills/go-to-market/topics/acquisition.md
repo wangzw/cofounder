@@ -11,6 +11,7 @@ Read before generating:
 - `gtm/pricing-strategy.md` — free-to-paid boundary, upgrade triggers
 - `gtm/channels.md` — ranked channels, community targets
 - `gtm/launch-plan.md` — launch phases, timeline
+- `gtm/landing-page-spec.md` — CTA strategy, onboarding entry points
 - `gtm/metrics.md` — KPIs, activation definition, tracking plan
 
 ## Gap-Fill Questions

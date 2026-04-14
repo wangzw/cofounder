@@ -11,6 +11,7 @@ Read before generating:
 - `gtm/pricing-strategy.md` — pricing model (determines revenue metrics)
 - `gtm/channels.md` — channels (determines acquisition metrics)
 - `gtm/launch-plan.md` — phases and timeline (determines when to measure what)
+- `gtm/landing-page-spec.md` — CTA strategy and conversion design (determines conversion metrics)
 
 ## Gap-Fill Questions
 
