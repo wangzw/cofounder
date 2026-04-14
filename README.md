@@ -1,6 +1,6 @@
-# DevForge
+# CoFounder
 
-Claude Code skills for turning ideas into production code and market-ready launches through a structured pipeline: requirements analysis, system design, automated multi-agent implementation, and go-to-market strategy.
+AI-powered skills that guide solo founders and small teams through the full business lifecycle — from idea to product to market-ready launch. Your AI co-founder for requirements, design, implementation, and go-to-market.
 
 ## Skills
 
