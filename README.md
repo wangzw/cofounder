@@ -39,6 +39,14 @@ Guides solo founders and small startup teams from finished product to market-rea
 - Outputs: strategy documents + ready-to-use templates (emails, social posts, launch checklist)
 - Review gates with cascade logic for revisions
 
+### `/dev-conventions` — Development Conventions
+
+Generates convention files for GitHub or GitLab projects: issue/PR/MR templates, CI/CD lint workflows, git hooks, and CONTRIBUTING.md.
+
+- Detects platform (GitHub/GitLab) and package manager automatically
+- Conventional Commits enforcement via hooks (Husky, pre-commit, or shell)
+- CI/CD workflows for commit message linting
+
 ## Workflow
 
 ```
@@ -50,8 +58,12 @@ Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → M
 Clone this repo into your workspace. The skills are automatically discovered by Claude Code from `.claude/skills/`.
 
 ```sh
-git clone <repo-url> devforge
+git clone git@github.com:wangzw/cofounder.git
 ```
+
+## Roadmap
+
+See [todo.md](todo.md) for planned skills covering business modeling, growth, customer ops, content strategy, pitch decks, team operations, legal templates, retrospectives, and pivot analysis.
 
 ## License
 
