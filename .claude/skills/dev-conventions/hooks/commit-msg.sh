@@ -2,7 +2,14 @@
 commit_msg=$(cat "$1")
 pattern='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,72}$'
 
-if ! echo "$commit_msg" | grep -qE "$pattern"; then
+# Skip validation for merge commits (e.g. "Merge branch 'foo' into main")
+# and `git revert`-generated messages (e.g. 'Revert "feat: ..."').
+first_line=$(echo "$commit_msg" | head -n 1)
+case "$first_line" in
+  "Merge "*|"Revert \""*) exit 0 ;;
+esac
+
+if ! echo "$first_line" | grep -qE "$pattern"; then
   echo ""
   echo "ERROR: Commit message does not follow Conventional Commits format."
   echo ""

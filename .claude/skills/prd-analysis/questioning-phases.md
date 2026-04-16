@@ -2,6 +2,22 @@
 
 This file contains the phase-by-phase questioning guide for PRD analysis. It is loaded during initial analysis (no flags) and evolve mode (`--evolve`).
 
+## Phase Index
+
+| Phase | Topic | Link |
+|-------|-------|------|
+| 1 | Vision & Context | [Phase 1 Deep-Dives](#phase-1-deep-dive-competitive-landscape) |
+| 2 | Users & Journeys | [Phase 2 Deep-Dive](#phase-2-deep-dive-user-journeys) |
+| 3 | Frontend Foundation | [Phase 3](#phase-3-frontend-foundation) |
+| 4 | Features & Interaction Design | [Phase 4 Step 1](#phase-4-step-1-user-story-extraction--feature-derivation) |
+| 5 | Interactive Prototypes | [Phase 5](#phase-5-interactive-prototype) |
+| 6 | Architecture & Conventions | [Phase 6 Deep-Dives](#phase-6-deep-dive-authorization--permissions) |
+| 7 | Prioritization & Roadmap | [Phase 7 Deep-Dive](#phase-7-deep-dive-priority-framework) |
+| 8 | Risk Identification | [Phase 8 Deep-Dive](#phase-8-deep-dive-risk-identification) |
+| — | Phase Completion Conditions | [Conditions](#phase-completion-conditions) |
+
+**Deep-Dives:** Competitive Landscape, Evidence Base, User Journeys, Frontend Foundation, Interaction Design, Form Specification, Prototypes, Authorization, Privacy, Development Infrastructure, Deployment Infrastructure, AI Agent Configuration
+
 ---
 
 ## Questioning (one at a time, prefer multiple choice)
@@ -62,7 +78,7 @@ For **each persona**, explore:
    - **Repeated touchpoints** — different journeys pass through the same screen/action (implies a shared component or hub)
    - **Handoff points** — where one persona's journey output becomes another persona's input (implies integration needs)
    - **Shared infrastructure needs** — multiple journeys require the same system capability (e.g. search, notification, progress tracking)
-   - Record these in README.md's Cross-Journey Patterns section — they directly inform feature derivation in Phase 3
+   - Record these in README.md's Cross-Journey Patterns section — they directly inform feature derivation in Phase 4
 4. **Journey metrics** — how do we measure journey success? (completion rate, time to complete, drop-off points)
 
 ### Phase 3: Frontend Foundation
@@ -89,7 +105,7 @@ Define the visual design foundation. Present sensible defaults based on the sele
 
 - If using an existing component library (Shadcn, Ant Design, etc.), extract its default tokens as the baseline; user confirms or overrides
 - If building custom, propose a sensible default set (inspired by Tailwind defaults) and iterate
-- Tokens must be expressed in the structured format defined in architecture-template.md (tables with Token / Value / Usage columns) that AI agents can parse into code
+- Tokens must be expressed in the structured format defined in feature-template.md (tables with Token / Value / Usage columns) that AI agents can parse into code
 - Every token must have a semantic name — AI agents reference `color.primary.500`, not `#3b82f6`
 
 Record in architecture.md's Design Token System section.

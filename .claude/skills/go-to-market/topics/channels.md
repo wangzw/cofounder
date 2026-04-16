@@ -11,6 +11,13 @@ Read before generating:
 - `gtm/pricing-strategy.md` — pricing model (affects channel fit: free products favor viral channels)
 - `references/channel-playbooks.md` — channel matrix, per-channel playbooks, budget allocation
 
+### Chained Mode (PRD exists)
+
+Re-read these PRD sections before generating (do not rely solely on prior `gtm/` files):
+- `journeys/*.md` — personas, workflows, where users currently discover tools
+- `README.md` — target audience description, competitive landscape
+- `architecture/deployment.md` — deployment model (affects distribution: self-hosted vs. SaaS vs. CLI)
+
 ## Gap-Fill Questions
 
 Ask one at a time, only if not already answered:
@@ -71,4 +78,4 @@ If budget > $0, reference `references/channel-playbooks.md` Budget Allocation Gu
 
 ## Output
 
-Write to `gtm/channels.md`. Present a summary to the user and enter the review gate.
+Write to `{output_dir}/channels.md`. Present a summary to the user and enter the review gate.

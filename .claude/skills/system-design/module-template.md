@@ -55,6 +55,8 @@ type TaskSource interface {
 - **Error format:** {e.g. RFC 7807 Problem Details — only if this module produces error responses}
 - **Testing:** {e.g. Jest for unit, Supertest for integration — framework mandates from PRD/README Test Strategy; see Testing section below for module-specific test strategy}
 
+If this module requires a convention pattern not yet documented in README's Implementation Conventions, add the pattern to this module's Relevant Conventions section with a note: `[NEW — propose adding to README Implementation Conventions]`. The design review will surface these for promotion to project-wide conventions.
+
 ### Internal Design
 
 {Core algorithms, state management, key flows — flowcharts or pseudocode. If source features define State Flow diagrams (stateDiagram), extract and refine the state machines here with implementation-level detail.}
@@ -103,6 +105,8 @@ type TaskSource interface {
 | Route | Component | Guard | Lazy Load | Data Prefetch |
 |-------|-----------|-------|-----------|---------------|
 | {route pattern from PRD} | {component name} | {e.g. authGuard / none} | {Yes / No} | {e.g. fetchData(id) / none} |
+
+Guard: Name of the route guard function (e.g., `authGuard`, `roleGuard('admin')`). Use `—` if no guard is needed. Guards are referenced by name; implementation details belong in the module's Internal Design section.
 
 **State Management:**
 
@@ -215,7 +219,9 @@ type TaskSource interface {
 
 ### Source Features
 
-- [F-001: {name}]({path to feature file}) — {which part of the feature this module implements}
+- [F-001: {name}]({relative path from design dir to PRD feature file}) — {which part of the feature this module implements}
+
+{**Path format:** Use relative paths from this module file to the PRD feature file. From `docs/raw/design/YYYY-MM-DD-{slug}/modules/M-001-{slug}.md`, the path to a PRD feature typically looks like `../../../prd/YYYY-MM-DD-{slug}/features/F-001-{slug}.md`. Verify the link resolves from the module file's location.}
 
 ### Implementation Constraints
 
@@ -246,6 +252,7 @@ type TaskSource interface {
 - **Frontend modules must include UI Architecture**: component tree, routing, state management, key interactions, frontend performance, design system usage, accessibility implementation, and i18n implementation (frontend). This section provides the **implementation architecture** — it references PRD feature specs for the interaction design (component contracts, state machines, a11y requirements) and specifies how to implement them technically.
 - **Backend modules returning locale-dependent text must include Backend i18n Implementation**: locale context propagation, message catalog access, locale-dependent outputs, timezone handling. Omit for single-language backends or modules with no locale-dependent output.
 - **Inline glossary terms**: if the module uses domain-specific terms from the PRD glossary, define them inline in Responsibility or the relevant section — don't assume the reader has access to the PRD architecture.md glossary.
+- **Cross-document paths are relative**: Source Features links point from the module file to the PRD feature file using relative paths (typically `../../../prd/YYYY-MM-DD-{slug}/features/F-001-{slug}.md`). Every link must resolve from the module file's filesystem location so downstream tools (autoforge planners) can follow them.
 - **Boundary Enforcement = mechanical, not advisory**: every row must name a concrete mechanism (lint rule, structural test, CI check) and what error the agent will see. "Should follow X" without an enforcement mechanism is not acceptable. Derive constraints from the project's Dependency Layering rules and module-level Relevant Conventions.
 - **Omit Boundary Enforcement** if the project has no linting/CI infrastructure, or for trivial S-complexity modules with no boundary constraints.
 - **Precise language**: "must", "returns", "rejects" — not "should consider", "might want to".

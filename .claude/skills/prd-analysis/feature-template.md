@@ -19,7 +19,7 @@ The feature file follows this structure. Omit any section that has no useful con
 **Product:** {one sentence}
 **Relevant architecture:** {only parts this feature touches, 3-5 lines}
 **Relevant data models:** {copy entity definitions this feature reads/writes}
-**Relevant conventions:** {copy applicable conventions from architecture.md — Coding Conventions (error handling, logging, concurrency policies relevant to this feature), Test Isolation policies (resource isolation, parallel safety rules relevant to this feature's tests), Security Coding Policy (input validation, secret handling, auth enforcement relevant to this feature), Shared Conventions (API format, auth, error handling, testing framework), Code Review Policy (review dimensions applicable to this feature), Performance Testing (budgets applicable to this feature), Backward Compatibility (API versioning, schema evolution relevant to this feature's API contracts or data models), Observability Requirements (mandatory logging events, health checks, metrics relevant to this feature), AI Agent Configuration (instruction file references, maintenance triggers relevant to this feature). Omit conventions this feature doesn't touch (e.g. no API conventions for a pure background-job feature; no concurrency policy for a stateless utility; no backward compatibility for internal-only features with no API)}
+**Relevant conventions:** copy applicable convention text from `architecture/` topic files — specifically `coding-conventions.md` (error handling, logging, concurrency policies relevant to this feature), `test-isolation.md` (resource isolation, parallel safety rules relevant to this feature's tests), `security.md` (input validation, secret handling relevant to this feature), and `shared-conventions.md` (API format, error structure). Copy the actual policy text inline — do not reference the files by path. The goal: a coding agent reads only this feature file and has all conventions needed to implement correctly. Also include when applicable: Code Review Policy (review dimensions applicable to this feature), Performance Testing (budgets applicable to this feature), Backward Compatibility (API versioning, schema evolution relevant to this feature's API contracts or data models), Observability Requirements (mandatory logging events, health checks, metrics relevant to this feature), AI Agent Configuration (instruction file references, maintenance triggers relevant to this feature). Omit conventions this feature doesn't touch (e.g. no API conventions for a pure background-job feature; no concurrency policy for a stateless utility; no backward compatibility for internal-only features with no API)
 **Permission:** {which roles can access this feature and at what level — e.g. "Admin: full, Member: read-only, Viewer: no access". Copy from architecture.md Authorization Model. Omit for single-role products or features with no access restrictions}
 
 ### User Stories
@@ -43,7 +43,7 @@ Behavioral (Given/When/Then):
 - Given {precondition}, when {action}, then {result}
 - Given {precondition}, when {edge case}, then {result}
 
-{If this feature has Dependencies (depends-on), include at least one cross-feature integration criterion:}
+{If this feature has Dependencies (depends-on), include at least one cross-feature integration criterion (Dependencies are listed in the Dependencies section below -- during initial writing, fill this integration criterion after completing the Dependencies section, or leave a `[TODO: add integration criterion for F-{dep}]` placeholder and backfill in Step 4 cross-linking):}
 - Given {upstream feature} has {completed its action / produced its output}, when {this feature consumes it}, then {end-to-end observable result}
 
 Non-behavioral (consider each dimension — include those that apply, omit the rest):
@@ -240,7 +240,7 @@ stateDiagram-v2
 
 #### Prototype Reference
 
-{Populated after PRD Phase 5 prototype validation. Omit during initial feature writing. Must be filled for every user-facing feature after Phase 5 completes.}
+{Populated after prototype validation completes. Omit during initial feature writing. Must be filled for every user-facing feature after prototype validation.}
 
 - **Prototype path:** `../prototypes/src/{feature-slug}/`
 - **Screenshots:** `../prototypes/screenshots/{feature-slug}/` {browser screenshots for web; teatest `.golden` files or terminal screenshots for TUI}

@@ -47,6 +47,8 @@ flowchart LR
 |---|-------|-------------|-----------------|-------------|------------------|---------|------------|----------------|
 | 1 | {stage name} | {what the user does} | {what the system does} | {screen or view the user is on — e.g. "Dashboard", "Settings > Profile", "CLI prompt". Use consistent names across journeys} | {primary interaction pattern: click / form / drag / swipe / long-press / keyboard / scroll / hover / voice / scan} | {positive/neutral/negative} | {frustration or friction, if any} | [F-{XXX}](../features/F-{XXX}-{slug}.md) |
 
+**Mapped Feature** is backfilled during PRD Step 4 (cross-linking) after features are derived from touchpoints. During initial journey writing (Phase 2), leave this column blank or mark as `—`. Do not block journey completion on feature mapping.
+
 **Stages** are logical phases of the journey, such as:
 - **Discovery** — user becomes aware of the product/feature
 - **Onboarding** — first-time setup, learning

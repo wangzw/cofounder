@@ -35,7 +35,7 @@ You will receive these parameters from the Orchestrator:
 
 ### 2. Write or Update Cross-Module Integration Tests
 
-**If `is_rerun` = true:** Review existing integration tests against the current code. If the fix changed a module's interface or behavior, update affected tests. Add tests for any new cross-module interactions introduced by the fix. Skip to Step 3 if no test changes are needed.
+**If `is_rerun` = true:** Read the previous integration test report at `{report_dir}/integration-phase-{phase_number}.md` to understand what failed before. Review existing integration tests against the current code — if the fix changed a module's interface or behavior, update affected tests. If tests for removed/changed behavior exist, update or remove them. Add tests for any new cross-module interactions introduced by the fix. Then run the full test suite. Skip to Step 3 if no test changes are needed.
 
 **If `is_rerun` = false:** Write integration tests from scratch.
 

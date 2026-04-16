@@ -14,6 +14,12 @@ Read before generating:
 - `gtm/landing-page-spec.md` — CTA strategy, onboarding entry points
 - `gtm/metrics.md` — KPIs, activation definition, tracking plan
 
+### Chained Mode (PRD exists)
+
+Re-read these PRD sections before generating (do not rely solely on prior `gtm/` files):
+- `journeys/*.md` — onboarding flow, first-run experience, activation moments
+- `features/*.md` — viral/sharing features, referral mechanics, upgrade triggers
+
 ## Gap-Fill Questions
 
 Minimal at this stage — most context comes from prior stages. Ask only if unclear:
@@ -100,4 +106,4 @@ How to systematically collect user feedback:
 
 ## Output
 
-Write to `gtm/acquisition-playbook.md`. Present a summary to the user and enter the review gate.
+Write to `{output_dir}/acquisition-playbook.md`. Present a summary to the user and enter the review gate.

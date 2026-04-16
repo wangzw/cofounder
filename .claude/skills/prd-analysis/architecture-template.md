@@ -220,6 +220,8 @@ AI agents consume this file to generate consistent visual code.
 | z.toast | 60 | Toast notifications |
 
 {Values above are defaults — replace with project-specific values during PRD Phase 3.}
+
+**Note:** Values shown are common defaults (Tailwind CSS defaults for web). Replace with project-specific values confirmed during Phase 3 questioning. These are examples, not prescriptions.
 ```
 
 ---

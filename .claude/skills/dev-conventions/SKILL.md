@@ -26,8 +26,9 @@ Detect the target platform from the git remote URL:
 1. Run `git remote -v` and inspect the output
 2. If the URL contains `github.com` → **GitHub**
 3. If the URL contains `gitlab.com` or a known self-hosted GitLab domain → **GitLab**
-4. If neither can be determined → Ask the user: "Is this a GitHub or GitLab project?"
-5. If not in a git repository → Report error and stop
+4. If the URL contains `bitbucket.org` → Inform the user: "Bitbucket is not currently supported. This skill generates conventions for GitHub and GitLab only." and stop.
+5. If neither can be determined → Ask the user: "Is this a GitHub or GitLab project?"
+6. If not in a git repository → Report error and stop
 
 ### Step 2: Tech Stack Detection
 
@@ -96,9 +97,7 @@ Based on the selected hook tool:
 
 **Husky:** Follow the instructions in `hooks/husky-setup.md`
 **pre-commit:** Follow the instructions in `hooks/pre-commit-setup.md`
-**Native script:** 
-  - Write `hooks/commit-msg.sh` to `scripts/install-hooks.sh` (wrapped in an installer that copies to `.git/hooks/commit-msg`)
-  - Inform the user to run `bash scripts/install-hooks.sh`
+**Native script:** Follow the instructions in `hooks/native-setup.md` (copies `commit-msg.sh` + `install-hooks.sh.tpl` into the target project and informs the user to run `bash scripts/install-hooks.sh`).
 
 #### CONTRIBUTING.md
 
@@ -128,8 +127,10 @@ Print a summary of all generated files:
 ## Next Steps
 
 1. Configure the `CLAUDE_CODE_OAUTH_TOKEN` secret in your repository settings
+   (required for AI-powered issue/PR linting workflows)
    - GitHub: Settings → Secrets and variables → Actions → New repository secret
-   - GitLab: Settings → CI/CD → Variables → Add variable
+   - GitLab: Settings → CI/CD → Variables → Add variable (masked, protected)
+   - The token authenticates Claude Code CLI in CI. Generate it from your Claude Code account settings.
 2. Review `CONTRIBUTING.md` and adjust if needed
 3. Commit all generated files
 ```

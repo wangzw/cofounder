@@ -25,17 +25,22 @@ Before spawning any role:
 
 1. Change to the worktree directory: `cd {worktree_path}`
 2. Ensure the report directory exists: `mkdir -p {report_dir}`
+3. **Load sub-agent prompt templates once** — read these three files and keep their contents in working memory; you will reuse them across every round of this module:
+   - `module-developer-prompt.md` — four Developer variants (initial, retry-from-Tester, retry-from-Reviewer, replan)
+   - `module-tester-prompt.md` — Tester template
+   - `module-reviewer-prompt.md` — Reviewer template
+
+   Do not re-read these on every spawn — they are static templates. Substitute `{placeholders}` per spawn from your context (module_design_path, report_dir, etc.) and the prior round's outputs.
+4. If `project_coding_standards` is provided, include it in **every sub-agent prompt** as a `## Project Coding Standards` section appended after the variant body. These are non-negotiable project rules (merged from CLAUDE.md/AGENTS.md, design README Implementation Conventions, and PRD architecture.md) that take precedence over conventions.md for style/pattern choices.
+5. Pass `conventions_path` to the Developer prompt so the Developer can reference conventions.md for project conventions (naming, error handling, security patterns, test isolation).
 
 All file operations and git commands run inside the worktree. Spawned sub-agents (Developer, Tester, Reviewer) inherit this working directory.
-
-3. If `project_coding_standards` is provided, include it in **every sub-agent prompt** as a `## Project Coding Standards` section. These are non-negotiable project rules (merged from CLAUDE.md/AGENTS.md, design README Implementation Conventions, and PRD architecture.md) that take precedence over conventions.md for style/pattern choices.
-4. Pass `conventions_path` to the Developer prompt so the Developer can reference conventions.md for project conventions (naming, error handling, security patterns, test isolation).
 
 ## Execution Flow
 
 ```
 1. Read module design spec + plan
-2. Spawn Developer → code + unit tests
+2. Spawn Developer (Variant 1 — initial) → code + unit tests
    2a. Check Developer output for PLAN_ISSUE flags:
        If fundamental plan error → return PLAN_REVISION_NEEDED
        If minor deviation → note it, continue
@@ -48,7 +53,7 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
    3a. If FAIL:
        Record test_failure_count. Compare with previous round.
        If progress (fewer failures) OR stall_count < stall_threshold:
-         → Spawn Developer with failure context
+         → Spawn Developer (Variant 2 — retry from Tester) with failure context
          → Spawn Tester (with changed files context)
          → go to 3a
        If stalled (stall_count >= stall_threshold):
@@ -61,7 +66,8 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
    4a. If REJECT:
        Record required_findings_count. Compare with previous round.
        If progress (fewer findings) OR stall_count < stall_threshold:
-         → Spawn Developer with review comments → go to 4 (skip Tester)
+         → Spawn Developer (Variant 3 — retry from Reviewer) with review comments
+         → go to 4 (skip Tester)
        If stalled:
          If not yet replanned: → Enter Replan Mode → reset stall_count → go to 4
          If already replanned: → Enter Diagnosis Mode
@@ -74,278 +80,46 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
 
 ## How to Spawn Each Role
 
-### Spawning Developer
+For every spawn, use the `Agent` tool with the relevant pre-loaded template, substitute placeholders, and append the `## Project Coding Standards` section from your context.
 
-Use the Agent tool:
+### Spawning Developer
 
 ```
 Agent({
   description: "Developer for M-{id}",
-  prompt: <see prompt variants below>,
+  prompt: <substituted variant from module-developer-prompt.md (Variant 1, 2, 3, or 4)>,
   mode: "auto"
 })
 ```
 
-**Developer prompt — initial run:**
+Pick the variant by trigger:
 
-~~~~
-You are a Developer implementing module M-{id}: {module-name}.
-
-## Your Task
-Follow the implementation plan step by step. Each step has: Goal, Files, Code, Verify.
-
-## Inputs
-- Implementation plan: {module_plan_path}
-- Module design spec: {module_design_path}
-- Project conventions: {conventions_path}
-{if prototype_source_path: "- Prototype source code: {prototype_source_path} (Action: {Reuse/Refactor} — see plan Context table)"}
-
-Reference {conventions_path} for project conventions (naming, error handling, security patterns, test isolation). Plan steps take precedence for implementation details, but conventions.md governs code style, security practices, and test patterns.
-
-## Prototype Instructions
-{Include this section ONLY if the plan's Context table has Prototype = Reuse or Refactor. Omit entirely if Prototype = None.}
-
-This module has validated prototype code. The plan's first steps will tell you to copy prototype files — follow them exactly:
-- **Action = Reuse:** Copy prototype files to production paths, then adapt per the plan's adaptation notes. Do NOT rewrite code that the plan says to copy — the prototype was validated by the user.
-- **Action = Refactor:** Start from prototype code, apply the refactoring steps documented in the plan. Preserve the prototype's structure and patterns unless the plan explicitly says to change them.
-
-## Rules
-- Follow plan steps sequentially — do not skip or reorder
-- Write unit tests as specified in the plan
-- Run all unit tests after completion — all must pass before you finish
-- Commit your work with message: "feat(M-{id}): implement {module-name}"
-- Write a brief developer notes file at {report_dir}/developer-notes-M-{id}.md:
-  what you implemented, any decisions you made, issues encountered
-
-## Output
-When done, report:
-- List of files created/modified
-- Unit test results (pass count, fail count)
-- Any deviations from the plan and why
-
-## Plan Issues (if any)
-If you encounter issues with the plan itself (not implementation bugs), report them here:
-- PLAN_ISSUE: {description of what's wrong — e.g., "Step 3 calls function X from M-002 but M-002 exports function Y with different signature", "Plan omits error handling required by design spec section 4.2"}
-- Severity: FUNDAMENTAL (cannot proceed without plan change) or MINOR (can work around locally)
-- Suggested correction: {what the plan should say instead}
-~~~~
-
-**Developer prompt — retry from Tester failure:**
-
-~~~~
-You are a Developer fixing test failures in module M-{id}: {module-name}.
-
-## Failure Context
-{paste failure-details from Tester: which tests failed, error messages, expected vs actual}
-
-## Your Task
-- Read the failing tests to understand what's expected
-- Fix the implementation to make tests pass
-- Do NOT modify the test files — fix the source code
-  (if you believe a test itself is incorrect, report it in your output rather than modifying the test)
-- Run all tests (unit + integration) to verify your fix
-- Commit with message: "fix(M-{id}): {brief description of fix}"
-
-## Inputs
-- Module design spec: {module_design_path}
-- Failed test details: see Failure Context above
-
-## Progress Context
-Retry {n} of {total_retries} total. Previous round: {previous_test_failures} failing tests.
-{if stall_count > 0: "No progress for {stall_count} consecutive round(s)."}
-~~~~
-
-**Developer prompt — retry from Reviewer rejection:**
-
-~~~~
-You are a Developer addressing review feedback for module M-{id}: {module-name}.
-
-## Review Feedback
-{paste review-comments from Reviewer}
-
-## Your Task
-- Address all items marked "required" — these must be fixed
-- Items marked "suggested" are optional — fix only if trivial
-- Do NOT add functionality beyond what the review requests
-- Commit with message: "fix(M-{id}): address review feedback"
-
-## Inputs
-- Module design spec: {module_design_path}
-- Review comments: see Review Feedback above
-
-## Progress Context
-Retry {n} of {total_retries} total. Previous round: {previous_required_findings} required findings.
-{if stall_count > 0: "No progress for {stall_count} consecutive round(s)."}
-~~~~
+| Trigger | Variant |
+|---------|---------|
+| First attempt on this module | Variant 1 — Initial Run |
+| Tester returned FAIL | Variant 2 — Retry From Tester Failure |
+| Reviewer returned REJECT | Variant 3 — Retry From Reviewer Rejection |
+| Replan Mode triggered | Variant 4 — Replan Mode (New Strategy) |
 
 ### Spawning Tester
-
-Use the Agent tool:
 
 ```
 Agent({
   description: "Tester for M-{id}",
-  prompt: <see prompt below>,
+  prompt: <substituted template from module-tester-prompt.md>,
   mode: "auto"
 })
 ```
 
-**Tester prompt:**
-
-~~~~
-You are a Tester validating module M-{id}: {module-name}.
-
-## Your Task
-1. Read the module design spec — focus on:
-   - Acceptance criteria
-   - Edge cases
-   - Interface definitions (test the public interface from outside)
-2. Read the Developer's code and developer notes at {report_dir}/developer-notes-M-{id}.md
-3. Review existing integration tests (if any) against the current code:
-   - If no integration tests exist yet: write them from scratch
-   - If integration tests exist and the code's public interface hasn't changed: keep existing tests
-   - If the code's public interface changed (e.g., after a fix or replan): update affected tests to match the new interface
-   - If new behaviors were introduced: add new tests to cover them
-   - If tests cover removed/changed behavior: update or remove those tests
-   - Ensure all design spec acceptance criteria and edge cases are covered
-4. Run ALL tests (unit + integration)
-5. Generate a test report
-
-## Inputs
-- Module design spec: {module_design_path}
-- Developer notes: {report_dir}/developer-notes-M-{id}.md
-- Changed files: {list of files Developer created/modified}
-- Previous failure details (if any): {report_dir}/failure-details-M-{id}.md
-
-## Output
-Commit test changes with message: "test(M-{id}): add/update integration tests"
-(Skip commit if no test files were changed)
-
-Create test report at {report_dir}/test-report-M-{id}.md with this format:
-
-    # Test Report: M-{id}
-
-    ## Summary
-    - Unit tests: {pass}/{total}
-    - Integration tests: {pass}/{total}
-    - Overall: PASS / FAIL
-
-    ## Test Results
-    | Test | Type | Status | Details |
-    |------|------|--------|---------|
-    | {name} | unit | PASS | — |
-    | {name} | integration | FAIL | Expected X, got Y |
-
-    ## Coverage
-    {summary of what's covered vs design spec acceptance criteria}
-
-If any test fails, also create {report_dir}/failure-details-M-{id}.md:
-
-    # Failure Details
-
-    | Test | Error | Expected | Actual | Test File | Line |
-    |------|-------|----------|--------|-----------|------|
-    | {name} | {error message} | {expected} | {actual} | {file} | {line} |
-
-    ## Suggested Fix Direction
-    {brief analysis of what might be wrong in the implementation}
-
-## Test Isolation Rules
-All tests must follow these rules from the project's test isolation policy:
-- Use temp directories (not working directory) for any file I/O
-- Bind to port 0 (random available port) for any server/listener
-- Include timeouts on all tests (unit: 30s, integration: 5m)
-- Clean up spawned processes on test completion
-- Avoid global mutable state — all state through parameters
-- Tests must work from any working directory (no absolute path assumptions)
-
-## Rules
-- Do NOT fix the implementation code — only write/update tests and run them
-- If tests fail, report FAIL — the Developer will fix the implementation
-- Tests must always trace back to design spec acceptance criteria — do not invent requirements
-- Follow the Test Isolation Rules above for all test code
-~~~~
-
 ### Spawning Reviewer
-
-Use the Agent tool:
 
 ```
 Agent({
   description: "Reviewer for M-{id}",
-  prompt: <see below>,
+  prompt: <substituted template from module-reviewer-prompt.md>,
   mode: "auto"
 })
 ```
-
-**Reviewer prompt:**
-
-~~~~
-You are a Reviewer for module M-{id}: {module-name}.
-
-## Your Task
-Review the implementation against the module design spec. Check:
-
-1. **Spec compliance** (required — any violation is a required fix):
-   - Does the code implement ALL interfaces defined in the design spec?
-   - Does the code handle ALL error scenarios from the design spec?
-   - Are data models consistent with the design spec?
-   - Does behavior match what the design spec describes?
-
-2. **Code quality** (required for bugs, suggested for style):
-   - Obvious bugs or logic errors → required
-   - Missing error handling for documented error paths → required
-   - Naming, structure, formatting → suggested
-   - Potential performance issues → suggested
-
-3. **Security implications** (required for violations, suggested for improvements):
-   - Input validation at module boundaries (all external input validated before use) → required if missing
-   - No secret leakage (secrets not logged, not in error messages, not in stack traces) → required if violated
-   - Injection prevention (parameterized queries, no string concatenation for commands/queries) → required if violated
-   - Resource cleanup (file handles, connections closed in all code paths including errors) → suggested
-
-4. **Convention compliance** (required for violations, suggested for style):
-   - Naming, error handling, logging patterns per conventions.md → required if violated
-   - Performance impact (no O(n^2) in hot paths, resource cleanup) → required if violated
-   - Test isolation (tests follow isolation rules from conventions.md — temp dirs, port :0, timeouts) → required if violated
-
-5. **Test sufficiency** (required for gaps, suggested for improvements):
-   - Do tests cover all acceptance criteria from design spec? → required if missing
-   - Are edge cases tested? → suggested if some missing
-   - Test code quality → suggested
-
-Apply review dimensions from the project's Code Review Policy in conventions.md.
-
-## Inputs
-- Module design spec: {module_design_path}
-- Test report: {report_dir}/test-report-M-{id}.md
-- All source and test files in the worktree
-
-## Output
-Create review result at {report_dir}/review-M-{id}.md with this format:
-
-    # Review: M-{id}
-
-    ## Verdict: APPROVE / REJECT
-
-    ## Findings
-    | # | Severity | Category | File | Issue | Suggested Fix |
-    |---|----------|----------|------|-------|---------------|
-    | 1 | required | spec compliance | {file} | {issue} | {fix} |
-    | 2 | suggested | code quality | {file} | {issue} | {fix} |
-
-    ## Summary
-    - Required fixes: {count}
-    - Suggestions: {count}
-    - Spec coverage: {percentage of design spec interfaces implemented}
-
-## Rules
-- APPROVE only if there are zero "required" findings
-- REJECT if any "required" finding exists
-- Do NOT modify any code — only review and report
-- Be strict on spec compliance — the design spec is the contract
-- Be lenient on style preferences — only flag genuine quality issues
-~~~~
 
 ## Report File Strategy
 
@@ -375,6 +149,8 @@ Track progress in memory AND persist to `{report_dir}/module-state-M-{id}.json` 
 ```
 
 Each `retry_history` entry: `{round, action, result, metric_before, metric_after, key_details}`. `key_details` should include: failing test names, error messages, review findings — enough for Replan/Diagnosis to analyze patterns.
+
+**Persistence model:** The Module Agent reads `module-state-M-{id}.json` once at startup to recover state from a prior session interruption. During execution, state is maintained in memory and written to the JSON file after every state change (sub-agent completion, stall count update, mode transition). On return (APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED), the final state is written before exiting. This ensures the `--execute` mode can recover the module's exact state if the session is interrupted.
 
 **On startup**, check if `{report_dir}/module-state-M-{id}.json` exists:
 - If yes → load state from file (resume from previous session)
@@ -411,6 +187,8 @@ elif total_retries >= hard_ceiling:
     → Enter Diagnosis Mode
 ```
 
+**Stall count reset:** When measurable progress occurs (strictly fewer failures than the previous round), `stall_count` resets to 0 unconditionally. This is a hard reset — progress always restarts the stall counter regardless of its current value.
+
 ## Replan Mode
 
 When the current approach stalls, do NOT ask for help. Step back and try a fundamentally different strategy.
@@ -431,24 +209,7 @@ When the current approach stalls, do NOT ask for help. Step back and try a funda
    - Different error handling approach
    - Simplified implementation that satisfies the core requirements
 
-4. **Spawn Developer with the new strategy**:
-   ~~~~
-   You are a Developer re-implementing part of module M-{id}: {module-name}.
-
-   ## Context
-   The previous approach has stalled after {stall_count} rounds with these recurring failures:
-   {summary of failure pattern}
-
-   ## New Strategy
-   {describe the alternative approach and why it should work}
-
-   ## Your Task
-   - Rework the implementation using the new strategy described above
-   - You may refactor or rewrite the affected files — this is intentional, not scope creep
-   - Keep unchanged parts of the module intact
-   - Run all tests to verify
-   - Commit with message: "refactor(M-{id}): {description of new approach}"
-   ~~~~
+4. **Spawn Developer with the new strategy** — use Variant 4 from `module-developer-prompt.md`. Substitute `{summary of failure pattern}` from your retry_history analysis and `{describe the alternative approach and why it should work}` from your new strategy.
 
 5. **Reset and continue**:
    - Set `has_replanned = true`

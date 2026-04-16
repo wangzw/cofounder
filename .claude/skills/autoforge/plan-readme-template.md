@@ -54,6 +54,8 @@ graph TD
 | M-001 {name} | 1 | [plan](plans/plan-M-001-{slug}.md) | {n} | M-003, M-005 | [design]({path}) |
 | M-008 {name} | 1 | [plan](plans/plan-M-008-{slug}.md) | {n} | M-003 | [design]({path}) |
 
+Integration Points: modules this module interacts with. Format: `-> M-003` (this module calls M-003), `<- M-005` (M-005 calls this module).
+
 ## Module Status
 
 | Module | Phase | Plan | Dev | Test | Review | Merged | Notes |

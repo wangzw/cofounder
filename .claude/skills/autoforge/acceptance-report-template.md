@@ -88,8 +88,10 @@
 
 **{PASS / PARTIAL / FAIL}**
 
-<!-- PASS: all criteria and E2E scenarios pass -->
-<!-- PARTIAL: >80% pass rate, failures are non-critical -->
-<!-- FAIL: <80% pass rate or critical failures exist -->
+- **PASS:** All criteria pass (or are NOT_COVERED with valid justification) AND overall pass rate >= acceptance threshold AND no critical failures.
+- **PARTIAL:** Overall pass rate >= acceptance threshold AND no critical failures, BUT some criteria failed (non-critical).
+- **FAIL:** Overall pass rate < acceptance threshold OR critical failures exist.
+
+A failure is **critical** if it affects a core acceptance criterion (not an edge case) of a feature that appears in multiple journeys.
 
 {1-2 sentence summary of the result and any important caveats.}

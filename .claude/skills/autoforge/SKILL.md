@@ -17,6 +17,18 @@ Orchestrate agent teams to turn a system design into tested, PRD-validated code.
 /autoforge --cleanup docs/raw/plans/2026-04-09-agent-team-a3f1/     # abandon run: remove worktrees, branches, optionally plans
 ```
 
+## Mode Routing
+
+Detect the mode first. Read the routing files for that mode only — do not load the others.
+
+| Mode | Trigger | Read These Files |
+|------|---------|------------------|
+| **Default** | `/autoforge <dir>` | `planner-prompt.md`, `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`, `acceptance-tester-prompt.md`, `integration-tester-prompt.md`, `acceptance-report-template.md` |
+| **Plan only** | `--plan-only` | Same as Default (stops after Step 1) |
+| **Execute** | `--execute <plan-dir>` | `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `acceptance-tester-prompt.md`, `integration-tester-prompt.md`, `acceptance-report-template.md` |
+| **Status** | `--status <plan-dir>` | No additional files (read-only query) |
+| **Cleanup** | `--cleanup <plan-dir>` | No additional files |
+
 ## Process Overview
 
 ```mermaid
@@ -410,18 +422,7 @@ Review Dimensions:
    - Spawn a Developer agent in the module's worktree with the chosen option as instructions
    - Spawn Tester to verify the fix (Tester will review/update tests as needed)
    - If pass → merge as normal; if fail → present updated diagnosis with new options to human; repeat until resolved or human chooses to skip/abort
-4. **Merge module branches** — in the primary worktree (already on the feature branch), for each approved module sequentially:
-   ```
-   cd {worktree_root}/main
-   git merge --ff-only autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
-   ```
-   If ff-merge fails (concurrent changes), rebase the module branch first (from the module worktree or using git directly):
-   ```
-   cd {worktree_root}/p{n}-M-{id}-{slug}
-   git rebase autoforge/{design-dir-name}-{hash4}
-   cd {worktree_root}/main
-   git merge --ff-only autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
-   ```
+4. **Merge module branches** — in the primary worktree (already on the feature branch), for each approved module sequentially, run the canonical module-merge command sequence documented in the **Git Strategy → Merge Rules** section below (fast-forward merge; on conflict rebase the module branch first then retry).
 5. **Cleanup module worktrees and branches** — for each merged module:
    ```
    git worktree remove {worktree_root}/p{n}-M-{id}-{slug}
@@ -561,6 +562,13 @@ If acceptance report shows failures:
 5. **Re-run acceptance tests** — Acceptance Tester re-runs full suite (with `is_rerun: true`)
 6. **Continue as long as progress** — repeat fix cycles while failing test count decreases. If stalled, the Orchestrator re-analyzes and tries a different approach. Follow the same autonomous-first principle as module-level iteration.
 
+### PARTIAL Verdict Handling
+
+When the acceptance fix cycle stabilizes at PARTIAL (no further progress but some non-critical failures remain), present the acceptance report to the user with options:
+- **(a) Merge with PARTIAL verdict** — accept the remaining gaps as known limitations; proceed to Step 4
+- **(b) Continue fixing with user guidance** — user provides priorities or hints on which failures to focus on; resume fix cycle
+- **(c) Abort and return to design phase** — the gaps indicate a design-level issue; return to re-planning (Step 1)
+
 ### After Acceptance
 
 1. **Commit final report** — `docs/raw/plans/{plan-dir}/reports/acceptance.md`, commit: `docs(plan): add acceptance report`
@@ -599,7 +607,7 @@ If rebase has conflicts, pause and present to human for resolution.
 When invoked with `--execute docs/raw/plans/{plan-dir}/`:
 
 1. **Read plan README** — extract Source Design, Source PRD, Feature Branch, and **Worktree Root** from the Design Input table
-2. **Recover or create worktrees** — derive the worktree root from the plan README (or from the feature branch name: `{project-root}/../{project-dirname}-worktrees/{feature-branch-name}/`). Check for existing worktrees:
+2. **Recover or create worktrees** — use the plan README's `Worktree Root` field as the authoritative source for the worktree root path. Do not derive it from the branch name (the branch name `autoforge/{design-dir-name}-{hash4}` uses a slash while the worktree directory uses a hyphen: `autoforge-{design-dir-name}-{hash4}`). Check for existing worktrees:
    ```
    git worktree list   # check for stale worktrees under {worktree_root}
    ```
@@ -623,7 +631,7 @@ When invoked with `--execute docs/raw/plans/{plan-dir}/`:
    - Phase is **in progress** if any module is started but phase is not complete
    - Phase is **pending** if no modules have started
 
-5. **Detect bootstrap status** — check if the feature branch contains a commit with message `chore: initialize project`. If yes, bootstrap is complete. If the design's project state was "existing source code" (Step 0.4), bootstrap was skipped and is considered complete.
+5. **Detect bootstrap status** — check if the feature branch contains a commit with message `chore: initialize project`. If yes, bootstrap is complete. If the design's project state was "existing source code" (Step 0.5), bootstrap was skipped and is considered complete.
 
 6. **Determine entry point**:
    - If no phases started and bootstrap not complete → start at Step 1.5
@@ -739,6 +747,25 @@ log: {brief event description}
 - **Only fast-forward merges** — `git merge --ff-only`; if ff not possible, rebase first
 - **Module → feature branch**: sequential merge after each module completes within a phase
 - **Feature → main**: only after full acceptance passes
+
+**Canonical module-merge command sequence** (referenced from Step 2 — Phase Execution):
+
+```bash
+# 1. Try fast-forward merge from the primary worktree (feature branch checked out)
+cd {worktree_root}/main
+git merge --ff-only autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
+
+# 2. If ff-merge fails (concurrent changes landed on the feature branch), rebase
+#    the module branch onto the current feature branch, then retry ff-merge:
+cd {worktree_root}/p{n}-M-{id}-{slug}
+git rebase autoforge/{design-dir-name}-{hash4}
+cd {worktree_root}/main
+git merge --ff-only autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
+```
+
+If rebase produces conflicts (overlapping changes from modules in the same phase), pause and present the conflicts to the user for resolution — same as the feature-to-main conflict handling in Step 4.
+
+Consider squashing `state()` commits during the merge to keep the feature branch history clean: `git merge --squash {module-branch}` followed by a single merge commit.
 
 ### Worktree Convention
 
@@ -928,6 +955,9 @@ docs/raw/plans/{design-dir-name}-{hash4}/
 - `planner-prompt.md` — Planner agent instructions (sequential planning with context accumulation)
 - `module-plan-template.md` — per-module implementation plan with atomic steps
 - `module-agent-prompt.md` — Module Agent instructions (second-level orchestrator)
+- `module-developer-prompt.md` — Developer sub-agent prompt variants (initial, retry-from-tester, retry-from-reviewer, replan)
+- `module-tester-prompt.md` — Tester sub-agent prompt
+- `module-reviewer-prompt.md` — Reviewer sub-agent prompt
 - `integration-tester-prompt.md` — Phase-level integration tester instructions
 - `acceptance-tester-prompt.md` — PRD acceptance tester instructions
 - `acceptance-report-template.md` — PRD acceptance report with traceability matrix

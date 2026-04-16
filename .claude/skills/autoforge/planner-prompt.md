@@ -14,9 +14,10 @@ You will receive these parameters from the Orchestrator:
 - `plan_dir`: plan output directory (`docs/raw/plans/{plan-dir}/plans/`)
 - `previous_plan_paths`: previously generated plan files (empty for first module)
 - `conventions_path`: path to conventions.md (`{plan_dir}/conventions.md`)
+- `module_slug`: Derived from the module design spec filename (e.g., `M-001-task-split.md` -> `task-split`). Used in output filenames.
 - `is_first_module`: boolean — true if this is the first module being planned
 - `planning_order`: full ordered list of modules to be planned (for awareness of what comes later)
-- `project_coding_standards`: unified project conventions from three sources (highest to lowest priority): (1) CLAUDE.md/AGENTS.md project-specific overrides, (2) design README's Implementation Conventions and Key Technical Decisions, (3) PRD architecture.md developer convention sections — plan code must follow these
+- `project_coding_standards`: unified coding standards merged from (1) CLAUDE.md/AGENTS.md overrides, (2) design README Implementation Conventions + Key Technical Decisions, (3) PRD architecture.md developer convention sections. Use these as an additional source when creating conventions.md (first module) or validating plan steps align with project standards.
 - `prd_architecture_path`: path to PRD architecture.md (for developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Observability Requirements, Performance Testing, Development Workflow, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration)
 - `implemented_module_paths`: paths to source code of already-implemented modules on the feature branch (empty during initial planning; populated during re-planning)
 - `prototype_source_path`: path to PRD prototype code for this module's features (empty if no prototype exists or Action = Rewrite). When present, the module design spec contains a Prototype Reuse Guide with specific files to copy and adaptations to make
@@ -60,12 +61,12 @@ Read in this order:
 
 5. **Conventions file** (`{conventions_path}`, if it exists) — follow established patterns
 
-5. **Previous plans** (`{previous_plan_paths}`) — concrete decisions already made:
+6. **Previous plans** (`{previous_plan_paths}`) — concrete decisions already made:
    - File paths and directory organization
    - Interface implementations already planned (that this module may consume or that set a pattern)
    - Type definitions, naming patterns, code style
 
-6. **Implemented code** (`{implemented_module_paths}`, if any) — for modules already merged to the feature branch, read their **actual source code**, not just their plans. Actual code is the source of truth: it may differ from the plan in parameter types, error handling, async behavior, or edge cases. When a plan and its implementation diverge, plan for the code as it actually is.
+7. **Implemented code** (`{implemented_module_paths}`, if any) — for modules already merged to the feature branch, read their **actual source code**, not just their plans. Actual code is the source of truth: it may differ from the plan in parameter types, error handling, async behavior, or edge cases. When a plan and its implementation diverge, plan for the code as it actually is.
 
 ### 2. Establish or Follow Conventions
 
@@ -128,7 +129,7 @@ Read and follow `conventions.md`. If you encounter a pattern not yet covered (e.
 
 ### 3. Write the Implementation Plan
 
-Output: `{plan_dir}/plan-M-{module_id}-{slug}.md` following the structure in `module-plan-template.md`.
+Output: `{plan_dir}/plan-M-{module_id}-{module_slug}.md` following the structure in `module-plan-template.md`.
 
 Populate the Context table fields:
 - **Prototype**: Action from the module design spec's Prototype Reuse Guide (Reuse / Refactor / None). Set to "None" if no Prototype Reuse Guide exists or Action = Rewrite
@@ -188,7 +189,7 @@ When complete, report:
 
 ```
 MODULE: M-{module_id} {module_name}
-PLAN: {plan_dir}/plan-M-{module_id}-{slug}.md
+PLAN: {plan_dir}/plan-M-{module_id}-{module_slug}.md
 CONVENTIONS: {created | followed | extended: {what was added}}
 STEPS: {count}
 KEY_DECISIONS: {list any decisions not directly derivable from the design spec}

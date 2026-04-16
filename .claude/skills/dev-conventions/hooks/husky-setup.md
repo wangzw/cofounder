@@ -14,8 +14,8 @@
 
 ## Verification
 
-Run: `echo "bad message" | npx husky .husky/commit-msg /dev/stdin`
-Expected: ERROR message about Conventional Commits format.
+Run: `git commit --allow-empty -m "bad message"`
+Expected: Commit rejected with ERROR message about Conventional Commits format.
 
-Run: `echo "feat: test message" | npx husky .husky/commit-msg /dev/stdin`
-Expected: No error, exit code 0.
+Run: `git commit --allow-empty -m "feat: test message"`
+Expected: Commit succeeds with exit code 0.

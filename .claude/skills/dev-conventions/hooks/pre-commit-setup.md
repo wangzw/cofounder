@@ -10,6 +10,8 @@
    - If it exists, append the conventional-pre-commit hook to the existing `repos` list
    - If it does not exist, create `.pre-commit-config.yaml` with the following content:
 
+Note: The version below (v3.6.0) was current at the time of writing. Check for newer versions at https://github.com/compilerla/conventional-pre-commit/releases
+
 ```yaml
 repos:
   - repo: https://github.com/compilerla/conventional-pre-commit

@@ -13,6 +13,7 @@ You will receive these parameters from the Orchestrator:
 - `conventions_path`: path to conventions.md (for test organization patterns)
 - `acceptance_threshold`: pass rate threshold for PARTIAL verdict (default: 80)
 - `is_rerun`: boolean — true if this is a re-run after a fix cycle (review and update existing tests as needed rather than writing from scratch)
+- `previous_report_path` (only when `is_rerun = true`): Path to the previous acceptance report (`{report_dir}/acceptance.md`). Read this to identify NOT_COVERED criteria for re-evaluation and to compare pass rates for progress tracking.
 
 ## Execution
 
@@ -37,7 +38,7 @@ You will receive these parameters from the Orchestrator:
 
 ### 2. Write Acceptance Tests
 
-**If `is_rerun` = true:** Review existing acceptance tests against the current code. If the fix changed behavior that affects existing tests, update them. Add tests for any newly covered criteria. Skip to Step 3 if no test changes are needed.
+**If `is_rerun` = true:** Read the previous acceptance report at `{previous_report_path}` to identify NOT_COVERED criteria from the prior run. Review existing acceptance tests against the current code. If the fix changed behavior that affects existing tests, update them. **Re-evaluate every NOT_COVERED criterion from the previous run** — a fix may have introduced code (new API surface, hook, observability event, etc.) that now enables automated testing. Promote NOT_COVERED -> PASS/FAIL by writing the test wherever possible; only keep NOT_COVERED when the automation barrier is still unchanged (documented in the reason). Add tests for any newly covered criteria. Compare pass rates with the previous report for progress tracking. Skip to Step 3 if no test changes are needed.
 
 #### Layer 1: Feature Acceptance Tests
 
@@ -60,8 +61,8 @@ For each journey that defines E2E Test Scenarios:
 - Do NOT test internal implementation details
 - Do NOT duplicate module-level or phase-level integration tests — test at the feature/journey level
 - If a criterion cannot be tested automatically (requires manual verification, external service, etc.), document it as NOT_COVERED with a reason
-- If the project conventions define **Observability Requirements**, verify: (a) mandatory logging events are present in the implementation (check that expected log calls exist at required points), (b) structured logging format is used consistently
-- If the project conventions define **Performance Testing** policies, verify: (a) performance budget compliance where testable (startup time, per-operation benchmarks), (b) benchmark tests exist for operations specified in the policy
+- Check {conventions_path} for **Observability Patterns** — if present, verify: (a) mandatory logging events are present in the implementation (check that expected log calls exist at required points), (b) structured logging format is used consistently
+- Check {conventions_path} for **Performance Testing** — if present, verify: (a) performance budget compliance where testable (startup time, per-operation benchmarks), (b) benchmark tests exist for operations specified in the policy
 
 ### 3. Run Full Test Suite
 

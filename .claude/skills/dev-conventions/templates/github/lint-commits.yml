@@ -19,6 +19,10 @@ jobs:
           ERRORS=""
 
           while IFS= read -r msg; do
+            # Skip merge commits and git revert messages — they have platform-defined formats.
+            case "$msg" in
+              "Merge "*|"Revert \""*) continue ;;
+            esac
             if ! echo "$msg" | grep -qE "$PATTERN"; then
               ERRORS="${ERRORS}\n  - ${msg}"
             fi

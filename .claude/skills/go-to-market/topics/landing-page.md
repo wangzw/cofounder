@@ -9,7 +9,14 @@ This file contains instructions for generating the landing page specification. I
 Read before generating:
 - `gtm/positioning.md` — value prop, taglines, elevator pitch, differentiators
 - `gtm/pricing-strategy.md` — tier structure, price points
+- `gtm/channels.md` — primary channels (affects which audiences and messaging the page needs to convert; also informs social proof emphasis)
 - `gtm/launch-plan.md` — launch approach (affects CTA: waitlist vs. signup vs. free trial)
+
+### Chained Mode (PRD exists)
+
+Re-read these PRD sections before generating (do not rely solely on prior `gtm/` files):
+- `features/*.md` — top features for hero messaging, feature highlights section
+- `journeys/*.md` — key pain points for problem/pain section, user language for copy
 
 ## Gap-Fill Questions
 
@@ -105,4 +112,4 @@ For each section, provide:
 
 ## Output
 
-Write to `gtm/landing-page-spec.md`. Present a summary to the user and enter the review gate.
+Write to `{output_dir}/landing-page-spec.md`. Present a summary to the user and enter the review gate.

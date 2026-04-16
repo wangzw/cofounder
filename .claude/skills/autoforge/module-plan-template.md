@@ -110,6 +110,8 @@ Interfaces this module exposes or consumes that other modules depend on:
 | Exposes → | M-{id} | `{function/method signature}` | {what the caller needs to know} |
 | Consumes ← | M-{id} | `{function/method signature}` | {how this module calls it} |
 
+Direction: `Exposes ->` means this module exposes an interface consumed by the listed module. `Consumes <-` means this module consumes an interface exposed by the listed module.
+
 ## Acceptance Criteria Mapping
 
 Trace from design spec acceptance criteria to implementation steps:

@@ -7,6 +7,7 @@ The README.md is the navigational entry point for the design directory. Omit any
 ```
 {output-dir}/
 ├── README.md              # Design overview + module index + mapping matrix
+├── REVISIONS.md           # Revision history (only present after first --revise)
 ├── modules/
 │   ├── M-001-{slug}.md    # Self-contained module design
 │   └── ...
@@ -94,6 +95,8 @@ graph LR
 Type: `backend` | `frontend` | `shared` — helps identify which modules have UI responsibilities
 Impl: `—` (not started) | `In progress` | `Done` — tracks per-module implementation status; updated by coding agents or users when implementation begins/completes
 
+**Two tracking dimensions:** The module `Status` field (Draft / Finalized / Implementing / Implemented) tracks the *design document's* lifecycle. The Module Index `Impl` column (`—` / In Progress / Done) tracks *code implementation* progress, updated by autoforge or manually. These are independent — a module can be Status=Finalized but Impl=— (designed but not yet coded).
+
 ### NFR Allocation
 
 {Shows how PRD-level non-functional requirements are decomposed across modules. Helps identify hot-spot modules (carrying multiple critical NFRs) and gaps (NFRs not allocated to any module).}
@@ -173,6 +176,7 @@ sequenceDiagram
 **Notes:**
 - View names must match the Screen/View column in PRD journey touchpoints exactly
 - If a view is shared across multiple journeys, list all journey references
+- Source Journeys format: `J-{id} #{n}` where `#n` is the touchpoint sequence number from the journey's Touchpoints table (e.g., `J-001 #3` = Journey J-001, touchpoint 3)
 - For complex views, note the major sections/areas and which feature controls each
 
 ### Prototype-to-Production Mapping
@@ -264,21 +268,34 @@ sequenceDiagram
 - [PRD]({path to PRD README.md})
 - [User Journeys]({path to PRD journeys/})
 - [Architecture & Glossary]({path to PRD architecture.md})
+- [Revision History](REVISIONS.md) {omit on initial creation; added by `--revise` mode}
 
-### Revision History
+## REVISIONS.md Template
 
-{Populated by `--revise` mode. Omit on initial creation.}
+The REVISIONS.md file records the version chain for this design. It is created on the first `--revise` invocation and appended on each subsequent revision. Omit this file on initial creation — only `--revise` writes it.
+
+```markdown
+# Revision History — {Product Name} (System Design)
+
+Chronological record of revisions to this design. Most recent entry first.
 
 | Version | Date | Change Type | Previous Version | Summary of Changes |
 |---------|------|-------------|-----------------|-------------------|
 | {this directory name or "in-place"} | {YYYY-MM-DD} | {New version / In-place edit} | [{previous directory name}]({relative path}) or N/A | {what changed and why} |
+```
+
+**Rules:**
+- New entries are inserted at the top of the table (most recent first)
+- `Previous Version` links are relative paths from this directory — e.g. `../2026-03-01-{product}/REVISIONS.md`
+- For in-place edits, `Version` may be the literal string `in-place` plus a date suffix if multiple in-place edits occur in the same directory
 
 ## Key Rules
 
 - README.md is **navigational only** — no module implementation details
+- Revision History lives in `REVISIONS.md`, not in README.md — keeps the navigational entry point stable as the version chain grows
 - `Key Technical Decisions` records important choices and rationale, preventing redundant discussion
 - `NFR Allocation` is the global view of how PRD-level NFRs decompose across modules — identifies hot-spot modules and coverage gaps
-- `Feature-Module Mapping` is the core input for the planning phase (writing-plans)
+- `Feature-Module Mapping` is the core input for the planning phase (`/autoforge`)
 - `Test Strategy` captures project-level testing approach — pyramid allocation, toolchain, test data management, NFR verification methods, and CI execution order. Per-module Testing sections derive from this global strategy. Omit if the project has no testable code (pure documentation, config-only)
 - `Module Interaction Protocols` captures cross-module contracts that no single module file owns — the global view of how modules work together. The `Contract Test` column specifies how each interaction is verified (shared fixtures, schema validation, integration tests)
 - `View / Screen Index` maps PRD journey screens to frontend modules — ensures every user-facing view has clear module ownership. Omit if the project has no user-facing interface

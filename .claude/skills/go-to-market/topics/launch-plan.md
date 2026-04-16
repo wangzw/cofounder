@@ -12,6 +12,13 @@ Read before generating:
 - `gtm/channels.md` — ranked channels, per-channel playbooks
 - `references/launch-timeline-examples.md` — timeline templates, go/no-go criteria, phase definitions
 
+### Chained Mode (PRD exists)
+
+Re-read these PRD sections before generating (do not rely solely on prior `gtm/` files):
+- `architecture/dev-workflow.md` — release process, CI/CD, deployment cadence
+- `README.md` — roadmap/phases, MVP scope
+- `architecture/deployment.md` — deployment model, environment setup
+
 ## Gap-Fill Questions
 
 Ask one at a time, only if not already answered:
@@ -81,4 +88,4 @@ Week-by-week table:
 
 ## Output
 
-Write to `gtm/launch-plan.md`. Present a summary to the user and enter the review gate.
+Write to `{output_dir}/launch-plan.md`. Present a summary to the user and enter the review gate.

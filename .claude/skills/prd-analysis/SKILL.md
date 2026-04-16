@@ -127,7 +127,7 @@ Applied as step 6 of the process (after writing, before commit). Check each dime
 | Deployment architecture completeness | architecture.md Deployment Architecture section covers: environments (purpose, users, infrastructure), local development setup (reproducibility, service dependencies, env vars, data seeding), environment parity policy, configuration management (source, secrets, validation, template), deployment pipeline/CD (triggers, strategy, rollback, smoke tests), environment isolation (multi-instance, ports, databases). Data migration and IaC sections present if applicable. A "Deployment Infrastructure" feature exists (auto-derived) with deliverables for each deployment aspect |
 | AI agent configuration completeness | architecture.md AI Agent Configuration section is present and covers: which agent instruction files to maintain (CLAUDE.md, AGENTS.md, etc.), structure policy (concise index vs monolithic — must be index), convention reference strategy (reference not duplicate), content policy (what is direct vs referenced), maintenance policy (when to update, who is responsible), multi-agent coordination (if applicable), context budget prioritization |
 | No ambiguity | No TBD/TODO/vague descriptions remaining |
-| Version integrity | If Revision History exists: every Previous Version path resolves to an actual directory; Summary of Changes is present for each entry. If Baseline section exists (evolve-mode PRD): Predecessor path resolves to valid directory; all `→ baseline` links in indexes resolve correctly; Change Summary matches actual files. If sibling directories with the same product slug exist in the parent directory: version chain is consistent (revise-mode links via Revision History, evolve-mode links via Baseline.Predecessor). Skip this dimension during the main process step 6 (self-review of initial creation) — it only applies to `--review`, `--revise` post-change review, and `--evolve` post-generation review |
+| Version integrity | If `REVISIONS.md` exists: every Previous Version path resolves to an actual directory; Summary of Changes is present for each entry; README's References section links to `REVISIONS.md`. If Baseline section exists (evolve-mode PRD): Predecessor path resolves to valid directory; all `→ baseline` links in indexes resolve correctly; Change Summary matches actual files. If sibling directories with the same product slug exist in the parent directory: version chain is consistent (revise-mode links via `REVISIONS.md`, evolve-mode links via Baseline.Predecessor). **Skip during initial creation self-review (step 6)** — only applies to `--review`, `--revise` post-change review, and `--evolve` post-generation review |
 
 ### Immutability Rule
 
@@ -136,7 +136,7 @@ Whether PRD files can be modified in place depends on their **downstream consump
 | Downstream State | Modify in Place? | Rationale |
 |-----------------|-----------------|-----------|
 | No design exists | Yes | No downstream consumers to break |
-| Design exists, not implemented | Yes + add Revision History entry | Design team needs the change record to update design accordingly |
+| Design exists, not implemented | Yes + append entry to `REVISIONS.md` (create the file if this is the first revision) | Design team needs the change record to update design accordingly |
 | Implementation exists | No — create new version | Modifying in place would invalidate implemented code |
 
 Steps 6-7 (self-review, user review) always occur before commit and are part of the creation process — modifying files during these steps is expected regardless of downstream state.
@@ -148,6 +148,7 @@ Steps 6-7 (self-review, user review) always occur before commit and are part of 
 ```
 {output-dir}/YYYY-MM-DD-{product-name}/
 ├── README.md                # Product overview + journey index + feature index + roadmap
+├── REVISIONS.md             # Revision history (only present after first --revise)
 ├── journeys/
 │   ├── J-001-{slug}.md      # Individual journey spec
 │   └── ...
@@ -221,6 +222,7 @@ Use templates: `prd-template.md` (README), `journey-template.md` (individual jou
 - **MVP ruthlessly** — push back on scope creep
 - **Minimal context** — agents read one small file, not a giant document
 - **Copy, don't reference** — feature files include relevant data models, conventions, and journey context inline
+- **README is a stable navigational index, REVISIONS.md tracks history** — README.md is the entry point and should not accumulate revision entries that destabilize navigation across versions. Revision history (entries written by `--revise`) lives in a sibling `REVISIONS.md`, created on first revision and grown thereafter. Both files coexist; the README's References section links to `REVISIONS.md` when present.
 - **No ambiguity** — if a requirement can be interpreted two ways, clarify now
 - **Omit empty sections** — if a section has nothing useful, skip it
 

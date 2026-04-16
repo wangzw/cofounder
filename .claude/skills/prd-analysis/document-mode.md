@@ -11,7 +11,7 @@ Read document → summarize understanding → check gaps against list below → 
 **Gap checklist for documents** — scan for missing or vague coverage in these areas:
 
 - [ ] Personas defined with clear goals?
-- [ ] User journeys (happy path + error/alternative paths) described or inferrable?
+- [ ] User journeys (happy path + error/alternative paths) explicitly described (or clearly implied with enough detail to write acceptance criteria)?
 - [ ] Cross-journey patterns identified (shared pain points, repeated touchpoints, handoff points)?
 - [ ] Success metrics with measurable targets?
 - [ ] Competitive context or alternatives acknowledged?
@@ -41,7 +41,7 @@ Read document → summarize understanding → check gaps against list below → 
 - [ ] Notification requirements captured (if the product notifies users)?
 - [ ] Technical stack and integration points specified?
 - [ ] Non-functional requirements (performance, security, i18n) stated?
-- [ ] Shared conventions (API format, error handling, testing strategy) defined or inferrable?
+- [ ] Shared conventions (API format, error handling, testing strategy) explicitly defined (or derivable from the document without assumptions)?
 - [ ] Coding conventions defined (code organization, naming, interface design, dependency wiring, error propagation, logging, config access, concurrency)?
 - [ ] Test isolation policies defined (resource isolation, no global mutable state, random ports, temp dirs, process cleanup, race detection, timeouts, directory independence)?
 - [ ] Development workflow defined (prerequisites, local setup, CI gates, build matrix, release process, dependency management)?
@@ -61,3 +61,23 @@ Read document → summarize understanding → check gaps against list below → 
 - [ ] Non-functional requirements stated per feature (not just globally)?
 - [ ] Test data requirements inferrable for non-trivial features?
 - [ ] E2E test scenarios inferrable from journey flows (happy + error paths)?
+
+## Remediation
+
+For each gap identified above, use the corresponding phase and deep-dive in `questioning-phases.md` to fill it:
+
+| Gap Area | Questioning Phase | Deep-Dive |
+|----------|------------------|-----------|
+| Vision, problem, goals | Phase 1 | — |
+| Personas, journeys | Phase 2 | User Journeys deep-dive |
+| Competitive landscape | Phase 1 | Competitive Landscape deep-dive |
+| Evidence base | Phase 1 | Evidence Base deep-dive |
+| Frontend foundation (tokens, navigation, a11y, i18n) | Phase 3 | Frontend Foundation deep-dive |
+| Features, interaction design, forms | Phase 4 | Interaction Design, Form Specification deep-dives |
+| Prototypes | Phase 5 | Prototypes deep-dive |
+| Architecture conventions | Phase 6 | Development Infrastructure, Deployment Infrastructure, AI Agent Configuration deep-dives |
+| Authorization, privacy | Phase 6 | Authorization, Privacy deep-dives |
+| Prioritization, roadmap | Phase 7 | — |
+| Risks | Phase 8 | — |
+
+Run the relevant questioning phase for each gap — do not attempt to fill gaps without the structured deep-dive guidance.

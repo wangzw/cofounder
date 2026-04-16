@@ -22,6 +22,38 @@ Review Checklist dimensions are defined in `SKILL.md` — read that first.
    - Architecture topics: later PRD's topic file overwrites same-name file in parent.
    - README sections (Problem & Goals, Users, Risks, Roadmap): if the later PRD rewrites the section, it overwrites; otherwise parent version is kept.
    - Personas: accumulated from all PRDs (later PRD's persona table overwrites if changed).
+
+**Flattening algorithm (pseudocode):**
+```
+function flatten(current_prd_path):
+    baseline = read(current_prd_path / "README.md").Baseline.Predecessor
+    if baseline is None:
+        return read_all_files(current_prd_path)  # base case: original PRD
+    
+    parent = flatten(baseline)  # recursive: flatten the predecessor first
+    current = read_all_files(current_prd_path)
+    
+    merged = copy(parent)
+    for item in current.features:
+        if item.status == "Deprecated":
+            merged.features.remove(item.id)  # tombstone removes from baseline
+        else:
+            merged.features[item.id] = item  # new/modified overwrites same-ID
+    
+    for item in current.journeys:
+        merged.journeys[item.id] = item  # same logic as features
+    
+    for topic in current.architecture:
+        merged.architecture[topic.name] = topic  # changed topics overwrite
+    
+    # IDs: new items use max(merged.*.id) + 1 to avoid collisions
+    return merged
+```
+
+**Edge cases:**
+- Feature deprecated in version N then re-added in version N+1: the re-add creates a NEW feature ID (the old ID remains deprecated in the chain)
+- Duplicate IDs across versions: the flattening always takes the latest version's entry, so duplicates are resolved by recency
+
 4. **Present baseline summary to user:**
 
 > Baseline loaded {if chain: "(chain: 2026-01-15 → 2026-03-20 → current flattened)"}
@@ -148,7 +180,7 @@ Change summary:
   Architecture: {list of changed topic files}
 
 Next steps:
-  If system-design exists → /system-design --evolve {design-path}
+  If system-design exists → /system-design --revise {design-path} (propagate PRD changes)
   If no system-design     → /system-design {this PRD path}
 ```
 

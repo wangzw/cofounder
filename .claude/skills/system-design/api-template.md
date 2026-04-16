@@ -16,7 +16,8 @@ The API contract file follows this structure. Omit any section that has no usefu
 
 ### Context
 
-**Owning module:** [M-{XXX}: {name}](../modules/M-{XXX}-{slug}.md)
+**Owning module(s):** [M-{XXX}: {name}](../modules/M-{XXX}-{slug}.md)
+If multiple modules jointly serve this API, list all with their responsibility scope.
 **Serving features:** F-001, F-003
 
 ### Endpoints
@@ -33,7 +34,9 @@ Adapt the format below to match the protocol. Examples for REST, gRPC, and CLI f
 
 | Parameter | Location | Type | Required | Description |
 |-----------|----------|------|----------|-------------|
-| {name} | path/query/body | string | Y | {desc} |
+| {name} | path/query/body/header | string | Y | {desc} |
+
+Location: `path` / `query` / `body` / `header` (e.g., Authorization, X-Request-ID)
 
 **Request example:**
 

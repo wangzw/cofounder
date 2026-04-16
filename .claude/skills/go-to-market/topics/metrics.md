@@ -11,7 +11,13 @@ Read before generating:
 - `gtm/pricing-strategy.md` — pricing model (determines revenue metrics)
 - `gtm/channels.md` — channels (determines acquisition metrics)
 - `gtm/launch-plan.md` — phases and timeline (determines when to measure what)
-- `gtm/landing-page-spec.md` — CTA strategy and conversion design (determines conversion metrics)
+- `gtm/landing-page-spec.md` — CTA strategy and conversion design (determines conversion metrics, CTA click-through rates, and page-level metrics)
+
+### Chained Mode (PRD exists)
+
+Re-read these PRD sections before generating (do not rely solely on prior `gtm/` files):
+- `features/*.md` — analytics events defined per feature, activation signals
+- `journeys/*.md` — journey metrics (completion rate, time to complete, drop-off points)
 
 ## Gap-Fill Questions
 
@@ -97,4 +103,4 @@ Metrics that should trigger action if they cross a threshold:
 
 ## Output
 
-Write to `gtm/metrics.md`. Present a summary to the user and enter the review gate.
+Write to `{output_dir}/metrics.md`. Present a summary to the user and enter the review gate.

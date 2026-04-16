@@ -10,9 +10,11 @@ CoFounder is a suite of interconnected Claude Code skills that guide solo founde
 
 ```
 Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → Market-Ready Business
+                                              ↑
+                              /dev-conventions (standalone, run anytime)
 ```
 
-Skills are chainable: `/system-design` reads PRD output, `/autoforge` reads system design output, `/go-to-market` can chain from PRD. `/dev-conventions` is standalone and generates repo scaffolding (templates, hooks, CI).
+Skills are chainable: `/system-design` reads PRD output, `/autoforge` reads system design output, `/go-to-market` can chain from PRD. `/dev-conventions` is standalone — run it at any point to generate repo scaffolding (issue/PR templates, CI lint workflows, git hooks, CONTRIBUTING.md). It is independent of the main pipeline and can be used before or after `/autoforge`.
 
 ## Skill Architecture
 
@@ -26,6 +28,8 @@ Each skill follows the same structure:
 ### Self-Contained File Principle
 
 Every output file (feature spec, module spec, journey map) must be independently readable. All referenced context — data models, conventions, dependencies — is copied inline rather than cross-referenced. This minimizes context consumption when coding agents consume a single spec.
+
+**In practice:** when a template says 'copy applicable conventions from architecture.md', it means copy the relevant text from `architecture/*.md` topic files into the feature/module file inline — not add a file path reference. The consuming agent should never need to open a second file.
 
 ### Output Conventions
 
@@ -41,6 +45,20 @@ Multi-file output structure: `README.md` (index with summaries, not full content
 - Features: `F-001`, `F-002`, ... (zero-padded, sequential, stable across iterations)
 - Journeys: `J-001`, `J-002`, ...
 - Modules: `M-001`, `M-002`, ...
+
+## Glossary
+
+Key terms used across skills. Skills reference these definitions rather than redefining them.
+
+| Term | Definition |
+|------|-----------|
+| **Self-contained file** | A file that can be read and acted on independently. All referenced context (data models, conventions, journey context) is copied inline rather than cross-referenced. A coding agent implementing a feature reads only that feature's file. |
+| **Interaction Mode** | The primary user interaction pattern at a journey touchpoint: `click` (mouse click on UI element), `form` (fill and submit form fields), `drag` (drag-and-drop), `keyboard` (keyboard input, shortcuts), `scroll` (scroll-triggered actions), `hover` (hover-triggered tooltips/menus), `swipe` (touch gesture), `voice` (voice command), `scan` (QR/barcode scan). If a touchpoint has multiple modes, list the primary one; details belong in the feature's state machine. |
+| **Cross-journey pattern** | A recurring theme observed across multiple user journeys — shared pain points, repeated touchpoints, common infrastructure needs, or handoff points between personas. Documented in the PRD README's Cross-Journey Patterns section. Each pattern should be addressed by at least one feature. |
+| **Feature-Module mapping** | A matrix in the system design README linking PRD features (columns) to implementation modules (rows). Symbols: `✦` = module modifies data for this feature, `△` = module provides read-only support. The mapping is the bridge between requirements and implementation. |
+| **Touchpoint** | A specific moment in a user journey where the user interacts with the system. Defined by: stage name, screen/view, action, interaction mode, system response, and pain point (if any). Touchpoints drive feature derivation — every feature maps back to at least one touchpoint. |
+| **Design token** | A named value (color, spacing, typography, motion, etc.) that represents a design decision. PRD defines token semantics and values; system-design defines the implementation mechanism (CSS custom properties, Tailwind config, terminal constants). Tokens use semantic names (e.g., `color.primary`, `spacing.md`) not raw values. |
+| **Tombstone** | In evolve-mode PRDs, a minimal file that marks a feature or journey as deprecated. Contains status, deprecation reason, replacement reference (if any), and link to the original in the baseline PRD. |
 
 ## Commit Messages
 
@@ -60,7 +78,7 @@ When modifying an existing skill, start by reading its `SKILL.md` to understand 
 ## Review Gates
 
 Skills include human review checkpoints before finalizing output:
-- `/prd-analysis`: 130+ dimension review checklist in SKILL.md
+- `/prd-analysis`: ~50 dimension review checklist in SKILL.md (many dimensions have multiple sub-checks)
 - `/system-design`: structured design review phase
 - `/autoforge`: approval gates after planning (before execution), progress checks during execution
 - `/go-to-market`: per-stage approve/revise/skip/go-back logic with cascade updates

@@ -46,7 +46,7 @@ The boundary between free and paid is the most critical pricing decision. Princi
 - Use competitor pricing as anchoring reference, not as ceiling
 - Annual discount of 15-20% is standard (incentivizes commitment, improves cash flow)
 
-### Common Price Ranges (2024-2025 SaaS benchmarks)
+### Common Price Ranges (SaaS benchmarks — verify current rates at launch time)
 - **Developer tools:** $10-30/month individual, $20-50/seat/month team
 - **Productivity SaaS:** $5-15/month individual, $8-25/seat/month team
 - **B2B Platform:** $50-200/month starter, $200-500/month growth, custom enterprise

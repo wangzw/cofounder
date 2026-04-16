@@ -15,6 +15,14 @@ Auto-detect what has been built on top of this PRD, then confirm with the user.
 1. **Check for design:** scan for a system-design directory whose `Design Input > Source` references this PRD path
 2. **Check for implementation:** if a design exists, read its `Design Input > Status` field — `Implementing` or `Implemented` means code exists
 
+**Detection algorithm:**
+1. Extract the product slug from the PRD directory name: `YYYY-MM-DD-{slug}` -> `{slug}`
+2. Scan `docs/raw/design/` for directories matching `*-{slug}/` -- if any exist, a design exists
+3. For each matching design directory, read its README.md Module Index `Impl` column:
+   - If any module has Impl = `In Progress` or `Done` -> implementation exists
+   - If all modules have Impl = `—` -> design exists but no implementation
+4. If no matching design directories found -> no downstream consumers (modify in place freely)
+
 **Ask user to confirm detected state:**
 
 > I detected the following downstream state for this PRD:
@@ -28,7 +36,7 @@ Auto-detect what has been built on top of this PRD, then confirm with the user.
 | Downstream State | Action |
 |-----------------|--------|
 | No design exists | Modify PRD files directly |
-| Design exists, not implemented | Modify PRD files directly + add Revision History entry describing what changed (so design can be updated accordingly) |
+| Design exists, not implemented | Modify PRD files directly + append entry to `REVISIONS.md` (create the file if absent) describing what changed (so design can be updated accordingly) |
 | Implementation exists (Status = Implementing or Implemented) | Create new PRD version (new dated directory); original untouched |
 
 If the user disagrees with the auto-detection (e.g. "the design exists but is outdated and will be regenerated"), defer to user judgment.
@@ -144,18 +152,18 @@ Based on the downstream state confirmed in Step 1:
 
 **Modify directly (no design, or design exists but not implemented):**
 - Update affected files in place
-- If design exists: add Revision History entry in README.md summarizing what changed and why — this record helps the design update process (`/system-design --revise`) identify what PRD changes need to propagate
+- If design exists: append an entry to `REVISIONS.md` summarizing what changed and why (create the file using the template in `prd-template.md` if this is the first revision, and add a link to it from README.md's References section) — this record helps the design update process (`/system-design --revise`) identify what PRD changes need to propagate
 
 **Create new version (implementation exists):**
 - Create new dated directory (e.g. `docs/raw/prd/YYYY-MM-DD-{product-name}/`)
-- Copy forward unchanged files
+- Copy forward unchanged files (including any existing `REVISIONS.md` from the previous version)
 - Apply changes to affected files
-- Add Revision History entry linking back to previous version
+- Append an entry to `REVISIONS.md` (create it if absent) linking back to the previous version's directory; add a link to `REVISIONS.md` from README.md's References section
 
 In both cases:
 - Update all cross-references (journey Mapped Feature columns, feature Dependencies, Cross-Journey Patterns "Addressed by Feature" column)
 - Mark deprecated features clearly — remove the feature file and remove it from Feature Index, Roadmap, and any Mapped Feature references
-- Re-derive affected User Stories if journey touchpoints changed (re-run Phase 3 Step 1 extraction for affected journeys only)
+- Re-derive affected User Stories if journey touchpoints changed (re-run Phase 4 Step 1 extraction for affected journeys only)
 
 ## Revise Step 6 — Post-Change Review
 

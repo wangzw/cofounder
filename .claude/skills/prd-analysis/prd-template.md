@@ -7,6 +7,7 @@ The README.md is the navigational entry point for the PRD directory. Omit any se
 ```
 {output-dir}/
 ├── README.md              # Product overview + journey index + feature index + roadmap
+├── REVISIONS.md           # Revision history (only present after first --revise)
 ├── journeys/
 │   ├── J-001-{slug}.md    # Individual journey spec
 │   └── ...
@@ -97,7 +98,7 @@ See [journeys/](journeys/) for full journey maps with touchpoints, alternative p
 | F-001 | {name} | UI | H | M | P0 | — | [screenshots](prototypes/screenshots/F-001-{slug}/) | [spec](features/F-001-{slug}.md) |
 | F-002 | {name} | API | H | S | P0 | F-001 | — | [spec](features/F-002-{slug}.md) |
 
-Type: `UI` (user-facing, has Interaction Design section) | `API` (exposes/consumes APIs) | `Backend` (background jobs, infrastructure)
+Type: `UI` (user-facing, has Interaction Design) | `API` (exposes/consumes APIs) | `Backend` (background jobs, infrastructure). Types are non-exclusive — use comma-separated if applicable (e.g., `UI, API` for a feature with both a user interface and an API).
 
 ### Risks
 
@@ -121,16 +122,29 @@ Default mapping: **Phase 1 (MVP) = all P0**, **Phase 2 = P1**, **Phase 3 = P2**.
 - [User Journeys](journeys/)
 - [Architecture, Design Tokens & Data Model](architecture.md)
 - [Interactive Prototypes](prototypes/) {omit if no prototypes}
+- [Revision History](REVISIONS.md) {omit on initial creation; added by `--revise` mode}
 
-### Revision History
+## REVISIONS.md Template
 
-{Populated by `--revise` mode. Omit on initial creation.}
+The REVISIONS.md file records the version chain for this PRD. It is created on the first `--revise` invocation and appended on each subsequent revision. Omit this file on initial creation — only `--revise` writes it.
+
+```markdown
+# Revision History — {Product Name}
+
+Chronological record of revisions to this PRD. Most recent entry first.
 
 | Version | Date | Change Type | Previous Version | Summary of Changes |
 |---------|------|-------------|-----------------|-------------------|
 | {this directory name or "in-place"} | {YYYY-MM-DD} | {New version / In-place edit} | [{previous directory name}]({relative path}) or N/A | {what changed and why} |
+```
+
+**Rules:**
+- New entries are inserted at the top of the table (most recent first)
+- `Previous Version` links are relative paths from this directory — e.g. `../2026-03-01-{product}/REVISIONS.md`
+- For in-place edits, `Version` may be the literal string `in-place` plus a date suffix if multiple in-place edits occur in the same directory
 
 ## Key Rules
 
 - README.md is **navigational only** — no feature details, no architecture deep-dives
+- Revision History lives in `REVISIONS.md`, not in README.md — keeps the navigational entry point stable as the version chain grows
 - No section should exist if it has nothing useful to say — omit empty sections

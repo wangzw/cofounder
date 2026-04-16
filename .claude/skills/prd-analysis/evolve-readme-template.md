@@ -151,6 +151,8 @@ Deprecated features get a short tombstone file instead of being silently removed
 
 All content types (features, journeys, architecture topics) use the same annotation system. See SKILL.md's Evolve Mode section for the full convention (metadata header + inline markers).
 
+All change annotations (file-level metadata headers, inline `[MODIFIED]`/`[ADDED]`/`[REMOVED]`/`[UNCHANGED]` tags) follow the **Change Annotation Convention** defined in `evolve-mode.md`. Refer to that file for the complete format specification, tag syntax, and examples.
+
 ## Key Rules
 
 - README.md contains **complete indexes** for journeys, features, and architecture — mixing local and baseline references

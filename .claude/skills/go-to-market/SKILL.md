@@ -9,7 +9,7 @@ Guide solo founders and small startup teams from finished product to market-read
 
 ## Pipeline Position
 
-Extends the DevForge pipeline beyond code delivery:
+Extends the CoFounder pipeline beyond code delivery:
 
 ```
 Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → Market-Ready Business
@@ -26,7 +26,7 @@ Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → M
 
 ## Mode Detection
 
-1. Check if a PRD path is provided as argument, OR if a `prd/` directory exists in the workspace
+1. Check if a PRD path is provided as argument, OR if a `prd/` directory exists in the workspace, OR if a `docs/raw/prd/` directory exists (scan for the most recent date-prefixed subdirectory)
 2. If PRD found → **Chained Mode** (read topic: `topics/positioning.md` with PRD extraction)
 3. If no PRD → **Standalone Mode** (full interactive Q&A for product context)
 
@@ -52,9 +52,45 @@ Read ONLY the current stage's topic file — do not read ahead. Each topic file 
 
 Every stage follows the same pattern:
 
-1. **Context gather** — pull relevant info from PRD (chained) + prior GTM sections already generated
+1. **Context gather** — pull relevant info from PRD (chained) + prior GTM sections already generated.
+   - **Chained mode (PRD present):** Even after Stage 1, every subsequent stage MUST re-read the PRD sections relevant to its topic before relying on the cached Stage 1 extraction. The PRD is the authority — `gtm/positioning.md` is a derived view that may have lost detail. Each topic file lists the PRD sections relevant to its stage in its Prerequisites; if a topic file omits this, default to: re-read `README.md` Problem & Goals, `features/*.md` for the feature surface this stage touches (e.g. pricing-relevant features for Stage 2, distribution-relevant features for Stage 3), `architecture.md` for any compliance/deployment constraints affecting GTM. If you find PRD facts that contradict a prior `gtm/` file, surface the contradiction to the user before proceeding.
+   - **Standalone mode:** Use only what was gathered in the SKILL.md gap-fill plus prior `gtm/` files. No PRD to consult.
+
+### Per-Stage PRD Extraction Guide
+
+When in chained mode, each stage should re-read these specific PRD sections (in addition to prior `gtm/` files):
+
+| Stage | PRD Sections to Re-Read | What to Extract |
+|-------|------------------------|-----------------|
+| 1. Positioning | README.md (Problem, Goals, Personas), journeys/*.md, architecture/tech-stack.md | Vision, target users, pain points, competitive landscape, tech constraints |
+| 2. Pricing | features/*.md (feature surface, usage patterns), architecture/deployment.md | Feature tiers, usage-based metrics, infrastructure cost drivers |
+| 3. Channels | journeys/*.md (personas, workflows), README.md (target audience) | Where users are, how they discover tools, community affiliations |
+| 4. Launch Plan | architecture/dev-workflow.md, README.md (roadmap/phases) | Release readiness, deployment model, beta/GA timeline |
+| 5. Landing Page | features/*.md (top features for messaging), journeys/*.md (key pain points) | Hero messaging hooks, feature highlights, social proof angles |
+| 6. Metrics | features/*.md (analytics events), journeys/*.md (journey metrics) | Activation signals, retention indicators, revenue events |
+| 7. Acquisition | journeys/*.md (onboarding flow), features/*.md (viral/sharing features) | Onboarding steps, referral mechanics, upgrade triggers |
+
+If a topic file's Prerequisites section lists different PRD sections, follow the topic file's list (it's more specific). This table is a default when topic files omit explicit PRD guidance.
+
 2. **Gap-fill** — ask the user ONLY what is missing (prefer multiple choice, one question at a time)
-3. **Generate** — produce the document
+3. **Generate** — produce the document. **Every generated file must be self-contained**: include a short "Context" header at the top summarizing the upstream facts this stage depends on (e.g. primary persona, core value prop, price tier names). A reader opening this file alone must be able to act on it without cross-referencing the rest of `gtm/` or the PRD. Do not write "see positioning.md" — copy the 2-3 sentences that matter.
+
+**Context header example:**
+
+Every `gtm/*.md` file begins with a Context section that inlines the upstream facts it depends on:
+
+```markdown
+## Context
+
+- **Product:** TaskFlow — AI-powered task management for solo developers
+- **Primary persona:** Independent developers juggling multiple side projects  
+- **Core value prop:** Reduces daily planning time from 30 min to 5 min
+- **Price tier:** Free (up to 3 projects) / Pro $12/mo (unlimited)
+- **Primary channels:** Developer communities (DEV.to, Hacker News), Twitter/X
+- **Launch date:** 2026-05-15 (public beta)
+```
+
+Copy the 3-5 most relevant facts from prior stages. A reader opening this file alone must be able to act on it without cross-referencing other `gtm/` files.
 4. **Review gate** — present a summary of the output, then ask:
 
 > **Stage N complete: [Stage Name]**
@@ -66,25 +102,74 @@ Every stage follows the same pattern:
 > - **Skip** — move on, come back later
 > - **Go back to [previous stage]** — revise an earlier stage
 
-5. On **Approve**: save the document, proceed to next stage
+5. On **Approve**: save the document, commit `gtm/.meta.json` with the stage update (`git add gtm/.meta.json && git commit -m "chore(gtm): update meta — {stage} approved"`), then proceed to next stage. Committing `.meta.json` after each stage ensures cascade state survives session interruptions.
 6. On **Revise**: regenerate based on feedback, present again
-7. On **Skip**: mark as skipped, proceed (will be flagged incomplete at final review)
+7. On **Skip**: mark as skipped, commit `.meta.json`, proceed (will be flagged incomplete at final review)
 8. On **Go back**: revise the earlier stage, then flag downstream documents that may need regeneration
 
 ## Cascade Logic
 
-If the user revises an earlier stage, flag dependent stages:
+If the user revises an earlier stage, downstream stages must be reviewed (and possibly regenerated).
+
+### Cascade Map
 
 | If Changed | Flag These for Review |
 |-----------|----------------------|
-| Positioning | Pricing, Channels, Landing Page, Acquisition |
-| Pricing | Channels, Launch Plan, Landing Page, Metrics |
-| Channels | Launch Plan, Metrics |
+| Positioning | Pricing, Channels, Launch Plan, Landing Page, Metrics, Acquisition |
+| Pricing | Channels, Launch Plan, Landing Page, Metrics, Acquisition |
+| Channels | Launch Plan, Landing Page, Metrics, Acquisition |
 | Launch Plan | Landing Page, Metrics |
-| Landing Page | Metrics |
+| Landing Page | Metrics, Acquisition |
 | Metrics | Acquisition |
 
-Ask: "This change may affect [list]. Want me to regenerate those sections, or just flag them for manual review?"
+### State Tracking
+
+To make cascades deterministic across sessions and revisions, maintain `gtm/.meta.json`:
+
+```json
+{
+  "schema_version": 1,
+  "stages": {
+    "positioning":   { "status": "approved", "version": 2, "updated": "2026-04-16T10:21:00Z" },
+    "pricing":       { "status": "approved", "version": 1, "updated": "2026-04-16T10:25:00Z" },
+    "channels":      { "status": "stale",    "version": 1, "updated": "2026-04-16T10:28:00Z", "stale_reason": "positioning v1 → v2" },
+    "launch-plan":   { "status": "approved", "version": 1, "updated": "2026-04-16T10:31:00Z" },
+    "landing-page":  { "status": "skipped",  "version": 0, "updated": null },
+    "metrics":       { "status": "pending",  "version": 0, "updated": null },
+    "acquisition":   { "status": "pending",  "version": 0, "updated": null }
+  }
+}
+```
+
+**Status values:** `pending` (not started), `approved` (current and accepted), `stale` (an upstream stage changed since this was approved — needs regeneration or explicit re-approval), `skipped` (user opted out for now).
+
+### Cascade Procedure
+
+When the user **approves** a revision to a stage `S`:
+
+1. Bump `stages[S].version`, set `status = approved`, update `updated` to current ISO timestamp.
+2. Look up `S` in the Cascade Map. For each downstream stage `D` whose current `status` is `approved`:
+   - Set `stages[D].status = stale` and `stages[D].stale_reason = "S v{old} → v{new}"`.
+3. Persist `gtm/.meta.json`.
+4. Ask the user (single prompt, listing the staled stages):
+
+   > Revising **{S}** invalidated **{D1, D2, ...}** (cascade). For each, choose:
+   > - **Regenerate now** — re-run the stage with the new {S}, then prompt for re-approval.
+   > - **Flag and continue** — keep current file but leave `status = stale` so the final review surfaces it.
+   > - **Re-approve as-is** — mark `status = approved` again without regenerating (only if you've manually verified the stale file is still correct).
+
+5. Apply the user's per-stage choices, updating `gtm/.meta.json` accordingly. If a regenerated stage itself has downstream stages in the Cascade Map, re-run the cascade procedure recursively for that stage (transitive cascade). This continues until no new stages are marked stale.
+
+### Skipped Prerequisite Handling
+
+If a stage's prerequisites include a skipped stage (the `gtm/*.md` file does not exist):
+- Inform the user: "Stage N depends on {skipped stage}. That stage was skipped, so the file does not exist."
+- Offer options: (a) **Go back** and complete the skipped stage first, or (b) **Continue best-effort** — generate the current stage without that input, noting limitations in the output's Context header.
+- If continuing best-effort, add a note to the output: `> **Note:** This document was generated without {skipped stage}. Some recommendations may be incomplete.`
+
+### Final Review Surface
+
+The Final Review step (below) reads `gtm/.meta.json` and lists every stage whose `status` is `stale` or `skipped`. The user must explicitly resolve each one (regenerate, re-approve, or accept skipped) before the final commit.
 
 ## PRD Extraction (Chained Mode)
 
@@ -122,6 +207,7 @@ When no PRD exists, ask these context questions before starting Stage 1 (one at 
 
 ```
 gtm/
+  .meta.json                    # Stage status & cascade state (see Cascade Logic)
   README.md                     # Executive summary, links to all sections
   positioning.md                # ~500-800 words
   pricing-strategy.md           # ~600-1000 words
@@ -149,14 +235,18 @@ gtm/
 - **Custom:** `--output <dir>` overrides the directory
 - Confirm path with user before writing
 
+Path confirmation happens **once before Stage 1** — not per-stage. After confirmation, all stages write to the confirmed directory without re-asking.
+
 ## Final Review
+
+**Note:** Templates (generated by `topics/templates.md` after Stage 7) do not have individual review gates — they are generated as a batch and reviewed holistically as part of this final review step.
 
 After all 7 stages + templates are generated:
 
-1. Generate `gtm/README.md` as executive summary linking all documents
-2. List any skipped stages
-3. Present the complete `gtm/` directory for final review
-4. On approval: commit the entire `gtm/` directory in a single commit
+1. Read `gtm/.meta.json`. List every stage whose status is `stale` or `skipped`. For each, the user must resolve (regenerate / re-approve / leave skipped). Loop until no `stale` stages remain.
+2. Generate `gtm/README.md` as executive summary linking all documents (note skipped stages explicitly).
+3. Present the complete `gtm/` directory for final review.
+4. On approval: commit the entire `gtm/` directory (including `.meta.json`) in a single commit.
 
 ## Key Principles
 
@@ -165,6 +255,7 @@ After all 7 stages + templates are generated:
 - **Multiple choice preferred** — easier to answer than open-ended
 - **Smart context** — read PRD when available, only ask what's missing
 - **Actionable outputs** — not just strategy docs but ready-to-use templates
+- **Self-contained outputs** — every `gtm/*.md` file starts with a short Context header inlining the upstream facts it relies on (persona, value prop, price tiers, launch date). A reader should be able to act on any single file without opening the others. Do not cross-reference — copy.
 - **YAGNI** — push back on overcomplicating the strategy
 
 ## Next Steps Hint
