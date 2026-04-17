@@ -1,6 +1,6 @@
 ---
 name: autoforge
-description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it — orchestrates multi-role agent teams for planning, coding, testing, reviewing, and PRD acceptance. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement'."
+description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules'."
 ---
 
 # Autoforge — Multi-Role Automated Development

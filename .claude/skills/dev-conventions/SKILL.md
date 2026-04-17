@@ -1,6 +1,6 @@
 ---
 name: dev-conventions
-description: "Generate development convention files for GitHub or GitLab projects: Issue/PR/MR templates, CI/CD lint workflows, git hooks, and CONTRIBUTING.md. Triggers: /dev-conventions, 'setup conventions', 'add issue templates', 'add PR templates'."
+description: "Use when the user wants to set up project conventions, add issue or PR/MR templates, configure CI/CD lint workflows, or enforce Conventional Commits with git hooks. Triggers: /dev-conventions, 'setup conventions', 'add issue templates', 'add PR templates', 'git hooks', 'CONTRIBUTING.md'."
 ---
 
 # Dev Conventions — Project Convention Generator
