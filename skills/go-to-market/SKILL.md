@@ -26,20 +26,27 @@ Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → M
 
 ## Mode Detection
 
-1. Check if a PRD path is provided as argument, OR if a `prd/` directory exists in the workspace, OR if a `docs/raw/prd/` directory exists (scan for the most recent date-prefixed subdirectory)
-2. If PRD found → **Chained Mode**: read all PRD files once now (see PRD Extraction below), then proceed stage by stage
-3. If no PRD → **Standalone Mode** (full interactive Q&A for product context)
+1. Check if a PRD path is provided as argument, OR if a `prd/` directory exists in the workspace, OR if a `docs/raw/prd/` directory exists (scan for the most recent date-prefixed subdirectory).
+2. If PRD found → **Chained Mode**: run the PRD Extract procedure (see below) to produce `gtm/.context.md`, then proceed stage by stage.
+3. If no PRD → **Standalone Mode** (full interactive Q&A for product context).
 
-**Chained mode — one-time PRD read (do this before Stage 1, not per stage):**
-Read all of the following upfront and keep them in context for all 7 stages:
-- `README.md` — product name, vision, problem, personas, competitive landscape, roadmap
-- `features/*.md` (all feature files) — feature surface, usage patterns, analytics events, viral/sharing hooks
-- `journeys/*.md` (all journey files) — personas, workflows, pain points, touchpoints, onboarding, journey metrics
-- `architecture/tech-stack.md` — tech constraints
-- `architecture/deployment.md` — infrastructure cost drivers, environment model (if present)
-- `architecture/dev-workflow.md` — release readiness, beta/GA timeline (if present)
+**Chained mode — PRD Extract (do this before Stage 1, not per stage):**
 
-Each stage extracts what it needs from this already-loaded content — **do not re-read PRD files per stage**.
+Do NOT bulk-load the raw PRD into main context — a 48-feature PRD can easily exceed 100K tokens of feature/journey files, leaving no budget to generate all 7 stages. Instead, dispatch a single `Explore` subagent to read the PRD in parallel and emit a compact context artifact. The main agent never reads feature/journey/architecture files directly.
+
+Dispatch once:
+
+```
+Agent({
+  subagent_type: "Explore",
+  description: "Extract GTM context from PRD",
+  prompt: <PRD Extract prompt — see below>
+})
+```
+
+The subagent writes the result to `gtm/.context.md` (create the `gtm/` directory if absent). All 7 stages consume this artifact. If a stage later discovers a fact it needs is missing from `.context.md`, the stage's topic file may read one specific source file and append the fact to `.context.md` — but bulk re-reading PRD is forbidden.
+
+See the **PRD Extract procedure** section below for the subagent prompt and `.context.md` schema.
 
 ## Stage Routing
 
@@ -63,8 +70,8 @@ Read ONLY the current stage's topic file — do not read ahead. Each topic file 
 
 Every stage follows the same pattern:
 
-1. **Context gather** — extract relevant info from the already-loaded PRD content (chained) + prior GTM sections already generated.
-   - **Chained mode (PRD present):** All PRD files were loaded at Mode Detection — use them directly from context. Each topic file lists the PRD sections relevant to its stage in its Prerequisites. If you find PRD facts that contradict a prior `gtm/` file, surface the contradiction to the user before proceeding.
+1. **Context gather** — use the compact GTM context (chained) + prior GTM sections already generated.
+   - **Chained mode (PRD present):** Read `gtm/.context.md` once (if not already in main context) and use its sections directly. When a topic file refers to "PRD README" or "features/*.md", treat those as pointers into `.context.md` — do NOT read the raw PRD files. If a fact is genuinely missing from `.context.md`, read the single specific source file, append the fact to `.context.md`, and continue. If you find `.context.md` facts that contradict a prior `gtm/` file, surface the contradiction to the user before proceeding.
    - **Standalone mode:** Use only what was gathered in the SKILL.md gap-fill plus prior `gtm/` files. No PRD to consult.
 
 2. **Gap-fill** — ask the user ONLY what is missing (prefer multiple choice, one question at a time)
@@ -166,20 +173,92 @@ If a stage's prerequisites include a skipped stage (the `gtm/*.md` file does not
 
 The Final Review step (below) reads `gtm/.meta.json` and lists every stage whose `status` is `stale` or `skipped`. The user must explicitly resolve each one (regenerate, re-approve, or accept skipped) before the final commit.
 
-## PRD Extraction (Chained Mode)
+## PRD Extract Procedure (Chained Mode)
 
-All PRD files are read once at Mode Detection (before Stage 1). After reading, present an extraction summary to the user:
+### Subagent Prompt
+
+Dispatch one `Explore` subagent at Mode Detection with this prompt (substitute `{prd-dir}`):
+
+```
+Read the following PRD files in parallel and emit a compact GTM context artifact.
+
+Target files (read each exactly once, in parallel):
+- {prd-dir}/README.md
+- {prd-dir}/features/F-*.md  (use Glob to enumerate, then parallel Read)
+- {prd-dir}/journeys/J-*.md  (use Glob to enumerate, then parallel Read)
+- {prd-dir}/architecture/deployment.md  (if present)
+- {prd-dir}/architecture/dev-workflow.md  (if present)
+- {prd-dir}/architecture/tech-stack.md  (if present — for cost signals)
+
+Write the extract to `gtm/.context.md` using the schema below. The goal is to compress the PRD to ~1500–3500 tokens — structured facts only, no prose narrative. Do not paste raw PRD sections; extract and condense.
+
+Schema (use these exact headings; omit any section with no content rather than writing "N/A"):
+
+---
+# GTM Context
+
+_Extracted {ISO timestamp} from {prd-dir}_
+
+## Product
+- **Name:**
+- **Vision:** (one sentence)
+- **Problem:** (one paragraph, <60 words)
+
+## Personas
+For each persona (derived from README Users + journey persona fields):
+- **{name}** — role, situation; primary pain point; frequency/depth of use; where they discover tools; onboarding/activation signals
+
+## Competitive Landscape
+For each competitor from README:
+- **{name}** — what they do well; where they fall short; differentiation hook if noted
+
+## Features
+Table with columns: ID | Name | Priority | 1-liner | Analytics events | Referral/upgrade mechanics (if any)
+Keep 1-liner ≤ 15 words. Only list analytics events + mechanics when they exist.
+
+## Journey Signals
+Per persona (or per journey if personas map 1:1 to journeys):
+- **Pain points verbatim** (top 3–5, for landing-page copy)
+- **Completion metrics** — completion rate target, time-to-complete, drop-off points
+- **Onboarding / first-run / activation** — described in 1–2 lines each
+
+## Roadmap & MVP
+- **MVP scope:** (phase/date if known)
+- **Phase breakdown:** P0 / P1 / P2 summary
+- **Beta/GA timeline:** (from dev-workflow, if present)
+
+## Architecture Signals
+- **Deployment model:** SaaS / self-hosted / CLI / hybrid (from deployment.md)
+- **Infrastructure cost drivers:** compute, storage, API limits (from deployment.md or tech-stack.md)
+- **Release cadence:** (from dev-workflow.md)
+---
+
+Rules:
+- Read PRD files in parallel, each exactly once.
+- Do not Read the same file twice.
+- Do not Grep or explore beyond the listed paths; use Glob only to enumerate features/journeys.
+- Do not write or edit anything except `gtm/.context.md`.
+
+On completion, return: "Extract complete: N features, N journeys, N personas. Written to gtm/.context.md."
+```
+
+### After Extract
+
+Read `gtm/.context.md` into main context (once), then present a summary to the user:
 
 > **Extracted from PRD:**
 > - Product: [name] — [vision]
 > - Target users: [personas]
-> - Key features: [list top 5-7]
+> - Key features: [top 5–7 by priority]
 > - Competitors: [list if found]
-> - Tech stack: [summary]
 >
-> Is this accurate? I'll use this as context for the GTM strategy. I only need to ask you about business-specific details the PRD doesn't cover.
+> Is this accurate? I'll use `gtm/.context.md` as the context for the GTM strategy; I only need to ask you about business-specific details the PRD doesn't cover.
 
-This summary is presented once. Subsequent stages extract from the PRD content already in context — no additional file reads.
+All 7 stages consume `gtm/.context.md`. When a topic file says "extract X from PRD README" or "from features/*.md", treat that as "look up X in `gtm/.context.md`". If a required fact is genuinely missing from `.context.md` (not covered by the schema), read the single specific source file, append the fact to `.context.md`, and continue — **never re-dispatch the Extract subagent or bulk-re-read the PRD**.
+
+### Caching
+
+`gtm/.context.md` is a persistent scratch artifact — it is re-emitted on each chained-mode invocation and should be added to `.gitignore` (see Output Structure below). It is not a spec — `gtm/.meta.json` and the `gtm/*.md` strategy files are the durable outputs.
 
 ## Standalone Mode Gap-Fill
 
@@ -196,6 +275,7 @@ When no PRD exists, ask these context questions before starting Stage 1 (one at 
 
 ```
 gtm/
+  .context.md                   # (Chained mode only) PRD extract — gitignore it, re-emitted each run
   .meta.json                    # Stage status & cascade state (see Cascade Logic)
   README.md                     # Executive summary, links to all sections
   positioning.md                # ~500-800 words
