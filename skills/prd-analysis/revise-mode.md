@@ -10,14 +10,71 @@ Review Checklist dimensions are defined in `review-checklist.md` — load it on 
 
 If the invocation prompt already provides answers to Steps 1–4 (downstream state confirmed, PRD overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–4 entirely** and jump directly to Step 5. Do not re-ask questions or re-run analysis that is already settled.
 
-**Review-driven fix pass:** If `{PRD-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input:
+**Review-driven fix pass:** If `{PRD-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input.
 
-1. Read the latest `.reviews/REVIEW-*.md` (sort by timestamp, pick the newest; ignore `*.applied.md`).
-2. Map findings to change types from Step 3 — most review findings are "Modify requirement" (behavior/scope/AC). A finding's `Dimension:` tag tells you which impact checks apply in Step 4.
-3. Use each finding's `Fix:` line as the concrete edit. Do not re-discover issues.
-4. Jump to Step 5 and apply all edits using the batch-by-file procedure.
-5. In Step 6 (post-change review), scope the delta review to the **dimensions that appear in the consumed `REVIEW-*.md`** plus the always-run checks.
-6. When finished, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 5.
+**DO NOT read the REVIEW file in the main agent.** For a PRD with ~30–50 features the file routinely exceeds 800–1500 lines (~20–40k tokens) and, once loaded, stays in the main-agent prompt cache for every subsequent turn (15–20 turns × main-agent cache_read = the largest single avoidable cost line in a revise session). Delegate the read + cluster step to a Sonnet subagent and consume only its compact manifest.
+
+**Flow:**
+
+1. **Select the REVIEW file** — list `{PRD-dir}/.reviews/REVIEW-*.md`, sort by timestamp, pick the newest file that does NOT end in `.applied.md`. This is a directory-listing step (`Glob` / `Bash ls`), not a file read — the REVIEW body itself is not loaded into main context.
+2. **Dispatch the Clustering Subagent** (see template below). It reads the REVIEW file, parses per-file findings, packs files into ≤3-file clusters, and returns a structured manifest. The manifest is typically **2–4k tokens** — small enough to stay in main context cheaply.
+3. **Consume the manifest directly** — no further reads of the REVIEW file by the main agent. Use `cluster.target_files` and `cluster.dimensions_tagged` to drive Step 5 dispatch and Step 6 delta-review scoping.
+4. **Jump to Step 5** and dispatch one Fix subagent per cluster using Template A (Template A points each Fix subagent at the REVIEW file itself — Fix subagents read only the sections they need).
+5. **Step 6 delta-review scope** comes from the manifest's union of `dimensions_tagged` plus the always-run checks. Do not re-run dimensions the review already validated as passing.
+6. **After all edits succeed**, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` (`Bash mv`) so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 5.
+
+**Clustering-Subagent dispatch template** (main agent emits this):
+
+```
+Cluster the findings in {REVIEW file absolute path} into fix batches.
+
+Read the REVIEW file exactly once. Do not read any other file.
+
+Parse every `### <relative path>` section under `## Per-File Findings`. For each section, count findings, collect the unique `Dimension:` tags, and note the severities present.
+
+Produce clusters using these rules:
+- Each cluster contains AT MOST 3 target files.
+- Files are grouped within the same artifact class first (features/*, journeys/*, architecture/*); do not mix classes within a cluster unless a class has <3 files left.
+- Files with >8 findings get their own cluster (1 file only) — large edit counts replay more cache_read per turn.
+- Preserve source order within a class (F-001..F-003, F-004..F-006, ...).
+- Cross-file findings from the `## Cross-File Findings` section are NOT clustered — list them separately in `cross_file_findings` so the main agent can handle them inline after Fix subagents return.
+
+Return the manifest as YAML inside a fenced code block, exactly this shape:
+
+```yaml
+review_file: <absolute path>
+total_findings: <int>
+critical: <int>
+important: <int>
+suggestion: <int>
+clusters:
+  - id: 1
+    target_files:
+      - <absolute path>
+      - <absolute path>
+    finding_counts: { critical: N, important: N, suggestion: N }
+    dimensions_tagged: [<dimension 1>, <dimension 2>, ...]
+  - id: 2
+    ...
+cross_file_findings:
+  - dimension: <dimension>
+    severity: <Critical|Important|Suggestion>
+    one_line: <the finding text, no Fix line>
+dimensions_tagged_union: [<every dimension that appears anywhere>]
+```
+
+**Forbidden:**
+- Reading any file other than the REVIEW file.
+- Grep/Glob/Bash exploration of the PRD directory.
+- Emitting the `Fix:` text of individual findings — clusters carry only the list of target files and dimension tags; Fix subagents will read the REVIEW themselves for the edit text (Template A).
+- Prose commentary outside the YAML block.
+
+Absolute paths only (resolve them from the REVIEW's `Reviewed:` header + each `### <relative path>` header).
+```
+
+The main agent consumes the returned YAML as the cluster plan. Fix-subagent dispatches in Step 5 use `cluster.target_files` directly; Step 6 delta-review scope uses `dimensions_tagged_union`.
+
+**Clustering-Subagent dispatch parameters:** Use `subagent_type: "general-purpose"` and `model: "sonnet"`. Do not use `Explore` (lightweight tier — will misparse the structured findings schema). Do not use `opus` (simple parsing + grouping is not top-tier work). Never pin a specific version.
 
 ---
 
@@ -254,7 +311,12 @@ Read each file exactly once (in parallel). Apply all edits in a single pass. Wri
 **On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". Do not report prose summaries of what changed — the edits list is the contract.
 ```
 
-The orchestrator (main agent) is responsible for the file → findings grouping (building the cluster). When using Template A, the subagent extracts the exact edit text from the REVIEW file it reads; when using Template B, the orchestrator pre-materializes every edit. Do not push the file-grouping decision into subagents.
+The orchestrator (main agent) owns the cluster plan — but how it is built depends on mode:
+
+- **Pre-Answered Mode (REVIEW-*.md exists):** the orchestrator MUST delegate the read + group step to the Clustering Subagent described at the top of this file, and consume its YAML manifest. The orchestrator never reads the REVIEW body itself.
+- **Interactive mode (Template B):** the orchestrator already has the change list in context from Step 3, so it pre-materializes every edit and dispatches directly. No Clustering Subagent is needed.
+
+When using Template A, Fix subagents extract the exact edit text from the REVIEW file they read; when using Template B, the orchestrator pre-materializes every edit. Do not push cluster-composition into Fix subagents in either mode.
 
 ---
 
