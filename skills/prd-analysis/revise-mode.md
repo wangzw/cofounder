@@ -2,7 +2,7 @@
 
 This file contains instructions for interactively modifying an existing PRD — whether it's still a draft or already finalized. Auto-detects PRD state, confirms intent with the user, then guides a structured change process with impact analysis and conflict detection.
 
-Review Checklist dimensions are defined in `SKILL.md` — read that first.
+Review Checklist dimensions are defined in `review-checklist.md` — load it on demand (Step 6 specifies when).
 
 ---
 
@@ -96,39 +96,48 @@ Then deep-dive each selected type:
 
 ## Revise Step 4 — Impact Analysis & Conflict Detection
 
-After gathering all changes, systematically trace their impact through the PRD.
+After gathering all changes, run **only the impact checks relevant to each change type**. Do not run checks for change types not present in this revision.
 
-**Impact propagation** — for each changed/added/deprecated item (feature, journey, or persona):
+**Impact checks by change type:**
 
-| Check | How |
-|-------|-----|
-| Journey impact | Which journeys reference the affected feature(s)? Do touchpoints need updating? If a journey itself changed, which features map to its touchpoints? |
-| Dependency chain | Which features depend on the affected item? Which features does it depend on? |
-| Cross-journey patterns | Does this change affect any documented cross-journey pattern? If a journey is added/removed, do patterns need re-evaluation? |
-| Metrics impact | Does the affected item feed a Goal metric? Will removing/changing it leave a metric unmeasured? |
-| Roadmap impact | Does this change affect phase ordering? Do dependencies still respect phase boundaries? |
-| Risk impact | Does this change introduce new risks or invalidate existing mitigations? |
-| Test impact | Which Acceptance Criteria, Edge Cases, and E2E Test Scenarios are invalidated or need updating? Which dependent Features' test cases need regression re-verification? List affected items by Feature/Journey ID |
-| Design token impact | Does the change affect design tokens in architecture.md? If so, ALL features referencing those tokens are impacted — check every user-facing feature's Interaction Design section |
-| Navigation impact | Does the change add/remove/rename screens? If so, architecture.md Navigation Architecture (site map, routes) and all affected features' Screen & Layout sub-sections need updating |
-| Component contract impact | Does the change modify a shared component's contract? If so, check which features use that component and whether their state machines and interactions are still valid |
-| Accessibility baseline impact | Does the change affect architecture.md's Accessibility Baseline? If so, every user-facing feature's Accessibility sub-section that references the baseline may need updating |
-| i18n baseline impact | Does the change affect architecture.md's Internationalization Baseline (frontend or backend)? If frontend baseline changed, every user-facing feature's i18n sub-section and i18n key prefixes may need updating. If backend baseline changed (locale resolution, timezone handling), every backend feature returning user-visible text may need updating |
-| Form specification impact | Does the change affect a feature's Form Specification (fields, validation, dependencies)? If so, check if the feature's state machine, acceptance criteria, and E2E Test Scenarios still cover the updated form behavior |
-| Micro-interaction & motion impact | Does the change introduce, remove, or modify UI interactions? If so, check affected features' Micro-Interactions & Motion sub-sections for consistency with updated state machines and component contracts |
-| Interaction mode impact | Does the change modify a journey's touchpoints or interaction patterns? If so, check that the Interaction Mode column is updated and that corresponding feature component contracts support the changed interaction mode |
-| Prototype impact | Does the change invalidate existing prototypes? Mark affected prototypes as needing regeneration in the feature's Prototype Reference section (set Confirmed date to empty); after regeneration, overwrite old source in `prototypes/src/{feature-slug}/` and old screenshots in `prototypes/screenshots/{feature-slug}/`, then update Confirmed date |
-| Coding conventions impact | Does the change affect architecture.md's Coding Conventions (e.g. new concurrency requirement, changed error handling policy)? If so, every feature's "Relevant conventions" section that copies those policies may need updating |
-| Test isolation impact | Does the change affect architecture.md's Test Isolation policies (e.g. new resource isolation requirement, changed timeout defaults)? If so, affected features' Test Data Requirements sections may need updating |
-| Development workflow impact | Does the change affect architecture.md's Development Workflow (e.g. new CI gate, changed prerequisites)? If so, check all features' Implementation Notes for consistency |
-| Security policy impact | Does the change affect architecture.md's Security Coding Policy (e.g. new validation requirement, changed secret handling rules)? If so, every feature's edge cases and acceptance criteria should be checked for security-relevant scenarios |
-| Backward compatibility impact | Does the change affect architecture.md's Backward Compatibility policy (e.g. new API version, changed migration strategy)? If so, affected features' API contracts and data model sections may need versioning annotations |
-| Git & Branch Strategy impact | Does the change affect architecture.md's Git & Branch Strategy (e.g. changed merge strategy, new branch protection)? If so, features' Implementation Notes and Development Workflow CI gates may need updating |
-| Code review policy impact | Does the change affect architecture.md's Code Review Policy (e.g. new review dimension, changed approval requirements)? If so, check if any feature's quality or testing criteria need alignment |
-| Observability requirements impact | Does the change affect architecture.md's Observability Requirements (e.g. new mandatory event, changed alerting rules)? If so, affected features' Analytics & Tracking sections may need new events added |
-| Performance testing impact | Does the change affect architecture.md's Performance Testing policy (e.g. new budget, changed regression threshold)? If so, affected features' non-behavioral acceptance criteria may need updating |
-| AI agent configuration impact | Does the change affect architecture.md's AI Agent Configuration (e.g. new instruction file, changed structure policy, updated convention references)? If so, the Development Infrastructure feature's CLAUDE.md deliverable may need updating; check if instruction file references still point to valid convention files |
-| Deployment architecture impact | Does the change affect architecture.md's Deployment Architecture (e.g. new environment, changed CD pipeline policy, updated rollback strategy, modified environment isolation)? If so, the Deployment Infrastructure feature's deliverables may need updating; check environment-specific configs, CD pipeline definitions, and isolation configurations |
+| Change Type | Run These Impact Checks |
+|-------------|------------------------|
+| **Add requirement** | Journey impact · Dependency chain · Cross-journey patterns · Metrics impact · Roadmap impact · Risk impact · Test impact |
+| **Modify requirement — priority only** | Roadmap impact · Dependency chain (phase ordering) |
+| **Modify requirement — behavior/scope/AC** | Journey impact · Dependency chain · Test impact · Prototype impact; plus conditionally: Design token impact (if tokens referenced), Navigation impact (if screens added/removed/renamed), Component contract impact (if shared component changed), Accessibility baseline impact (if a11y requirements changed), i18n baseline impact (if i18n requirements changed), Form specification impact (if form fields changed), Micro-interaction & motion impact (if animations/transitions changed), Interaction mode impact (if touchpoint interaction pattern changed) |
+| **Deprecate requirement** | Journey impact · Dependency chain · Cross-journey patterns · Metrics impact · Risk impact · Prototype impact |
+| **Environment change** | Risk impact · Metrics impact; then determine which additional checks apply based on the specific external change (tech stack shift → AI agent config impact; security/compliance → Security policy impact; competitor → note in risks only) |
+| **Convention/policy change** | Run only the single convention category that changed: Coding conventions → Coding conventions impact + per-feature Relevant conventions; Test isolation → Test isolation impact + Test Data Requirements; Security policy → Security policy impact + edge cases; Backward compat → Backward compatibility impact + API contracts; Git strategy → Git & Branch Strategy impact + Implementation Notes; Code review policy → Code review policy impact; Observability → Observability requirements impact + Analytics events; Performance testing → Performance testing impact + non-behavioral AC; AI agent config → AI agent configuration impact; Deployment architecture → Deployment architecture impact + Deployment Infrastructure feature |
+
+**Impact check definitions** (consult only the definitions relevant to your change types):
+
+- **Journey impact** — Which journeys reference the affected feature(s)? Do touchpoints need updating? If a journey itself changed, which features map to its touchpoints?
+- **Dependency chain** — Which features depend on the affected item? Which features does it depend on?
+- **Cross-journey patterns** — Does this change affect any documented cross-journey pattern? If a journey is added/removed, do patterns need re-evaluation?
+- **Metrics impact** — Does the affected item feed a Goal metric? Will removing/changing it leave a metric unmeasured?
+- **Roadmap impact** — Does this change affect phase ordering? Do dependencies still respect phase boundaries?
+- **Risk impact** — Does this change introduce new risks or invalidate existing mitigations?
+- **Test impact** — Which Acceptance Criteria, Edge Cases, and E2E Test Scenarios are invalidated or need updating? Which dependent features' test cases need regression re-verification?
+- **Design token impact** — Does the change affect design tokens in architecture.md? If so, check every user-facing feature's Interaction Design section for references to those tokens.
+- **Navigation impact** — Does the change add/remove/rename screens? If so, update architecture.md Navigation Architecture and affected features' Screen & Layout sub-sections.
+- **Component contract impact** — Does the change modify a shared component's contract? If so, check which features use that component and whether their state machines and interactions are still valid.
+- **Accessibility baseline impact** — Does the change affect architecture.md's Accessibility Baseline? If so, affected user-facing features' Accessibility sub-sections may need updating.
+- **i18n baseline impact** — Does the change affect architecture.md's Internationalization Baseline? If frontend baseline changed, check user-facing features' i18n sub-sections. If backend baseline changed, check backend features returning user-visible text.
+- **Form specification impact** — Does the change affect a feature's Form Specification? If so, check whether the state machine, acceptance criteria, and E2E Test Scenarios still cover the updated form behavior.
+- **Micro-interaction & motion impact** — Does the change introduce, remove, or modify UI interactions? If so, check affected features' Micro-Interactions & Motion sub-sections.
+- **Interaction mode impact** — Does the change modify a journey's touchpoints or interaction patterns? If so, check that the Interaction Mode column is updated and corresponding feature component contracts support the changed mode.
+- **Prototype impact** — Does the change invalidate existing prototypes? Mark affected prototypes as needing regeneration (set Confirmed date to empty); after regeneration, overwrite old source and screenshots, then update Confirmed date.
+- **Coding conventions impact** — Which features copy affected policies into their "Relevant conventions" section? Update those inline copies.
+- **Test isolation impact** — Which features' Test Data Requirements reference the changed policies? Update those sections.
+- **Development workflow impact** — Which features' Implementation Notes reference the changed CI gates or prerequisites? Update those sections.
+- **Security policy impact** — Which features' edge cases and acceptance criteria cover security-relevant scenarios affected by the change? Update those sections.
+- **Backward compatibility impact** — Which features' API contracts and data model sections need versioning annotations for the changed strategy?
+- **Git & Branch Strategy impact** — Which features' Implementation Notes and Development Workflow CI gates reference the changed strategy?
+- **Code review policy impact** — Which features have Reviewer-related user stories or acceptance criteria that need alignment?
+- **Observability requirements impact** — Which features' Analytics & Tracking sections need new or updated events for the changed requirements?
+- **Performance testing impact** — Which features' non-behavioral acceptance criteria reference the changed budgets or thresholds?
+- **AI agent configuration impact** — Does the Development Infrastructure feature's CLAUDE.md deliverable need updating? Do any convention file references still point to valid files?
+- **Deployment architecture impact** — Does the Deployment Infrastructure feature's deliverables need updating for the changed environments, pipeline policy, or isolation configuration?
 
 **Conflict detection** — check for these types:
 
@@ -165,28 +174,36 @@ In both cases:
 - Mark deprecated features clearly — remove the feature file and remove it from Feature Index, Roadmap, and any Mapped Feature references
 - Re-derive affected User Stories if journey touchpoints changed (re-run Phase 4 Step 1 extraction for affected journeys only)
 
-## Revise Step 6 — Post-Change Review
+## Revise Step 6 — Post-Change Review (Delta-Focused)
 
-Run the full Review Checklist on the modified/new PRD, with special attention to:
-- Traceability chain integrity after changes
-- No orphan features (especially after deprecation)
-- No uncovered touchpoints or pain points (especially after deprecation)
-- Dependency ordering still valid after priority changes
-- Cross-journey patterns still accurate
-- All conflicts from Step 4 resolved
-- Interaction Design sections consistent with any changed journeys (interaction modes, page transitions, state machines)
-- Architecture-level baselines (a11y, i18n, design tokens) still consistent with per-feature sections after changes
-- Prototype archival up to date (no stale screenshots or source for changed features)
-- Developer convention sections (Coding Conventions, Test Isolation, Security Coding Policy, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, Development Workflow, Backward Compatibility) still consistent with per-feature "Relevant conventions" sections after changes
-- Security Coding Policy changes reflected in affected features' edge cases (e.g. new input validation boundary → new edge case testing unauthorized input)
-- Performance Testing budget changes reflected in affected features' non-behavioral acceptance criteria
-- Code Review Policy changes aligned with features that have Reviewer-related user stories or acceptance criteria
-- Observability Requirements changes reflected in affected features' Analytics & Tracking events
-- Test Isolation policy changes reflected in affected features' Test Data Requirements sections
-- Development Workflow changes (CI gates, prerequisites) reflected in affected features' Implementation Notes
-- Backward Compatibility policy changes reflected in affected features' API Contracts and data model versioning annotations
-- Git & Branch Strategy changes reflected in affected features' Implementation Notes and Development Workflow CI gates
-- AI Agent Configuration consistency: instruction file structure policy still valid, convention references still point to existing files, maintenance triggers still aligned with changed conventions
+**Do NOT run the full 52-dimension review checklist.** Run only the checklist dimensions relevant to what actually changed. Load `review-checklist.md` only if you need to reference a dimension's exact definition.
+
+**Always run (every revision):**
+- **Traceability** — no orphan features; every touchpoint still maps to a feature; Cross-Journey Patterns still accurate
+- **No ambiguity** — no TBD/TODO/vague descriptions in modified files
+- **Version integrity** — REVISIONS.md entry is present and correct; README References section links to REVISIONS.md; all `→ baseline` links valid if applicable
+- **All conflicts from Step 4 resolved**
+
+**Run if features were added or modified:**
+- **Priority** — new/modified feature's priority aligns with roadmap phase; dependencies respect phase ordering
+- **Self-containment** — modified feature file can be read and implemented independently
+- **Testability** (sub-checks a, b, e, f only) — ACs are precise; edge cases have Given/When/Then; error paths map to an AC or edge case; cross-feature dependencies have integration-level AC
+- **Scope boundary** — no implementation-level details crept into the modified feature
+
+**Run if features were deprecated:**
+- **Traceability** (focused) — no journey touchpoint or pain point left uncovered; no Metric orphan; no Dependency conflict (no remaining feature depends on the deprecated one)
+
+**Run additionally if the change touches UI (screens, components, interactions):**
+- **Interaction Design coverage** — modified user-facing features have complete Interaction Design sections
+- **State machine integrity** — no dead states; every transition has system feedback; loading states have success and error exits
+- **Component contract consistency** — shared components used by modified features have consistent contracts
+- **Journey interaction mode coverage** — touchpoints in modified journeys have Interaction Mode specified
+- **Accessibility per-feature** — modified user-facing features have Accessibility sub-sections
+- **i18n per-feature — frontend** — modified user-facing features have no hardcoded strings
+
+**Run additionally if architecture conventions changed:**
+- The single relevant architecture completeness dimension (e.g., "Coding conventions completeness" if coding conventions changed)
+- **Development infrastructure feature** — check that the concrete deliverable for the changed convention is still present and correct
 
 Then proceed to user review → commit (same as initial creation flow steps 7-8).
 

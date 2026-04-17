@@ -33,7 +33,7 @@ After detecting the invocation mode, read the corresponding files before proceed
 | Initial analysis (no flags) | `questioning-phases.md`, `scope-reference.md`, `review-checklist.md` |
 | Initial analysis + document input | `questioning-phases.md`, `document-mode.md`, `scope-reference.md`, `review-checklist.md` |
 | `--review` | `review-mode.md`, `review-checklist.md` |
-| `--revise` | `revise-mode.md`, `scope-reference.md`, `review-checklist.md` |
+| `--revise` | `revise-mode.md` (load `scope-reference.md` and `review-checklist.md` on demand per revise-mode.md instructions) |
 | `--evolve` | `evolve-mode.md`, `questioning-phases.md`, `scope-reference.md`, `review-checklist.md` |
 
 Do NOT read files not listed for the current mode — they are not needed and waste context.
