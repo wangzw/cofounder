@@ -26,7 +26,14 @@ Record the file lists for use in Step 2.
 
 ## Step 2 — Dispatch Parallel Review Subagents
 
-Dispatch **one round** of `Explore` subagents, covering disjoint file sets, split by artifact class. **Do not dispatch a second review pass for the same files** — if a subagent's findings are vague, prefer `--revise` over re-reviewing.
+Dispatch **one round** of subagents, covering disjoint file sets, split by artifact class. **Do not dispatch a second review pass for the same files** — if a subagent's findings are vague, prefer `--revise` over re-reviewing.
+
+**Subagent type and model — REQUIRED:**
+
+- Use `subagent_type: "general-purpose"` (NOT `Explore`). Explore defaults to a lightweight tier that is miscalibrated for design-document judgment: it produces surface-level findings (wording / formatting), misses interface-contract inconsistencies and data-model mismatches, and gives vague "Fix:" actions. The net effect is slow convergence across `--review → --revise` cycles.
+- Pass `model: "sonnet"` explicitly. Per-file design review requires understanding dimension semantics, spotting subtle logical gaps across module boundaries, and writing actionable fixes — that is mid-tier work, not light-tier pattern matching.
+- Never pin a specific model version (e.g. `claude-sonnet-4-6`). Use the tier alias `sonnet` so the policy survives model rotations.
+- **Escalation (rare):** if a design has gone through ≥3 `--review → --revise` cycles and the same dimension keeps surfacing findings, escalate that file's next review to `model: "opus"` — recurring findings usually mean the dimension requires cross-module architectural judgment that Sonnet is not catching.
 
 **Dispatch rules:**
 
