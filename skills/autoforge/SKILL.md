@@ -5,7 +5,7 @@ description: "Use when the user has a finalized system design (system-design ski
 
 # Autoforge — Multi-Role Automated Development
 
-Orchestrate agent teams to turn a system design into tested, PRD-validated code. Modules are planned sequentially in dependency order for consistency, then executed in parallel with isolated git worktrees. Each module gets a team (Developer, Tester, Reviewer). Fully automated with adaptive iteration — human intervenes only at explicit approval gates or when the agent has exhausted reasonable approaches and needs a trade-off decision.
+Orchestrate agent teams to turn a system design into tested, PRD-validated code. Modules are planned **phase by phase** — phases run sequentially so upstream plans are finalized first, but Planners within a phase run in parallel (same-phase modules are independent by construction). Each Planner receives only its **dependency closure** of already-completed plans instead of every prior plan, keeping input size proportional to fan-in. Execution then runs modules in parallel with isolated git worktrees; each module gets a team (Developer, Tester, Reviewer). Fully automated with adaptive iteration — human intervenes only at explicit approval gates or when the agent has exhausted reasonable approaches and needs a trade-off decision.
 
 ## Input Modes
 
@@ -56,7 +56,7 @@ Every `Agent(...)` dispatch in this skill MUST set the `model` field to a tier *
 ```mermaid
 flowchart TD
   init["Step 0: Initialize\nRead design, build dep graph,\ncreate feature branch"]
-  plan["Step 1: Sequential Planning\nPlan modules in dependency order"]
+  plan["Step 1: Phased Planning\nParallel within phases;\ndependency-closure context"]
   human{"Human Review\nApprove / edit plans"}
   needsBootstrap{"New project?\n(no existing source)"}
   bootstrap["Step 1.5: Project Bootstrap\nInit project on feature branch"]
@@ -108,22 +108,38 @@ flowchart TD
 
 **Step 0 → Step 1 gate:** User confirms phase breakdown and branch naming.
 
-## Step 1 — Sequential Planning
+## Step 1 — Phased Planning (parallel within phases)
 
 > **Load now:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`
 
-Plan modules one at a time in dependency order. Each Planner receives all previously generated plans as accumulated context, ensuring consistent conventions, concrete interface alignment, and coherent file organization across the entire project.
+Plan modules **phase by phase**. Phases run sequentially — so every plan in Phase N-1 is complete before any Phase N Planner starts — but within a phase, Planners run **in parallel**. Same-phase modules are independent by the DAG construction (no dep between them), so parallelism is safe for interface consistency.
 
-Planners run in the **primary worktree** (on the feature branch) — they only produce plan documents, no code. **Planners write files but do NOT commit** — the Orchestrator commits all plans together after all Planners complete.
+Each Planner receives only its **dependency closure** of already-completed plans — the transitive set of upstream modules it consumes — instead of every prior plan. Combined with the shared `conventions.md`, this preserves cross-module coherence while keeping per-Planner input proportional to fan-in (typically 1–3 plans) rather than the full run size.
+
+Planners run in the **primary worktree** (on the feature branch) — they only produce plan documents, no code. **Planners write files but do NOT commit** — the Orchestrator commits all plans together after all phases complete.
 
 ### Planning Order
 
-Use the topological sort from Step 0. Within the same phase, order by module ID ascending:
+Use the topological sort from Step 0. Plan one phase at a time; within a phase, spawn all Planners in a single message (multiple `Agent` tool calls in one response) and wait for the whole phase to finish before moving to the next.
+
+**Conventions-bootstrap exception:** the very first Planner (lowest M-id in Phase 1) runs alone to create `conventions.md`. Once it returns, the rest of Phase 1 spawns in parallel. This is the only serialized step in the planning flow.
 
 ```
 Example: Phase 1 [M-001, M-002, M-008] → Phase 2 [M-003, M-005] → Phase 3 [M-006, M-007]
-Planning order: M-001 → M-002 → M-008 → M-003 → M-005 → M-006 → M-007
+  Round 1 (serialized): M-001 alone       # bootstraps conventions.md + its own plan
+  Round 2 (parallel):   M-002, M-008      # rest of Phase 1
+  Round 3 (parallel):   M-003, M-005      # Phase 2
+  Round 4 (parallel):   M-006, M-007      # Phase 3
 ```
+
+### Dependency Closure
+
+For each module M about to be planned, the Orchestrator computes its **dependency closure** over the DAG:
+
+- `direct_deps(M)` = modules listed in M's `Deps` column of the Module Index
+- `closure(M)` = `direct_deps(M) ∪ { closure(d) for d in direct_deps(M) }` — transitive
+
+Only plans for modules in `closure(M)` are passed to M's Planner. By the phase ordering, all of them are already planned by the time M is planned (closure can only point to earlier phases, never to same or later phases). For Phase 1 modules the closure is empty.
 
 ### Conventions Bootstrap
 
@@ -148,19 +164,33 @@ The first Planner has an additional responsibility: create `docs/raw/plans/{plan
 - Development workflow — prerequisites, setup commands, CI gate ordering, build matrix (from PRD Development Workflow)
 - AI agent instruction file policy — which instruction files to maintain (CLAUDE.md, AGENTS.md), structure policy (concise index with references to convention files, not monolithic), content priorities, maintenance triggers (from PRD AI Agent Configuration)
 
-Subsequent Planners follow `conventions.md` and may extend it if they encounter patterns not yet covered.
-
-### Per-Module Planning
-
-For each module in planning order, spawn a single **Planner** agent. **Wait for each Planner to complete before spawning the next** — this is what enables context accumulation:
+Subsequent Planners follow `conventions.md`. If they encounter a pattern not yet covered, they **must not edit `conventions.md` directly** — within-phase Planners run in parallel and would race. Instead, each Planner writes its additions to a per-module file:
 
 ```
+docs/raw/plans/{plan-dir}/plans/conventions-additions/M-{id}.md
+```
+
+After each phase of planning completes, the Orchestrator merges all `conventions-additions/*.md` from that phase into `conventions.md` (dedup, reconcile, then delete the merged addition files) before the next phase starts. This gives later phases a single consolidated conventions file to read.
+
+### Per-Phase Planning
+
+For each phase (following the conventions-bootstrap exception in the first round), spawn every Planner for that phase in a **single message** with multiple `Agent` tool calls so they run in parallel. Wait for the entire phase to return before starting the next phase.
+
+```
+# Round 1 — bootstrap (only the very first Planner in Phase 1)
 Agent({
-  description: "Planner for M-{id}",
-  prompt: <fill in planner-prompt.md with parameters>,
+  description: "Planner for M-001 (conventions bootstrap)",
+  prompt: <fill in planner-prompt.md; is_first_module=true, dependency_closure_plan_paths=[]>,
   model: "opus",
   mode: "auto"
 })
+
+# Round 2+ — phase parallel (all remaining Planners in the current phase,
+# spawned as parallel Agent calls in one message)
+Agent({ description: "Planner for M-002", model: "opus", mode: "auto",
+        prompt: <is_first_module=false, dependency_closure_plan_paths=[closure(M-002)]> })
+Agent({ description: "Planner for M-008", model: "opus", mode: "auto",
+        prompt: <is_first_module=false, dependency_closure_plan_paths=[closure(M-008)]> })
 ```
 
 See `planner-prompt.md` for the complete Planner prompt template.
@@ -175,16 +205,25 @@ See `planner-prompt.md` for the complete Planner prompt template.
 | PRD feature specs | `features/F-*.md` | Features referenced in module's Source Features section |
 | Prototype Reuse Guide | Module spec's UI Architecture section | If module has Action = Reuse/Refactor: files to copy, patterns to preserve, adaptations needed. Planner uses this to generate "copy/adapt prototype" steps instead of "write from scratch" steps |
 | PRD prototype source | `{prd-dir}/prototypes/src/{feature-slug}/` | Actual prototype code files (if module has Prototype Reuse Guide). Planner reads these to write concrete adaptation steps |
-| Previous plans | `plans/plan-M-*.md` (all completed so far) | Accumulated context — concrete decisions from earlier modules |
+| Dependency closure plans | `plans/plan-M-*.md` for every module in `closure(M)` | Concrete interface signatures, types, and file paths for the upstream modules this one consumes. Empty for Phase 1 modules. Replaces the prior "all previous plans" input. |
 | Implemented code | Source files on feature branch | For already-merged modules: actual code is source of truth over plans (populated during re-planning) |
-| Conventions | `plans/conventions.md` | First module creates; subsequent modules read and may extend |
+| Conventions | `plans/conventions.md` | First Planner creates; subsequent Planners read. Extensions are written to per-module `conventions-additions/M-{id}.md` files and merged by the Orchestrator between phases. |
 
 **Planner output:**
 - `docs/raw/plans/{plan-dir}/plans/plan-M-{id}-{slug}.md` (using `module-plan-template.md`)
 - [First module only] `docs/raw/plans/{plan-dir}/plans/conventions.md`
-- [Subsequent modules, if needed] Additions to `conventions.md`
+- [Subsequent modules, if needed] `docs/raw/plans/{plan-dir}/plans/conventions-additions/M-{id}.md`
 
-### After All Planners Complete
+### After Each Phase of Planning
+
+Run between phases — before spawning the next phase's Planners — so later phases read a single consolidated conventions file:
+
+1. **Collect conventions additions** — list files under `plans/conventions-additions/` produced by this phase's Planners
+2. **Merge into `conventions.md`** — fold in any new sections, dedup and reconcile against existing content, preserve section order. For a non-trivial batch, spawn a `sonnet` subagent with the merge task; for zero or one addition, merge inline
+3. **Delete the merged addition files** so the directory is empty before the next phase writes into it
+4. **Proceed to the next phase**
+
+### After All Phases of Planning Complete
 
 1. **Generate plan README** — write `docs/raw/plans/{plan-dir}/README.md` using `plan-readme-template.md`: dependency graph (mermaid), phase breakdown, module list with status
 2. **Commit plans** — single commit of all plan files on the feature branch: `docs(plan): add implementation plans for {project}`
@@ -438,11 +477,12 @@ Review Dimensions:
      - The issue report from the Module Agent (ISSUE_TYPE, evidence, suggested fix)
      - Current project state: which modules are already implemented and merged, which are in progress
      - The actual code on the feature branch (Planners read the real code, not just the old plans)
-   - Re-planning follows the same sequential process as Step 1 but starts from the current state:
-     - Planner re-evaluates ALL plans (completed and remaining) in dependency order
+   - Re-planning follows the same phased-parallel process as Step 1 (phases serialized, Planners within a phase in parallel, dependency-closure context) but starts from the current state:
+     - Planners re-evaluate ALL plans (completed and remaining), grouped into phases by the DAG
+     - Each Planner still receives only its dependency closure; for already-merged upstream modules in that closure, the Planner reads the actual source code (authoritative) in addition to the old plan
      - For already-implemented modules that need changes: plan produces fix/enhancement steps
      - For not-yet-implemented modules: plan is revised to account for the new reality
-     - Conventions.md is updated if needed
+     - `conventions.md` is updated if needed via the same `conventions-additions/` flow
    - Commit revised plans: `docs(plan): re-plan from phase {n} — {reason}`
    - **Human review gate** — present the re-plan review summary (see Step 1, item 3) with emphasis on what changed and why. The user should be able to understand the re-plan without re-reading unchanged plans.
    - After approval: resume execution from the appropriate phase, using `--execute` mode logic to determine which modules need re-execution
@@ -955,7 +995,7 @@ If an Agent tool call fails due to infrastructure issues (timeout, context overf
 ## Key Principles
 
 - **Self-contained agents** — each agent receives all needed context; no agent needs to read prior conversation history
-- **Sequential planning, parallel execution** — modules are planned one at a time in dependency order for consistency; within each execution phase, modules run in parallel
+- **Phased-parallel planning, parallel execution** — phases plan sequentially (so upstream plans are final before downstream starts), Planners within a phase run in parallel, and each Planner reads only its dependency-closure of prior plans; within each execution phase, modules run in parallel
 - **Fail fast, fix targeted** — test failures and review rejections are addressed by the responsible Developer, not by re-running the entire pipeline
 - **Main stays clean** — all work happens on the feature branch; main is only touched at the very end after full acceptance
 - **Design is the contract** — module design specs are the source of truth; Reviewer checks code against design, not against subjective standards
@@ -971,6 +1011,9 @@ docs/raw/plans/{design-dir-name}-{hash4}/
 ├── execution-log.md                       # Chronological event log (append-only)
 ├── plans/
 │   ├── conventions.md                     # Project-wide implementation conventions
+│   ├── conventions-additions/             # Transient: per-module convention extensions,
+│   │                                      #   merged into conventions.md and deleted
+│   │                                      #   between phases (empty at end of planning)
 │   ├── plan-M-001-{slug}.md               # Module implementation plan
 │   ├── plan-M-002-{slug}.md
 │   └── ...

@@ -12,7 +12,7 @@ You will receive these parameters from the Orchestrator:
 - `design_readme_path`: path to the design README.md
 - `prd_feature_paths`: paths to PRD feature specs referenced by this module
 - `plan_dir`: plan output directory (`docs/raw/plans/{plan-dir}/plans/`)
-- `previous_plan_paths`: previously generated plan files (empty for first module)
+- `dependency_closure_plan_paths`: plan files for modules in this module's **dependency closure** — the transitive set of upstream modules it consumes (direct `Deps` + their deps). Empty for Phase 1 modules with no dependencies. This is the only set of prior plans you receive; you do not have access to plans outside the closure.
 - `conventions_path`: path to conventions.md (`{plan_dir}/conventions.md`)
 - `module_slug`: Derived from the module design spec filename (e.g., `M-001-task-split.md` -> `task-split`). Used in output filenames.
 - `is_first_module`: boolean — true if this is the first module being planned
@@ -61,10 +61,10 @@ Read in this order:
 
 5. **Conventions file** (`{conventions_path}`, if it exists) — follow established patterns
 
-6. **Previous plans** (`{previous_plan_paths}`) — concrete decisions already made:
-   - File paths and directory organization
-   - Interface implementations already planned (that this module may consume or that set a pattern)
-   - Type definitions, naming patterns, code style
+6. **Dependency closure plans** (`{dependency_closure_plan_paths}`) — plans for the upstream modules this one consumes (direct deps + their transitive deps). Use them for:
+   - Exact interface signatures, types, and file paths you must conform to when consuming an upstream module
+   - Error-handling and naming patterns set by those upstream plans
+   - Empty list is normal for Phase 1 leaves — rely on `conventions.md` and the design spec instead
 
 7. **Implemented code** (`{implemented_module_paths}`, if any) — for modules already merged to the feature branch, read their **actual source code**, not just their plans. Actual code is the source of truth: it may differ from the plan in parameter types, error handling, async behavior, or edge cases. When a plan and its implementation diverge, plan for the code as it actually is.
 
@@ -125,7 +125,15 @@ Review the Module Interaction Protocols and full Module Index to identify shared
 
 **If `is_first_module` = false:**
 
-Read and follow `conventions.md`. If you encounter a pattern not yet covered (e.g., a new interaction style, a database access pattern), **append** it to conventions.md. Do not contradict existing conventions.
+Read and follow `conventions.md`. If you encounter a pattern not yet covered (e.g., a new interaction style, a database access pattern), **do NOT edit `conventions.md` directly** — within-phase Planners run in parallel, so a direct edit would race with peers. Instead, write your additions to:
+
+```
+{plan_dir}/conventions-additions/M-{module_id}.md
+```
+
+Use the same top-level section headings as `conventions.md` (e.g., `## Error Handling`, `## Shared Types`) so the Orchestrator can merge by section. Only include sections you are adding to or extending. Do not contradict existing conventions — if the existing convention is wrong for this module, flag it in `KEY_DECISIONS` rather than overriding it silently.
+
+The Orchestrator merges all `conventions-additions/*.md` into `conventions.md` after the current phase completes and before the next phase starts.
 
 ### 3. Write the Implementation Plan
 
@@ -190,7 +198,7 @@ When complete, report:
 ```
 MODULE: M-{module_id} {module_name}
 PLAN: {plan_dir}/plan-M-{module_id}-{module_slug}.md
-CONVENTIONS: {created | followed | extended: {what was added}}
+CONVENTIONS: {created | followed | extended via conventions-additions/M-{module_id}.md: {what was added}}
 STEPS: {count}
 KEY_DECISIONS: {list any decisions not directly derivable from the design spec}
 INTEGRATION:
