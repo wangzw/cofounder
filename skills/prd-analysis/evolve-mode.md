@@ -4,7 +4,7 @@ This file contains instructions for generating an incremental PRD for a new soft
 
 For evolve mode, also read `questioning-phases.md` — the per-phase questioning guide is reused with "review existing → ask delta → deep-dive" pattern.
 
-Review Checklist dimensions are defined in `SKILL.md` — read that first.
+Review Checklist dimensions are defined in `review-checklist.md` — load it on demand (Evolve Step 4 specifies when).
 
 ---
 
@@ -141,11 +141,37 @@ Generate files using the standard templates, with the following evolve-specific 
 
 **Output path:** `docs/raw/prd/YYYY-MM-DD-{product-name}/` (same product name, new date). Confirm path with user before writing.
 
+### Batch by File (Required)
+
+Before writing any files, **group all content by target file**. Generate each file's complete content once, then write it. Never write a file more than once per evolve cycle. For large delta sets (>10 files), write independent clusters in parallel: features/* + journeys/* in parallel, then architecture/* in parallel, then README.md and cross-reference updates as a final sweep.
+
 ## Evolve Step 4 — Review Checklist
 
-Run a two-layer review:
+Run a two-layer review. Load `review-checklist.md` only if you need to reference a dimension's exact definition.
 
-**Layer 1 — Flattened view review:** mentally merge the incremental PRD with its baseline to form a complete product view. Run the full Review Checklist (see above) against this combined view. This catches issues like orphan features, broken traceability chains, or missing coverage.
+**Layer 1 — Delta review (new and modified files only):** Do NOT re-check baseline files that haven't changed — they were reviewed at initial creation. Only run checklist dimensions relevant to what actually changed in this evolve cycle:
+
+**Always run (every evolve):**
+- **Traceability** — no orphan features; every new/modified touchpoint maps to a feature; Cross-Journey Patterns updated for any new/changed journeys
+- **No ambiguity** — no TBD/TODO/vague descriptions in any new or modified file
+- **Version integrity** — README Baseline section and Change Summary are present and accurate; all `→ baseline` links valid
+
+**Run if features were added or modified:**
+- **Priority** — new/modified feature priority aligns with roadmap phase; dependencies respect phase ordering; no P0 depending on a P1/P2 across phase boundaries
+- **Self-containment** — each new/modified feature file can be read and implemented independently
+- **Testability** (sub-checks a, b, e, f only) — ACs precise; edge cases have Given/When/Then; error paths map to an AC or edge case; cross-feature dependencies have integration-level AC
+- **Scope boundary** — no implementation-level details in new/modified features
+
+**Run if features were deprecated:**
+- **Traceability** (focused) — no journey touchpoint left uncovered; no metric orphan; no remaining feature depends on the deprecated one; tombstone file present
+
+**Run if architecture conventions changed:**
+- The single relevant architecture completeness dimension for what changed (e.g. Coding conventions if coding-conventions.md changed)
+
+**Run if UI changes (new/modified screens, components, interactions):**
+- **Interaction Design coverage** — modified user-facing features have complete Interaction Design sections
+- **State machine integrity** — no dead states; loading states have success and error exits
+- **Accessibility per-feature** — modified user-facing features have Accessibility sub-sections
 
 **Layer 2 — Evolve-specific checks:**
 

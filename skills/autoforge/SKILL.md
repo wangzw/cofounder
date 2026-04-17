@@ -69,7 +69,7 @@ flowchart TD
    - **(c) PRD architecture.md developer convention sections** — follow the design README's `Design Input > Source` to the PRD directory, then read `architecture.md` for: Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration, Deployment Architecture (environments, local dev setup, config management, CD pipeline, environment isolation)
    
    Merge these into a unified `project_coding_standards` context: (a) overrides (b) overrides (c). Pass relevant sections to all sub-agents throughout the pipeline.
-3. **Locate PRD** — follow `Design Input > Source` to find the PRD directory; read PRD README.md for feature index, acceptance criteria references, journey E2E scenarios
+3. **Locate PRD** — follow `Design Input > Source` to find the PRD directory. Read: `README.md` (feature index only). Do NOT read journeys/, architecture topic files, or prototypes/ upfront — they are not needed for planning. Individual module Planners and Developers will read specific feature files on demand when they need acceptance criteria or interaction design details.
 4. **Build dependency graph** — from Module Index `Deps` column, construct a DAG. Topologically sort into phases: Phase 1 = modules with no dependencies, Phase 2 = modules whose deps are all in Phase 1, etc.
 5. **Detect project state** — check if project has existing source code (package manifests, src directories). If so, note this — Planners must account for existing code structure
 6. **Determine output paths**:
