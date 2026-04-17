@@ -29,6 +29,28 @@ Detect the mode first. Read the routing files for that mode only — do not load
 | **Status** | `--status <plan-dir>` | No additional files (read-only query) |
 | **Cleanup** | `--cleanup <plan-dir>` | No additional files |
 
+## Model Tier Policy
+
+Every `Agent(...)` dispatch in this skill MUST set the `model` field to a tier **alias** — never pin a specific version. Aliases (`opus` / `sonnet` / `haiku`) track the current tier member and avoid rot as models evolve. The top tier is materially more expensive per token; use it only where its reasoning budget is actually needed.
+
+**Default tiers by role:**
+
+| Role | Tier | Why |
+|------|------|-----|
+| Planner | `opus` | Architecture decisions, cross-module consistency, most reasoning-heavy role in the pipeline |
+| Bootstrap | `sonnet` | Mechanical project scaffolding from a tech-stack spec |
+| Module Agent (2nd-level orchestrator) | `sonnet` | Flow control + state updates; escalate only on Replan/Diagnosis mode (see below) |
+| Developer (initial + retry-from-tester/reviewer) | `sonnet` | Implementing code from a detailed plan |
+| Developer (Replan Mode — Variant 4) | `opus` | New-strategy design after the current approach stalled |
+| Tester | `sonnet` | Test authoring from spec acceptance criteria is mechanical |
+| Reviewer | `sonnet` | Spec-compliance checking — escalate to `opus` only after repeated REJECT with the same findings pattern |
+| Integration Tester | `sonnet` | Phase-level test authoring + execution |
+| Acceptance Tester | `sonnet` | E2E tests + traceability matrix; escalate to `opus` only for ambiguity classification during the fix cycle |
+
+**Escalation rule:** when Replan Mode / Diagnosis Mode triggers (Module Agent has stalled for ≥3 non-progress rounds), the next Developer spawn uses `model: opus` instead of `sonnet`. After one Opus-backed Replan attempt, revert to `sonnet` for routine retries.
+
+**Why not top-tier everywhere:** top tier is ~5× Sonnet on input and ~15× on cache_read. Autoforge's inner loop (Developer → Tester → Reviewer) runs dozens of times per module across many modules — a mis-tiered default multiplies across the whole run. Sonnet is the right default; Opus is a targeted escalation, not a baseline.
+
 ## Process Overview
 
 ```mermaid
@@ -136,6 +158,7 @@ For each module in planning order, spawn a single **Planner** agent. **Wait for 
 Agent({
   description: "Planner for M-{id}",
   prompt: <fill in planner-prompt.md with parameters>,
+  model: "opus",
   mode: "auto"
 })
 ```
@@ -189,6 +212,7 @@ This step only applies when creating a new project from scratch. It initializes 
    ```
    Agent({
      description: "Project bootstrap",
+     model: "sonnet",
      prompt: "Initialize project based on tech stack: {tech stack details}.
        Read the conventions file at {conventions_path} — it defines the expected
        directory structure, file naming, test organization, and shared types.
@@ -241,6 +265,7 @@ Read the module design spec's UI Architecture section. If a **Prototype Reuse Gu
 ```
 Agent({
   description: "Module Agent for M-{id}: {module-name}",
+  model: "sonnet",
   mode: "auto",
   prompt: "You are a Module Agent implementing M-{id}: {module-name}.
     Your working directory is: {module_worktree}
@@ -439,6 +464,7 @@ Review Dimensions:
    Agent({
      description: "Integration Tester for phase {n}",
      prompt: <fill in integration-tester-prompt.md with parameters below>,
+     model: "sonnet",
      mode: "auto"
    })
    ```
@@ -502,6 +528,7 @@ Spawn the Acceptance Tester agent in the primary worktree:
 Agent({
   description: "Acceptance Tester",
   prompt: <fill in acceptance-tester-prompt.md with parameters below>,
+  model: "sonnet",
   mode: "auto"
 })
 ```

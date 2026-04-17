@@ -88,18 +88,21 @@ For every spawn, use the `Agent` tool with the relevant pre-loaded template, sub
 Agent({
   description: "Developer for M-{id}",
   prompt: <substituted variant from module-developer-prompt.md (Variant 1, 2, 3, or 4)>,
+  model: <tier per variant — see table below>,
   mode: "auto"
 })
 ```
 
-Pick the variant by trigger:
+Pick the variant and tier by trigger:
 
-| Trigger | Variant |
-|---------|---------|
-| First attempt on this module | Variant 1 — Initial Run |
-| Tester returned FAIL | Variant 2 — Retry From Tester Failure |
-| Reviewer returned REJECT | Variant 3 — Retry From Reviewer Rejection |
-| Replan Mode triggered | Variant 4 — Replan Mode (New Strategy) |
+| Trigger | Variant | `model` tier |
+|---------|---------|--------------|
+| First attempt on this module | Variant 1 — Initial Run | `sonnet` |
+| Tester returned FAIL | Variant 2 — Retry From Tester Failure | `sonnet` |
+| Reviewer returned REJECT | Variant 3 — Retry From Reviewer Rejection | `sonnet` |
+| Replan Mode triggered | Variant 4 — Replan Mode (New Strategy) | `opus` |
+
+Always use tier aliases (`sonnet` / `opus` / `haiku`); never pin a specific model version. Aliases track the current tier member and avoid rot as models evolve. See the parent skill's Model Tier Policy section for the full rationale.
 
 ### Spawning Tester
 
@@ -107,6 +110,7 @@ Pick the variant by trigger:
 Agent({
   description: "Tester for M-{id}",
   prompt: <substituted template from module-tester-prompt.md>,
+  model: "sonnet",
   mode: "auto"
 })
 ```
@@ -117,9 +121,12 @@ Agent({
 Agent({
   description: "Reviewer for M-{id}",
   prompt: <substituted template from module-reviewer-prompt.md>,
+  model: "sonnet",
   mode: "auto"
 })
 ```
+
+**Reviewer escalation:** if the same Reviewer finding recurs across ≥2 REJECT rounds (e.g. same spec-compliance gap flagged twice), escalate the next Reviewer to `model: "opus"` for that round. Revert to `sonnet` once the finding is resolved. Do not default the Reviewer to `opus` — most reviews are spec-compliance checks that Sonnet handles well.
 
 ## Report File Strategy
 

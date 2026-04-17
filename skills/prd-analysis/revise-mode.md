@@ -185,13 +185,53 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 **Parallelism:** If the change set is large (>15 changes), group files into independent clusters (features/*, architecture/*, journeys/*, README.md) and process clusters in parallel where no cluster's output is an input to another cluster's edit. For example: fix all feature files in parallel, then fix architecture files that reference those features, then update README/cross-references.
 
+**Cluster sizing:** each Fix subagent handles **at most 3 files**. Larger clusters balloon the per-turn cache_read: a 5-file cluster doing 40 edits across 40 turns replays ~165k context per turn; splitting into 3-file clusters caps the replay at ~60k. Bias toward more smaller clusters (dispatched in parallel) over few large clusters.
+
 ### Fix-Subagent Dispatch Rules
 
+**Model tier:** Fix subagents MUST be dispatched with `model: sonnet` (the mid-tier alias). Edit application is a deterministic text transformation — the top tier's reasoning budget is not needed and is materially more expensive per token. Only escalate to `opus` for a finding explicitly tagged as requiring cross-feature design judgment (rare; must be justified in the dispatch prompt). Use aliases (`sonnet` / `opus` / `haiku`), never pin a specific version — aliases track the current tier member and avoid rot as models evolve.
+
+**Tool usage:** when a file has **>1 queued edit**, the subagent MUST use `MultiEdit` (one tool call, one write). Sequential `Edit` calls on the same file are forbidden — each Edit triggers a cache_read replay of the full conversation state, which dominates cost on long-running edit sessions. One `Edit` only when a file has exactly one change.
+
 When delegating a cluster to a `general-purpose` subagent, the dispatch prompt MUST use this template. Free-form prompts lead to the subagent re-reading files (4× observed on same file) and running its own Glob/Grep to re-discover the change set — both are pure waste.
+
+If a `.reviews/REVIEW-*.md` was consumed (Pre-Answered Mode), prefer **Template A** (reference-based, short). Otherwise use **Template B** (inline edits list).
+
+**Template A — reference-based dispatch** (when REVIEW-*.md exists):
+
+```
+Apply the findings from {REVIEW-*.md absolute path} that target the files listed below.
+The REVIEW file groups findings by file under `### <relative path>` headings; each finding has a `Fix:` line describing the concrete edit.
+
+Read each target file exactly once (in parallel). For each file, collect all matching findings from the REVIEW file, then apply them in a single pass:
+- file with 1 finding: use `Edit`
+- file with >1 finding: use `MultiEdit` (mandatory — no sequential Edits on the same file)
+Write once per file.
+
+**Forbidden:**
+- Re-reading a target file after editing it (no "verification read").
+- Sequential `Edit` calls on the same file — use `MultiEdit` when >1 edit applies.
+- Grep/Glob exploration — all paths are listed below.
+- Editing files not listed below.
+- Applying findings for files not in your list.
+
+**Target files (read in parallel):**
+- <absolute path 1>
+- <absolute path 2>
+- <absolute path 3>
+
+**On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". No prose summary.
+```
+
+**Template B — inline edits** (interactive revise, no REVIEW-*.md):
 
 ```
 Apply the following edits. Each file is listed with its queued edits.
 Read each file exactly once (in parallel). Apply all edits in a single pass. Write once.
+
+**Tool usage (mandatory):**
+- file with 1 edit: use `Edit`
+- file with >1 edit: use `MultiEdit` (one call with all edits). Sequential `Edit` on the same file is FORBIDDEN.
 
 **Forbidden:**
 - Re-reading a file after editing it (no "verification read").
@@ -214,7 +254,7 @@ Read each file exactly once (in parallel). Apply all edits in a single pass. Wri
 **On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". Do not report prose summaries of what changed — the edits list is the contract.
 ```
 
-The orchestrator (main agent) is responsible for building the edits list from consumed `REVIEW-*.md` findings or from Step 3 changes. Do not push that grouping work into subagents.
+The orchestrator (main agent) is responsible for the file → findings grouping (building the cluster). When using Template A, the subagent extracts the exact edit text from the REVIEW file it reads; when using Template B, the orchestrator pre-materializes every edit. Do not push the file-grouping decision into subagents.
 
 ---
 
