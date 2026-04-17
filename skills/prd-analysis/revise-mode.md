@@ -6,6 +6,12 @@ Review Checklist dimensions are defined in `review-checklist.md` — load it on 
 
 ---
 
+## Pre-Answered Mode (Automated / CI)
+
+If the invocation prompt already provides answers to Steps 1–4 (downstream state confirmed, PRD overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–4 entirely** and jump directly to Step 5. Do not re-ask questions or re-run analysis that is already settled.
+
+---
+
 ## Revise Step 1 — Detect Downstream State & Confirm Intent
 
 Auto-detect what has been built on top of this PRD, then confirm with the user.
@@ -43,7 +49,7 @@ If the user disagrees with the auto-detection (e.g. "the design exists but is ou
 
 ## Revise Step 2 — Present PRD Overview
 
-Read and summarize the current PRD so the user has context before describing changes:
+Read README.md in parallel with a quick scan of journey filenames (do not read full journey files yet). Summarize:
 
 - Product name and vision
 - Personas and journey count
@@ -157,16 +163,31 @@ Present findings to the user before proceeding:
 
 ## Revise Step 5 — Execute Changes
 
+### Batch by File (Required)
+
+Before making any edits, **group all pending changes by target file**. For each file, collect every change that applies to it, then read the file once, apply all changes in a single pass, and write it once. Never read or write a file more than once per revision cycle. This is mandatory — per-finding sequential edits cause O(n) file re-reads and dramatically increase cost.
+
+**Grouping procedure:**
+1. List all changes (from Step 3 or from the pre-answered findings list).
+2. For each change, identify the target file(s) it affects.
+3. Build a file → [changes] map.
+4. Process each file in the map: read → apply all its changes → write.
+5. After all files are processed, handle cross-reference updates (README, journey Mapped Feature columns, Feature Index) as a final sweep — also one read-and-write per cross-reference file.
+
+**Parallelism:** If the change set is large (>15 changes), group files into independent clusters (features/*, architecture/*, journeys/*, README.md) and process clusters in parallel where no cluster's output is an input to another cluster's edit. For example: fix all feature files in parallel, then fix architecture files that reference those features, then update README/cross-references.
+
+---
+
 Based on the downstream state confirmed in Step 1:
 
 **Modify directly (no design, or design exists but not implemented):**
-- Update affected files in place
+- Update affected files in place (using batch-by-file procedure above)
 - If design exists: append an entry to `REVISIONS.md` summarizing what changed and why (create the file using the template in `prd-template.md` if this is the first revision, and add a link to it from README.md's References section) — this record helps the design update process (`/system-design --revise`) identify what PRD changes need to propagate
 
 **Create new version (implementation exists):**
 - Create new dated directory (e.g. `docs/raw/prd/YYYY-MM-DD-{product-name}/`)
 - Copy forward unchanged files (including any existing `REVISIONS.md` from the previous version)
-- Apply changes to affected files
+- Apply changes to affected files (using batch-by-file procedure above)
 - Append an entry to `REVISIONS.md` (create it if absent) linking back to the previous version's directory; add a link to `REVISIONS.md` from README.md's References section
 
 In both cases:
