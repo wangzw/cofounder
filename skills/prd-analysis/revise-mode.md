@@ -6,9 +6,18 @@ Review Checklist dimensions are defined in `review-checklist.md` — load it on 
 
 ---
 
-## Pre-Answered Mode (Automated / CI)
+## Pre-Answered Mode (Automated / CI / Review-driven fix pass)
 
 If the invocation prompt already provides answers to Steps 1–4 (downstream state confirmed, PRD overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–4 entirely** and jump directly to Step 5. Do not re-ask questions or re-run analysis that is already settled.
+
+**Review-driven fix pass:** If `{PRD-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input:
+
+1. Read the latest `.reviews/REVIEW-*.md` (sort by timestamp, pick the newest; ignore `*.applied.md`).
+2. Map findings to change types from Step 3 — most review findings are "Modify requirement" (behavior/scope/AC). A finding's `Dimension:` tag tells you which impact checks apply in Step 4.
+3. Use each finding's `Fix:` line as the concrete edit. Do not re-discover issues.
+4. Jump to Step 5 and apply all edits using the batch-by-file procedure.
+5. In Step 6 (post-change review), scope the delta review to the **dimensions that appear in the consumed `REVIEW-*.md`** plus the always-run checks.
+6. When finished, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 5.
 
 ---
 
@@ -176,6 +185,37 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 **Parallelism:** If the change set is large (>15 changes), group files into independent clusters (features/*, architecture/*, journeys/*, README.md) and process clusters in parallel where no cluster's output is an input to another cluster's edit. For example: fix all feature files in parallel, then fix architecture files that reference those features, then update README/cross-references.
 
+### Fix-Subagent Dispatch Rules
+
+When delegating a cluster to a `general-purpose` subagent, the dispatch prompt MUST use this template. Free-form prompts lead to the subagent re-reading files (4× observed on same file) and running its own Glob/Grep to re-discover the change set — both are pure waste.
+
+```
+Apply the following edits. Each file is listed with its queued edits.
+Read each file exactly once (in parallel). Apply all edits in a single pass. Write once.
+
+**Forbidden:**
+- Re-reading a file after editing it (no "verification read").
+- Grep/Glob exploration of the target directory — all paths are listed below.
+- Editing files outside the list below.
+- Making edits not listed below (even if you spot an adjacent issue — report it instead).
+
+**Target files & queued edits:**
+
+- file: <absolute path>
+  edits:
+    - <unique anchor text from current file>: replace with <new text>
+    - <unique anchor text>: replace with <new text>
+    - ...
+
+- file: <absolute path>
+  edits:
+    - ...
+
+**On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". Do not report prose summaries of what changed — the edits list is the contract.
+```
+
+The orchestrator (main agent) is responsible for building the edits list from consumed `REVIEW-*.md` findings or from Step 3 changes. Do not push that grouping work into subagents.
+
 ---
 
 Based on the downstream state confirmed in Step 1:
@@ -198,6 +238,13 @@ In both cases:
 ## Revise Step 6 — Post-Change Review (Delta-Focused)
 
 **Do NOT run the full 52-dimension review checklist.** Run only the checklist dimensions relevant to what actually changed. Load `review-checklist.md` only if you need to reference a dimension's exact definition.
+
+**Review-driven fix pass scope:** If this revision consumed a `REVIEW-*.md` file (Pre-Answered Mode), the delta review scope is:
+
+- The **always-run** set below, **plus**
+- Only the dimensions whose tags appeared in the consumed `REVIEW-*.md`.
+
+Do not re-run dimensions the review already validated as passing.
 
 **Always run (every revision):**
 - **Traceability** — no orphan features; every touchpoint still maps to a feature; Cross-Journey Patterns still accurate

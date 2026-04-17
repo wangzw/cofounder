@@ -1,5 +1,18 @@
 # PRD Review Checklist
 
+## Execution Scope — Per-File vs Cross-File
+
+When review is run via parallel subagents (see `review-mode.md` Steps 2–3), each subagent runs only **per-file** dimensions on its assigned files. **Cross-file** dimensions need a whole-PRD view and must be run once by the orchestrating (main) agent after subagents return.
+
+| Scope | Dimensions |
+|-------|-----------|
+| **Per-file** | Evidence · Authorization · Self-containment · Testability (a, b, c, d, h) · Interaction Design coverage · Form specification completeness · Micro-interactions & motion · State machine integrity · Frontend stack consistency · Accessibility per-feature · i18n per-feature — frontend · i18n per-feature — backend · Page transition completeness · Prototype-spec alignment · Prototype feedback incorporation · Responsive coverage · Scope boundary · Notifications · Journey interaction mode coverage · No ambiguity |
+| **Cross-file** | Traceability · Competitive context · Metrics · Risks · Priority · Privacy · Testability (e, f, g) · Design token completeness · Component contract consistency · Cross-feature event flow · Accessibility baseline completeness · i18n baseline completeness · Navigation consistency · Prototype archival completeness · Coding conventions completeness · Test isolation completeness · Development workflow completeness · Security coding policy completeness · Backward compatibility completeness · Git & Branch Strategy completeness · Code review policy completeness · Observability requirements completeness · Performance testing completeness · Development infrastructure feature · Deployment architecture completeness · AI agent configuration completeness · Version integrity |
+
+When review is run inline (self-review during initial creation, step 6), both scopes are checked together by the main agent — no split needed.
+
+---
+
 Applied as step 6 of the process (after writing, before commit). Check each dimension and fix issues directly in the written files:
 
 | Dimension | Check |

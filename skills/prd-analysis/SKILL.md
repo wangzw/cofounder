@@ -106,6 +106,8 @@ Steps 6-7 (self-review, user review) always occur before commit and are part of 
 ├── prototypes/              # Interactive prototypes (seed code for production)
 │   ├── src/                 # Runnable prototype source
 │   └── screenshots/         # Key state screenshots per feature
+└── .reviews/                # Transient — not version-controlled (gitignore: docs/raw/prd/*/.reviews/)
+    └── REVIEW-*.md          # Review findings produced by --review, consumed by --revise
 ```
 
 Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture index + topic files), and `feature-template.md` (feature specs). Evolve mode uses `evolve-readme-template.md` instead of `prd-template.md` for the README; all other templates are reused with the addition of the Change Annotation Convention (defined in `evolve-mode.md`).
