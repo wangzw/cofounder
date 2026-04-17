@@ -4,7 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CoFounder is a suite of interconnected Claude Code skills that guide solo founders and small teams through the full business lifecycle: idea -> requirements -> design -> implementation -> launch. Skills live in `.claude/skills/` and are auto-discovered by Claude Code.
+CoFounder is a Claude Code **plugin** that guides solo founders and small teams through the full business lifecycle: idea -> requirements -> design -> implementation -> launch. Skills live in `skills/` (plugin format) and are loaded via the plugin system.
+
+**Install locally for development:**
+```bash
+claude --plugin-dir /path/to/cofounder
+```
+
+Skills are invoked with the `cofounder:` namespace prefix: `/cofounder:prd-analysis`, `/cofounder:system-design`, etc.
 
 ## Pipeline
 
@@ -67,7 +74,7 @@ This project uses [Conventional Commits](https://www.conventionalcommits.org/). 
 ## Adding or Modifying Skills
 
 When creating a new skill:
-1. Create `.claude/skills/{skill-name}/SKILL.md` with frontmatter (name, description, trigger conditions)
+1. Create `skills/{skill-name}/SKILL.md` with frontmatter (name, description, trigger conditions)
 2. Use mode-routing in SKILL.md to avoid loading all topic files at once
 3. Create topic files for each phase/mode
 4. Create template files that define output format
@@ -78,7 +85,7 @@ When modifying an existing skill, start by reading its `SKILL.md` to understand 
 ## Review Gates
 
 Skills include human review checkpoints before finalizing output:
-- `/prd-analysis`: ~50 dimension review checklist in SKILL.md (many dimensions have multiple sub-checks)
+- `/cofounder:prd-analysis`: ~50 dimension review checklist in `review-checklist.md` (many dimensions have multiple sub-checks)
 - `/system-design`: structured design review phase
 - `/autoforge`: approval gates after planning (before execution), progress checks during execution
 - `/go-to-market`: per-stage approve/revise/skip/go-back logic with cascade updates

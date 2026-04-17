@@ -1,0 +1,11 @@
+{
+  "name": "cofounder",
+  "description": "AI-powered skills for solo founders and small teams: PRD analysis, system design, automated implementation, and go-to-market strategy.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Zhanwei Wang"
+  },
+  "repository": "https://github.com/wangzw/cofounder",
+  "license": "MIT",
+  "keywords": ["prd", "system-design", "autoforge", "go-to-market", "startup", "founder", "requirements", "planning"]
+}
