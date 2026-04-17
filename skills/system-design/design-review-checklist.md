@@ -8,6 +8,19 @@ This checklist is shared by three flows:
 
 The checklist itself is identical; the surrounding workflow differs (see `generate-mode.md`, `review-mode.md`, `revise-mode.md`).
 
+## Execution Scope — Per-File vs Cross-File
+
+When review is run via parallel subagents (see `review-mode.md` Steps 2–3), each subagent runs only **per-file** dimensions on its assigned files. **Cross-file** dimensions need a whole-design view (multiple modules, API index, README cross-references, or PRD traceability) and must be run once by the orchestrating (main) agent after subagents return.
+
+| Scope | Dimensions |
+|-------|-----------|
+| **Per-file** | Self-containment · Implementability · API completeness · Frontend performance · Backend i18n coverage · Form implementation consistency · Risk awareness (per-module mitigations) · Enforcement coverage (per-module conventions) · Testability (per-module isolation + test double strategy) |
+| **Cross-file** | Completeness · Consistency · Dependency sanity · PRD traceability · NFR coverage · Interaction completeness · UI coverage · Prototype coverage · PRD interaction design alignment · Analytics coverage · Frontend-backend contract alignment · Convention translation · Infrastructure module coverage · PRD-Design freshness · Version integrity · Bootstrap self-sufficiency · Task entry points · Testability (README Test Strategy) |
+
+When review is run inline (Phase 1 Step 10 self-review during initial creation, or `--revise` Step 7 delta review), both scopes are checked together by the main agent — no split needed.
+
+---
+
 ## Checklist — check each dimension, fix issues directly
 
 | Dimension | Check |

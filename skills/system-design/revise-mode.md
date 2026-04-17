@@ -2,6 +2,19 @@
 
 Interactively modify an existing design — whether it's still pre-implementation or already being coded. Auto-detects downstream state, confirms intent with the user, then guides a structured change process with impact analysis and conflict detection.
 
+## Pre-Answered Mode (Automated / CI / Review-driven fix pass)
+
+If the invocation prompt already provides answers to Steps 1–5 (downstream state confirmed, PRD change detection resolved, design overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–5 entirely** and jump directly to Step 6. Do not re-ask questions or re-run analysis that is already settled.
+
+**Review-driven fix pass:** If `{design-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input:
+
+1. Read the latest `.reviews/REVIEW-*.md` (sort by timestamp, pick the newest; ignore `*.applied.md`).
+2. Map findings to change types from Step 4 — most review findings are **Interface change**, **Module restructure**, or targeted updates. A finding's `Dimension:` tag tells you which impact checks apply in Step 5.
+3. Use each finding's `Fix:` line as the concrete edit. Do not re-discover issues.
+4. Jump to Step 6 and apply all edits using the batch-by-file procedure.
+5. In Step 7 (post-change review), scope the delta review to the **dimensions that appear in the consumed `REVIEW-*.md`** plus the always-run checks.
+6. When finished, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 6.
+
 ## Step 1: Detect Downstream State & Confirm Intent
 
 Read `Design Input > Status` field for the design-level state:
@@ -120,23 +133,76 @@ If conflicts are detected, present them and ask user how to resolve before proce
 
 ## Step 6: Execute Changes
 
+### Batch by File (Required)
+
+Before making any edits, **group all pending changes by target file**. For each file, collect every change that applies to it, then read the file once, apply all changes in a single pass, and write it once. Never read or write a file more than once per revision cycle. Per-finding sequential edits cause O(n) file re-reads and dramatically increase cost.
+
+**Grouping procedure:**
+1. List all changes (from Step 4 or from the pre-answered findings list).
+2. For each change, identify the target file(s) it affects.
+3. Build a file → [changes] map.
+4. Process each file in the map: read → apply all its changes → write.
+5. After all files are processed, handle cross-reference updates (README Module Index, Feature-Module Mapping, Interaction Protocols, API Index) as a final sweep — also one read-and-write per cross-reference file.
+
+**Parallelism:** If the change set is large (>15 changes), group files into independent clusters (`modules/*`, `api/*`, `README.md`) and process clusters in parallel where no cluster's output is an input to another cluster's edit. For example: fix all module files in parallel, then fix API files that reference those modules, then update README cross-references.
+
+### Fix-Subagent Dispatch Rules
+
+When delegating a cluster to a `general-purpose` subagent, the dispatch prompt MUST use this template. Free-form prompts lead to the subagent re-reading files and running its own Glob/Grep to re-discover the change set — both are pure waste.
+
+```
+Apply the following edits. Each file is listed with its queued edits.
+Read each file exactly once (in parallel). Apply all edits in a single pass. Write once.
+
+**Forbidden:**
+- Re-reading a file after editing it (no "verification read").
+- Grep/Glob exploration of the target directory — all paths are listed below.
+- Editing files outside the list below.
+- Making edits not listed below (even if you spot an adjacent issue — report it instead).
+
+**Target files & queued edits:**
+
+- file: <absolute path>
+  edits:
+    - <unique anchor text from current file>: replace with <new text>
+    - <unique anchor text>: replace with <new text>
+    - ...
+
+- file: <absolute path>
+  edits:
+    - ...
+
+**On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". Do not report prose summaries of what changed — the edits list is the contract.
+```
+
+The orchestrator (main agent) is responsible for building the edits list from the consumed `REVIEW-*.md` findings or from Step 4 changes. Do not push that grouping work into subagents.
+
+---
+
 Based on the mutability determination from Step 5 (not just Step 1 — Step 5's module-level check is the final decision):
 
 **Modify in place** (Design Status is Draft/Finalized, OR Status is Implementing/Implemented but all affected modules are `—`):
-1. Apply all changes directly to existing files
+1. Apply all changes directly to existing files (using the batch-by-file procedure above)
 2. Append an entry to `REVISIONS.md` with Change Type = "In-place edit" (create the file using the template in `design-template.md` if this is the first revision, and add a link to it from README.md's References section)
 3. Update all impacted files identified in Step 5
 
 **New version** (any affected module has Impl `In progress` or `Done`):
 1. Create new dated directory (e.g. `docs/raw/design/2026-04-10-{product-name}/`)
-2. Copy all files from original directory (including any existing `REVISIONS.md`)
-3. Apply changes to the new copy
+2. Copy all files from original directory (including any existing `REVISIONS.md`; do NOT copy `.reviews/` — it is transient scratch)
+3. Apply changes to the new copy (using the batch-by-file procedure above)
 4. Append an entry to `REVISIONS.md` (create it if absent) with Change Type = "New version", linking back to previous version's directory; add a link to `REVISIONS.md` from README.md's References section
 5. Set `Design Input > Status` to `Finalized`; reset all module `Impl` to `—` (implementation restarts from new design)
 
 ## Step 7: Post-Change Review (Delta-Focused)
 
 **Do NOT run the full Design Review checklist.** Run only the dimensions relevant to what actually changed. Load `design-review-checklist.md` only if you need to reference a dimension's exact wording.
+
+**Review-driven fix pass scope:** If this revision consumed a `.reviews/REVIEW-*.md` file (Pre-Answered Mode), the delta review scope is:
+
+- The **always-run** set below, **plus**
+- Only the dimensions whose tags appeared in the consumed `REVIEW-*.md`.
+
+Do not re-run dimensions the review already validated as passing.
 
 **Always run (every revision):**
 - **Consistency** — updated module interfaces match their callers; data models match API contracts

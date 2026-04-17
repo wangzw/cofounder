@@ -45,6 +45,8 @@ Detect the mode first. Read the routing files for that mode only — do not load
 ├── api/                   # Only generated when project has APIs
 │   ├── API-001-{slug}.md  # Self-contained API contract
 │   └── ...
+└── .reviews/              # Transient — not version-controlled (gitignore: docs/raw/design/*/.reviews/)
+    └── REVIEW-*.md        # Review findings produced by --review, consumed by --revise
 ```
 
 Use templates: `design-template.md` (README), `module-template.md` (module specs),
