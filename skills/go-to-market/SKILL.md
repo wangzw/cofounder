@@ -244,6 +244,8 @@ On completion, return: "Extract complete: N features, N journeys, N personas. Wr
 
 ### After Extract
 
+If `.gitignore` does not yet exclude `gtm/.context.md` (either as a line entry or under a broader pattern like `gtm/.context*`), prompt the user to add it before proceeding. `.context.md` is a transient PRD extract, not a spec — see Caching note below.
+
 Read `gtm/.context.md` into main context (once), then present a summary to the user:
 
 > **Extracted from PRD:**
