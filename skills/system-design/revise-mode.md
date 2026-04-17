@@ -134,24 +134,37 @@ Based on the mutability determination from Step 5 (not just Step 1 — Step 5's 
 4. Append an entry to `REVISIONS.md` (create it if absent) with Change Type = "New version", linking back to previous version's directory; add a link to `REVISIONS.md` from README.md's References section
 5. Set `Design Input > Status` to `Finalized`; reset all module `Impl` to `—` (implementation restarts from new design)
 
-## Step 7: Post-Change Review
+## Step 7: Post-Change Review (Delta-Focused)
 
-Run the full Design Review checklist on the result (see `design-review-checklist.md`), with extra attention to:
+**Do NOT run the full Design Review checklist.** Run only the dimensions relevant to what actually changed. Load `design-review-checklist.md` only if you need to reference a dimension's exact wording.
 
-- **Consistency:** do updated module interfaces match their callers?
-- **Completeness:** do all features still have module coverage?
-- **NFR coverage:** are all NFR budgets still within PRD targets?
-- **Interaction completeness:** are all cross-module interactions in sync with module interfaces?
-- **Testability:** do changed modules remain independently testable? Are test double strategies still valid after interface changes?
-- **Enforcement coverage:** do changed modules' Boundary Enforcement sections still reference valid constraints? Are new constraints needed for restructured boundaries?
-- **Dependency Layering:** do module changes still comply with the layer order? Does the Dependency Layering table need updating?
-- **Frontend consistency:** are form patterns, state management, and routing still consistent across changed frontend modules? Do Design System Conventions and component structures reflect the new boundaries?
-- **Frontend-backend alignment:** do frontend modules' API call entries still match API contracts after changes?
-- **Accessibility consistency:** are a11y implementation strategies (tab order, ARIA, testing approach) still consistent across changed frontend modules?
-- **i18n consistency (frontend):** are i18n implementation strategies (namespace mapping, lazy loading, fallback behavior) still consistent across changed frontend modules?
-- **i18n consistency (backend):** are backend i18n implementation strategies (locale resolution, message catalog access, timezone conversion) still consistent across changed backend modules? Does locale context propagation still work across module boundaries?
-- **Analytics coverage:** are all PRD feature analytics events still mapped to a responsible module after restructuring?
-- **Convention translation validity:** are README's Implementation Conventions patterns still valid for the changed stack? Do module-level Relevant Conventions still reference correct implementation patterns (not stale patterns from the pre-change stack)?
+**Always run (every revision):**
+- **Consistency** — updated module interfaces match their callers; data models match API contracts
+- **Version integrity** — REVISIONS.md entry is present; README References links to REVISIONS.md; all version paths resolve
+
+**Run if modules were added, removed, restructured, or boundaries changed:**
+- **Completeness** — every Feature still has module coverage; no orphan features
+- **Dependency sanity** — no circular dependencies; Dependency Layering table still valid; no reverse-layer imports
+- **PRD traceability** — every module still traces back to at least one Feature
+- **Interaction completeness** — all cross-module interactions in README's Module Interaction Protocols are in sync with updated interfaces
+- **Testability** — changed modules remain independently testable; test double strategies still valid
+- **Enforcement coverage** — changed modules' Boundary Enforcement sections reference valid constraints
+
+**Run if interfaces changed:**
+- **API completeness** — API contracts referencing the changed interface have updated schemas, error codes, and examples
+- **Frontend-backend contract alignment** — frontend modules' API call entries match the updated API contracts
+
+**Run if NFR budgets were reallocated:**
+- **NFR coverage** — all PRD NFRs still decomposed to at least one module; reallocated budgets don't exceed PRD-level targets
+
+**Run if technology decisions changed:**
+- **Convention translation** — README's Implementation Conventions patterns still valid for the changed stack; module Relevant Conventions updated to match
+
+**Run if frontend modules changed:**
+- **UI coverage** — changed frontend modules have complete UI Architecture sections
+- **Frontend performance** — performance targets consistent with PRD NFRs after restructuring
+- **Form implementation consistency** — form patterns still consistent across changed views
+- **Analytics coverage** — all PRD analytics events still mapped to a responsible module
 
 Fix any issues found. Present change summary to user.
 

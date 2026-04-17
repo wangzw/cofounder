@@ -27,8 +27,19 @@ Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → M
 ## Mode Detection
 
 1. Check if a PRD path is provided as argument, OR if a `prd/` directory exists in the workspace, OR if a `docs/raw/prd/` directory exists (scan for the most recent date-prefixed subdirectory)
-2. If PRD found → **Chained Mode** (read topic: `topics/positioning.md` with PRD extraction)
+2. If PRD found → **Chained Mode**: read all PRD files once now (see PRD Extraction below), then proceed stage by stage
 3. If no PRD → **Standalone Mode** (full interactive Q&A for product context)
+
+**Chained mode — one-time PRD read (do this before Stage 1, not per stage):**
+Read all of the following upfront and keep them in context for all 7 stages:
+- `README.md` — product name, vision, problem, personas, competitive landscape, roadmap
+- `features/*.md` (all feature files) — feature surface, usage patterns, analytics events, viral/sharing hooks
+- `journeys/*.md` (all journey files) — personas, workflows, pain points, touchpoints, onboarding, journey metrics
+- `architecture/tech-stack.md` — tech constraints
+- `architecture/deployment.md` — infrastructure cost drivers, environment model (if present)
+- `architecture/dev-workflow.md` — release readiness, beta/GA timeline (if present)
+
+Each stage extracts what it needs from this already-loaded content — **do not re-read PRD files per stage**.
 
 ## Stage Routing
 
@@ -52,25 +63,9 @@ Read ONLY the current stage's topic file — do not read ahead. Each topic file 
 
 Every stage follows the same pattern:
 
-1. **Context gather** — pull relevant info from PRD (chained) + prior GTM sections already generated.
-   - **Chained mode (PRD present):** Even after Stage 1, every subsequent stage MUST re-read the PRD sections relevant to its topic before relying on the cached Stage 1 extraction. The PRD is the authority — `gtm/positioning.md` is a derived view that may have lost detail. Each topic file lists the PRD sections relevant to its stage in its Prerequisites; if a topic file omits this, default to: re-read `README.md` Problem & Goals, `features/*.md` for the feature surface this stage touches (e.g. pricing-relevant features for Stage 2, distribution-relevant features for Stage 3), `architecture.md` for any compliance/deployment constraints affecting GTM. If you find PRD facts that contradict a prior `gtm/` file, surface the contradiction to the user before proceeding.
+1. **Context gather** — extract relevant info from the already-loaded PRD content (chained) + prior GTM sections already generated.
+   - **Chained mode (PRD present):** All PRD files were loaded at Mode Detection — use them directly from context. Each topic file lists the PRD sections relevant to its stage in its Prerequisites. If you find PRD facts that contradict a prior `gtm/` file, surface the contradiction to the user before proceeding.
    - **Standalone mode:** Use only what was gathered in the SKILL.md gap-fill plus prior `gtm/` files. No PRD to consult.
-
-### Per-Stage PRD Extraction Guide
-
-When in chained mode, each stage should re-read these specific PRD sections (in addition to prior `gtm/` files):
-
-| Stage | PRD Sections to Re-Read | What to Extract |
-|-------|------------------------|-----------------|
-| 1. Positioning | README.md (Problem, Goals, Personas), journeys/*.md, architecture/tech-stack.md | Vision, target users, pain points, competitive landscape, tech constraints |
-| 2. Pricing | features/*.md (feature surface, usage patterns), architecture/deployment.md | Feature tiers, usage-based metrics, infrastructure cost drivers |
-| 3. Channels | journeys/*.md (personas, workflows), README.md (target audience) | Where users are, how they discover tools, community affiliations |
-| 4. Launch Plan | architecture/dev-workflow.md, README.md (roadmap/phases) | Release readiness, deployment model, beta/GA timeline |
-| 5. Landing Page | features/*.md (top features for messaging), journeys/*.md (key pain points) | Hero messaging hooks, feature highlights, social proof angles |
-| 6. Metrics | features/*.md (analytics events), journeys/*.md (journey metrics) | Activation signals, retention indicators, revenue events |
-| 7. Acquisition | journeys/*.md (onboarding flow), features/*.md (viral/sharing features) | Onboarding steps, referral mechanics, upgrade triggers |
-
-If a topic file's Prerequisites section lists different PRD sections, follow the topic file's list (it's more specific). This table is a default when topic files omit explicit PRD guidance.
 
 2. **Gap-fill** — ask the user ONLY what is missing (prefer multiple choice, one question at a time)
 3. **Generate** — produce the document. **Every generated file must be self-contained**: include a short "Context" header at the top summarizing the upstream facts this stage depends on (e.g. primary persona, core value prop, price tier names). A reader opening this file alone must be able to act on it without cross-referencing the rest of `gtm/` or the PRD. Do not write "see positioning.md" — copy the 2-3 sentences that matter.
@@ -173,16 +168,8 @@ The Final Review step (below) reads `gtm/.meta.json` and lists every stage whose
 
 ## PRD Extraction (Chained Mode)
 
-When a PRD directory is found, extract and present to user before gap-filling:
+All PRD files are read once at Mode Detection (before Stage 1). After reading, present an extraction summary to the user:
 
-| PRD Source | Extract |
-|-----------|---------|
-| `README.md` | Product name, vision, problem statement, target audience, competitive landscape |
-| `features/*.md` or `features/F-*.md` | Feature list, user stories, acceptance criteria |
-| `journeys/*.md` or `journeys/J-*.md` | User personas, workflows, pain points |
-| `architecture.md` + `architecture/*.md` | Tech stack, integrations, deployment model |
-
-Present extraction summary:
 > **Extracted from PRD:**
 > - Product: [name] — [vision]
 > - Target users: [personas]
@@ -191,6 +178,8 @@ Present extraction summary:
 > - Tech stack: [summary]
 >
 > Is this accurate? I'll use this as context for the GTM strategy. I only need to ask you about business-specific details the PRD doesn't cover.
+
+This summary is presented once. Subsequent stages extract from the PRD content already in context — no additional file reads.
 
 ## Standalone Mode Gap-Fill
 

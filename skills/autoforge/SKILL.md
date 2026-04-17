@@ -23,9 +23,9 @@ Detect the mode first. Read the routing files for that mode only — do not load
 
 | Mode | Trigger | Read These Files |
 |------|---------|------------------|
-| **Default** | `/autoforge <dir>` | `planner-prompt.md`, `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`, `acceptance-tester-prompt.md`, `integration-tester-prompt.md`, `acceptance-report-template.md` |
-| **Plan only** | `--plan-only` | Same as Default (stops after Step 1) |
-| **Execute** | `--execute <plan-dir>` | `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `acceptance-tester-prompt.md`, `integration-tester-prompt.md`, `acceptance-report-template.md` |
+| **Default** | `/autoforge <dir>` | Load per-step as needed (see loading notes in Steps 1–3 below) |
+| **Plan only** | `--plan-only` | Same — stops after Step 1; only planner files are ever loaded |
+| **Execute** | `--execute <plan-dir>` | Same — skip planner files unless re-plan is triggered |
 | **Status** | `--status <plan-dir>` | No additional files (read-only query) |
 | **Cleanup** | `--cleanup <plan-dir>` | No additional files |
 
@@ -87,6 +87,8 @@ flowchart TD
 **Step 0 → Step 1 gate:** User confirms phase breakdown and branch naming.
 
 ## Step 1 — Sequential Planning
+
+> **Load now:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`
 
 Plan modules one at a time in dependency order. Each Planner receives all previously generated plans as accumulated context, ensuring consistent conventions, concrete interface alignment, and coherent file organization across the entire project.
 
@@ -208,6 +210,9 @@ This step only applies when creating a new project from scratch. It initializes 
    ```
 
 ## Step 2 — Phase Execution
+
+> **Load now:** `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`
+> **Load at phase integration test:** `integration-tester-prompt.md`
 
 Execute phases sequentially. Within each phase, execute modules in parallel.
 
@@ -485,6 +490,8 @@ Review Dimensions:
 
 ## Step 3 — PRD Acceptance Validation
 
+> **Load now:** `acceptance-tester-prompt.md`, `acceptance-report-template.md`
+
 After all phases complete, validate against the original PRD.
 
 ### Acceptance Tester Role
@@ -603,6 +610,9 @@ Only executed when acceptance verdict is PASS.
 If rebase has conflicts, pause and present to human for resolution.
 
 ## --execute Mode
+
+> **Load on entry:** `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `integration-tester-prompt.md`, `acceptance-tester-prompt.md`, `acceptance-report-template.md`
+> **Load only if re-plan triggered:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`
 
 When invoked with `--execute docs/raw/plans/{plan-dir}/`:
 

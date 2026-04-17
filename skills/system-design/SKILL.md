@@ -27,9 +27,9 @@ Detect mode from the input flags and load only the relevant topic file. The Desi
 
 | Mode | Trigger | Read These Files |
 |------|---------|------------------|
-| **Generate** (default) | No `--review` / `--revise` flag | `generate-mode.md` + `design-review-checklist.md` (used at Phase 1 Step 10) |
+| **Generate** (default) | No `--review` / `--revise` flag | `generate-mode.md` (load `design-review-checklist.md` on demand at Phase 1 Step 10) |
 | **Review** | `--review <design-dir>` | `review-mode.md` + `design-review-checklist.md` |
-| **Revise** | `--revise <design-dir>` | `revise-mode.md` + `design-review-checklist.md` (used at Step 7) |
+| **Revise** | `--revise <design-dir>` | `revise-mode.md` (load `design-review-checklist.md` on demand per revise-mode.md instructions) |
 
 Detect the mode first. Read the routing files for that mode only — do not load the others. Templates (`design-template.md`, `module-template.md`, `api-template.md`) are loaded per-section as needed during file generation.
 
