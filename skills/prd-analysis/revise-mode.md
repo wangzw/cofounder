@@ -74,6 +74,12 @@ Absolute paths only (resolve them from the REVIEW's `Reviewed:` header + each `#
 
 The main agent consumes the returned YAML as the cluster plan. Fix-subagent dispatches in Step 5 use `cluster.target_files` directly; Step 6 delta-review scope uses `dimensions_tagged_union`.
 
+**Dispatch execution (MANDATORY — see `parallel-dispatch.md` Rule 1):**
+
+Once the manifest is consumed, emit ALL Fix subagent dispatches in a **single assistant response** containing N `Agent` tool_use blocks (one per cluster). Sequential dispatch is **FORBIDDEN** — it replays ~280k cache_read per cluster, costing roughly $1.30 per cluster on a typical PRD. A 10-cluster revision dispatched in parallel costs ~$1.30; dispatched serially costs ~$13.
+
+Do NOT emit any intermediate assistant response between consuming the manifest and the dispatch. No "Now I will dispatch the fix subagents" preamble — proceed directly to the multi-tool-use response.
+
 **Clustering-Subagent dispatch parameters:** Use `subagent_type: "general-purpose"` and `model: "sonnet"`. Do not use `Explore` (lightweight tier — will misparse the structured findings schema). Do not use `opus` (simple parsing + grouping is not top-tier work). Never pin a specific version.
 
 ---
