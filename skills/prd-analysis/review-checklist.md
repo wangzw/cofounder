@@ -6,7 +6,7 @@ When review is run via parallel subagents (see `review-mode.md` Steps 2–3), ea
 
 | Scope | Dimensions |
 |-------|-----------|
-| **Per-file** | Evidence · Authorization · Self-containment · Testability (a, b, c, d, h) · Interaction Design coverage · Form specification completeness · Micro-interactions & motion · State machine integrity · Frontend stack consistency · Accessibility per-feature · i18n per-feature — frontend · i18n per-feature — backend · Page transition completeness · Prototype-spec alignment · Prototype feedback incorporation · Responsive coverage · Scope boundary · Notifications · Journey interaction mode coverage · No ambiguity |
+| **Per-file** | Evidence · Authorization · Self-containment · Testability (a, b, c, d, h) · Interaction Design coverage · Form specification completeness · Micro-interactions & motion · State machine integrity · Frontend stack consistency · Accessibility per-feature · i18n per-feature — frontend · i18n per-feature — backend · Page transition completeness · Prototype-spec alignment · Prototype feedback incorporation · Responsive coverage · Notifications · Journey interaction mode coverage · No ambiguity |
 | **Cross-file** | Traceability · Competitive context · Metrics · Risks · Priority · Privacy · Testability (e, f, g) · Design token completeness · Component contract consistency · Cross-feature event flow · Accessibility baseline completeness · i18n baseline completeness · Navigation consistency · Prototype archival completeness · Coding conventions completeness · Test isolation completeness · Development workflow completeness · Security coding policy completeness · Backward compatibility completeness · Git & Branch Strategy completeness · Code review policy completeness · Observability requirements completeness · Performance testing completeness · Development infrastructure feature · Deployment architecture completeness · AI agent configuration completeness · Version integrity |
 
 When review is run inline (self-review during initial creation, step 6), both scopes are checked together by the main agent — no split needed.
@@ -27,7 +27,7 @@ Count prior review-driven revision passes from `REVISIONS.md` (version-controlle
 | 2 | Critical, Important (drop Suggestion) |
 | ≥3 | Critical only |
 
-Rationale: after three passes, remaining non-Critical findings are overwhelmingly judgment drift on subjective dimensions (scope boundary, fixture detail, i18n table shape, per-endpoint NR). If real structural gaps remain, system-design will surface them; do not keep scrubbing the PRD.
+Rationale: after three passes, remaining non-Critical findings are overwhelmingly judgment drift on subjective dimensions (fixture detail, i18n table shape, per-endpoint NR). If real structural gaps remain, system-design will surface them; do not keep scrubbing the PRD.
 
 ### Dimension Saturation Rules
 
@@ -42,24 +42,6 @@ Do NOT flag a finding if the listed saturation condition already holds. These di
 | i18n per-feature — frontend | Key-naming convention is stated. Do NOT audit individual string keys. |
 | Micro-interactions & motion | Animations reference motion/timing tokens by name. Do NOT demand frame-by-frame choreography or easing math. |
 | Self-containment | Feature contains the capability, contract, and observable behavior needed to implement. Do NOT demand deeper inlining of entities already described at JSON-schema level. |
-| Scope boundary | See partition table below — flag ONLY if content is clearly in the "defer" column. |
-
-### Scope Boundary vs Self-Containment — Authoritative Partition
-
-Self-containment ("inline the context") and scope boundary ("no implementation detail") pull opposite directions. Use this table to resolve. Content on the boundary (storage-hint nouns, capability statements) is the author's judgment — respected, not flagged.
-
-| Inline in feature file (self-contained) | Defer to system-design (scope boundary) |
-|------------------------------------------|------------------------------------------|
-| Entity names, field semantics, types at JSON-schema level | Table names, column physical types, index strategy, SQL DDL blocks |
-| API endpoint path, method, request/response schema | Handler names, middleware composition, framework idioms |
-| State machine states + transitions + system feedback | Concurrency mechanism (goroutine / channel / lock / SELECT FOR UPDATE) |
-| Required behavior under concurrency ("no lost writes under 100 concurrent PATCH") | Implementation mechanism for achieving it |
-| i18n key naming convention + category coverage | i18n library choice, loader config |
-| Error envelope shape + error-type enum | Exception class hierarchy, error-wrapping library |
-| Timeout and retry values, heartbeat intervals | Retry library, circuit breaker config |
-| Storage-hint nouns ("transactional store", "PostgreSQL-backed") | Schema migrations, physical deployment choice |
-
-Flag ONLY when content is clearly in the right-hand column. Storage-hint or capability-level content is NOT a violation.
 
 ### Oscillation Detection
 
@@ -107,7 +89,6 @@ Applied as step 6 of the process (after writing, before commit). Check each dime
 | Prototype feedback incorporation | (Skip if no prototypes) Every prototype has evidence of user validation (confirmation date in Prototype Reference); feedback has been categorized (spec change / token change / prototype-only) and incorporated — spec changes reflected in feature files, token changes reflected in architecture.md |
 | Prototype archival completeness | (Skip if no prototypes) Prototype source code exists in `{prd-dir}/prototypes/src/`; key state screenshots/snapshots exist in `{prd-dir}/prototypes/screenshots/` (browser screenshots for web, teatest golden files or terminal screenshots for TUI); every user-facing feature's Prototype Reference section has path and confirmation date filled |
 | Responsive coverage | Every user-facing feature has a Responsive Behavior sub-section; **web**: layout changes described for at least mobile (< sm) and desktop (>= lg) breakpoints; **TUI**: terminal width/height constraints and layout adaptations described (e.g. sidebar collapse threshold, minimum terminal size) |
-| Scope boundary | PRD does not contain implementation-level details that belong in system-design (no middleware implementations, no database schemas, no library configurations, no code-splitting strategies); PRD interaction design uses design token semantic names, not implementation-specific values (no CSS class names, no Tailwind utilities) |
 | Notifications | Every feature that triggers user notifications has a Notifications section with channel, recipient, content summary, and user control; features without notifications correctly omit it |
 | Coding conventions completeness | architecture.md Coding Conventions section is present and covers: code organization/layering policy, naming conventions, interface/abstraction design policy, dependency wiring policy, error handling & propagation policy, logging conventions (levels, structured format, sensitive data), configuration access policy, concurrency patterns (lifecycle, shared state rules). If UI exists: component structure, state management patterns, styling conventions. All conventions are technology-agnostic policies, not implementation-specific patterns |
 | Test isolation completeness | architecture.md Test Isolation section is present and covers: resource isolation policy (temp dirs, random ports, isolated DBs), global mutable state prohibition, file system isolation, external process cleanup, race detection requirement in CI, test timeout defaults, worktree/directory independence, parallel test classification. Per-feature Test Data Requirements reference these policies where applicable |

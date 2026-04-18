@@ -160,7 +160,6 @@ Run a two-layer review. Load `review-checklist.md` only if you need to reference
 - **Priority** — new/modified feature priority aligns with roadmap phase; dependencies respect phase ordering; no P0 depending on a P1/P2 across phase boundaries
 - **Self-containment** — each new/modified feature file can be read and implemented independently
 - **Testability** (sub-checks a, b, e, f only) — ACs precise; edge cases have Given/When/Then; error paths map to an AC or edge case; cross-feature dependencies have integration-level AC
-- **Scope boundary** — no implementation-level details in new/modified features
 
 **Run if features were deprecated:**
 - **Traceability** (focused) — no journey touchpoint left uncovered; no metric orphan; no remaining feature depends on the deprecated one; tombstone file present

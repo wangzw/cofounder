@@ -83,8 +83,7 @@ Per-file dimensions to check:
 **Convergence Rules — apply BEFORE flagging any finding:**
 1. **Pass-Count Severity Gate** — drop findings below the gate value above.
 2. **Dimension Saturation Rules** (see `review-checklist.md` → Convergence Rules) — do NOT flag a dimension whose saturation condition is met. Specifically: Testability (c) does not require per-endpoint p95; Testability (d) does not require enumerating every role×workspace×org combination; Testability (h) does not require prescribed fixture shapes; i18n backend tables do not require one row per EC.
-3. **Scope Boundary partition** — flag scope-boundary violations ONLY for content clearly in the "defer to system-design" column of the partition table (SQL DDL, handler names, concurrency mechanism, library choice). Storage-hint nouns and capability statements are NOT violations.
-4. **Oscillation detection** — read the most recent 2–3 entries' `**Themes:**` sections from `REVISIONS.md` (version-controlled, always available). If a Theme line records a prior pass adding content you're about to flag as violation (or removing content you're about to demand), emit a single `[Critical] Convergence conflict` citing the REVISIONS.md entry date + Theme line, NOT the per-dimension finding. Local `.reviews/*.applied.md` may be consulted as a supplement when present.
+3. **Oscillation detection** — read the most recent 2–3 entries' `**Themes:**` sections from `REVISIONS.md` (version-controlled, always available). If a Theme line records a prior pass adding content you're about to flag as violation (or removing content you're about to demand), emit a single `[Critical] Convergence conflict` citing the REVISIONS.md entry date + Theme line, NOT the per-dimension finding. Local `.reviews/*.applied.md` may be consulted as a supplement when present.
 
 For each file, report findings in this exact format:
 

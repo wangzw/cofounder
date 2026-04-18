@@ -422,7 +422,6 @@ Do not re-run dimensions the review already validated as passing.
 - **Priority** — new/modified feature's priority aligns with roadmap phase; dependencies respect phase ordering
 - **Self-containment** — modified feature file can be read and implemented independently
 - **Testability** (sub-checks a, b, e, f only) — ACs are precise; edge cases have Given/When/Then; error paths map to an AC or edge case; cross-feature dependencies have integration-level AC
-- **Scope boundary** — no implementation-level details crept into the modified feature
 
 **Run if features were deprecated:**
 - **Traceability** (focused) — no journey touchpoint or pain point left uncovered; no Metric orphan; no Dependency conflict (no remaining feature depends on the deprecated one)
