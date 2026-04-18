@@ -252,13 +252,14 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 ### Fix-Subagent Dispatch Rules
 
-**Model tier:** Fix subagents MUST be dispatched with `model: sonnet` (the mid-tier alias). Edit application is a deterministic text transformation — the top tier's reasoning budget is not needed and is materially more expensive per token. Only escalate to `opus` for a finding explicitly tagged as requiring cross-feature design judgment (rare; must be justified in the dispatch prompt). Use aliases (`sonnet` / `opus` / `haiku`), never pin a specific version — aliases track the current tier member and avoid rot as models evolve.
+**Read `parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, model tier, cluster sizing ≤3 files, MultiEdit for >1 edit, forbidden post-edit re-reads, dispatch prompt contract).
 
-**Tool usage:** when a file has **>1 queued edit**, the subagent MUST use `MultiEdit` (one tool call, one write). Sequential `Edit` calls on the same file are forbidden — each Edit triggers a cache_read replay of the full conversation state, which dominates cost on long-running edit sessions. One `Edit` only when a file has exactly one change.
+**Revise-mode-specific rules:**
+
+- If a `.reviews/REVIEW-*.md` was consumed (Pre-Answered Mode), use **Template A** (reference-based, below).
+- Otherwise (interactive revise, Step 3 gathered the change list), use **Template B** (inline edits list, below).
 
 When delegating a cluster to a `general-purpose` subagent, the dispatch prompt MUST use this template. Free-form prompts lead to the subagent re-reading files (4× observed on same file) and running its own Glob/Grep to re-discover the change set — both are pure waste.
-
-If a `.reviews/REVIEW-*.md` was consumed (Pre-Answered Mode), prefer **Template A** (reference-based, short). Otherwise use **Template B** (inline edits list).
 
 **Template A — reference-based dispatch** (when REVIEW-*.md exists):
 
