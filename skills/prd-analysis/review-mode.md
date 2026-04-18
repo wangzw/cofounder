@@ -102,6 +102,7 @@ Rules:
 - Do not Read, Glob, or Grep any other files outside the listed target files.
 - Do not read architecture.md or other feature/journey files for cross-reference — cross-file checks are handled separately.
 - Do not write or edit anything.
+- Output discipline: emit per-file findings directly as structured text. No prose preamble or "I will now report findings" framing. Do not echo the findings list in your final summary — the structured entries ARE the output.
 ```
 
 ## Step 3 — Cross-File Checks (main agent)
