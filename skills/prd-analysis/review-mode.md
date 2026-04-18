@@ -50,19 +50,13 @@ Record the file lists for use in Step 2.
 
 Dispatch **one round** of subagents, covering disjoint file sets, split by artifact class. **Do not dispatch a second review pass for the same files** — if a subagent's findings are vague, prefer `--revise` over re-reviewing.
 
-**Subagent type and model — REQUIRED:**
+**Read `parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, `subagent_type`, model tier, cluster sizing, tool usage, prompt contract). Review-mode-specific overrides are below.
 
-- Use `subagent_type: "general-purpose"` (NOT `Explore`). Explore defaults to a lightweight tier that is miscalibrated for PRD judgment work: it produces surface-level findings (wording / formatting), misses cross-field consistency and AC-completeness issues, and gives vague "Fix:" actions. The net effect is slow convergence — review rounds keep flagging trivial items while hard issues persist across revise cycles.
-- Pass `model: "sonnet"` explicitly. Per-file review requires understanding dimension semantics, spotting subtle logical gaps, and writing actionable fixes — that is mid-tier work, not light-tier pattern matching.
-- Never pin a specific model version (e.g. `claude-sonnet-4-6`). Use the tier alias `sonnet` so the policy survives model rotations.
-- **Escalation (rare):** if a PRD has gone through ≥3 `--review → --revise` cycles and the same dimension keeps surfacing findings, escalate that file's next review to `model: "opus"` — recurring findings at that point usually mean the dimension requires cross-feature design judgment that Sonnet is not catching.
+**Review-mode-specific rules:**
 
-**Dispatch rules:**
-
-- Group files by artifact class: `features/`, `journeys/`, `architecture/`.
-- Target **~10–15 files per subagent**. A class with ≤15 files → one subagent; with more → split into disjoint ranges (e.g. F-001..F-015, F-016..F-030, F-031..F-048).
-- File sets across subagents must not overlap.
-- Each subagent runs only the **per-file** dimensions from `review-checklist.md`.
+- Group files by artifact class: `features/`, `journeys/`, `architecture/`. Do not mix classes within a cluster.
+- Each cluster contains **10–15 files** (not the ≤3 used by Fix subagents).
+- Every subagent runs only the **per-file** dimensions from `review-checklist.md` — cross-file dimensions run in Step 3 on the main agent.
 - Each subagent prompt MUST include:
   1. Exact absolute paths of target files (no globs — prevents re-discovery).
   2. Instruction to read each target file exactly once, in parallel.
