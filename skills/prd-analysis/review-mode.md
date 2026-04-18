@@ -187,6 +187,20 @@ Then present:
 - Issues are significant (missing journeys, orphan features, gaps): recommend `--revise {PRD-dir}`. Tell the user the revise command will auto-consume the latest `REVIEW-*.md` in Pre-Answered Mode — no need to re-enumerate findings.
 - Reviewing an older version: note that the latest version should be reviewed instead, unless the user explicitly requested this version.
 
+### Compaction Hint
+
+After presenting findings and before the user proceeds to `--revise`, emit this message verbatim:
+
+> 💡 **Context compaction recommended**
+>
+> The review phase has loaded your journey/architecture/feature files into context (~280k tokens). If you plan to run `--revise` next, running `/compact` now will let the revise phase start with a cleaner context — saves roughly $20–$30 in cache_read costs on a PRD this size.
+>
+> Run `/compact` to proceed, or skip this if you are not revising this session.
+
+**Skip this message if:**
+- No REVIEW file was written (convergence gate aborted in Step 0.5), OR
+- Critical + Important finding count is below 5 (revise is unlikely to be worth running at that point).
+
 ## Prototypes — How to Handle
 
 If `prototypes/` exists, list `prototypes/screenshots/` (directory structure and filenames only). This covers the three prototype dimensions: alignment uses filenames vs. state machine states, feedback incorporation uses the `Confirmed` date in each feature's Prototype Reference section, archival completeness uses screenshot presence per feature as a proxy. **Never list or read `prototypes/src/`** — source is seed code, not part of the spec. Only read an individual screenshot file when a state-machine ↔ screenshot mismatch is suspected for a specific feature and visual confirmation is needed; skip otherwise.
