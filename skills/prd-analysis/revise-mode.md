@@ -265,6 +265,8 @@ Read each target file exactly once (in parallel). For each file, collect all mat
 - file with >1 finding: use `MultiEdit` (mandatory — no sequential Edits on the same file)
 Write once per file.
 
+**Oscillation guard:** if a finding's Fix would undo content that is clearly the result of a prior remediation (e.g. the Fix removes text that looks like it was added by a prior review pass — inline fixtures, capability statements, extra edge cases), do NOT apply it. Skip that finding and report it with status `skipped: oscillation suspected — <one line why>`. The main agent will resolve oscillations; subagents must not swing content back and forth.
+
 **Forbidden:**
 - Re-reading a target file after editing it (no "verification read").
 - Sequential `Edit` calls on the same file — use `MultiEdit` when >1 edit applies.
@@ -277,7 +279,7 @@ Write once per file.
 - <absolute path 2>
 - <absolute path 3>
 
-**On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". No prose summary.
+**On completion**, report per-file: `applied N edits` OR `skipped M: oscillation suspected` OR `file not found` OR `anchor not found: <anchor>`. No prose summary.
 ```
 
 **Template B — inline edits** (interactive revise, no REVIEW-*.md):
@@ -336,6 +338,53 @@ In both cases:
 - Update all cross-references (journey Mapped Feature columns, feature Dependencies, Cross-Journey Patterns "Addressed by Feature" column)
 - Mark deprecated features clearly — remove the feature file and remove it from Feature Index, Roadmap, and any Mapped Feature references
 - Re-derive affected User Stories if journey touchpoints changed (re-run Phase 4 Step 1 extraction for affected journeys only)
+
+### REVISIONS.md Entry Format (Required for Convergence Tracking)
+
+`REVISIONS.md` is the version-controlled source of truth used by `review-mode.md` Step 0.5 to count prior passes and detect oscillations. Review-driven fix-pass entries MUST use a stable heading format and include a `**Themes:**` section detailed enough for oscillation detection.
+
+**Heading format for Pre-Answered Mode (REVIEW-driven fix passes) — MANDATORY:**
+
+```
+## {YYYY-MM-DD} — {Nth}-pass review-finding fixes (REVIEW-{timestamp})
+```
+
+The word `review-finding` MUST appear in the heading — `review-mode.md` Step 0.5 greps `^## .*review-finding` to count passes. Do not rephrase this anchor.
+
+**Required sections in each review-driven entry:**
+
+- **Rationale:** which REVIEW file was consumed, finding counts by severity, remaining-Critical count (explicit "zero Critical remaining" if applicable — this triggers the convergence-gate abort condition on the next `--review`).
+- **Themes:** one bullet per thematic cluster of fixes. Each bullet MUST be specific enough that a future reviewer can tell what was added or removed (e.g. "Removed SQL DDL blocks from F-018/F-021/F-022" — not "Scope cleanup"). This powers oscillation detection: future reviews grep Themes to check whether a new finding would swing content back.
+- **Files affected:** count and class breakdown.
+- **Downstream impact:** whether design exists and what it will inherit.
+
+For non-review-driven revisions (interactive feature add/modify/deprecate), use a different heading (e.g. `## {date} — Add F-049 SSO` / `## {date} — Deprecate F-005`) so they are NOT counted by the convergence gate.
+
+### Rolling Detail Window (keeps REVISIONS.md bounded)
+
+`REVISIONS.md` grows monotonically and would bloat subagent context. Every append uses a rolling window: the 3 most recent entries keep full bodies; older entries are compacted to heading + one-line summary, with full detail recoverable via `git log -p REVISIONS.md`.
+
+**Append procedure (execute in this order):**
+
+1. **Compact older bodies** — before appending the new entry, identify entries that will become older than the 3rd-most-recent after the append (i.e. entries currently 3rd-most-recent and older). For each such entry still in full-body form, replace its body (everything between its `## ...` heading and the next `---` separator, or EOF) with a single line:
+
+   ```
+   **Summary:** {one-line themes digest}. Full detail in git history (`git log -p REVISIONS.md`).
+   ```
+
+   The one-line digest SHOULD be derived from the entry's current `**Themes:**` bullets — take the noun phrases (e.g. `Scope-boundary tightening; testability tightening; authorization matrices; UI state machine completions`). Keep the heading line and any trailing `---` separator intact.
+
+2. **Append the new full-body entry** after compaction.
+
+3. **The detail window applies to review-driven entries only.** Non-review-driven entries (feature add/modify/deprecate) are treated as standalone narrative — do not compact them; they record substantive product decisions worth keeping in line.
+
+**Invariants preserved by this procedure:**
+
+- **Pass count stays exact.** `Grep` of `^## .*review-finding` still matches every compacted entry — only bodies change, not headings.
+- **Oscillation detection stays accurate.** The 3-entry detailed window matches `review-mode.md` Step 2's "read most recent 2–3 entries" — all the signal it needs is still in full form.
+- **No audit loss.** Full body of every compacted entry is recoverable via `git log -p REVISIONS.md` — the compaction commit is itself the pointer.
+
+**When NOT to apply compaction:** first 3 review-driven passes (nothing to compact); entry being compacted is already in summary form (idempotent — skip). Never compact the entry you are currently appending.
 
 ## Revise Step 6 — Post-Change Review (Delta-Focused)
 

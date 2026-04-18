@@ -10,6 +10,26 @@ Review Checklist dimensions and the per-file / cross-file scope split are define
 
 Scan the parent directory for sibling PRD directories with the same product slug (the portion after the date prefix `YYYY-MM-DD-`). If the reviewed directory name does not match the `YYYY-MM-DD-{slug}` pattern (e.g. custom `--output` path), skip this step. If multiple versions exist: identify which version is being reviewed, which is latest (by date prefix), and whether the versions form a consistent chain. Chain links may be via `REVISIONS.md` (revise-mode) or Baseline.Predecessor (evolve-mode) — check both. Record this context for subsequent steps. If the reviewed PRD is an evolve-mode PRD (has Baseline section): additionally validate all `→ baseline` reference links, Change Summary accuracy, and change annotation completeness using the evolve-specific checks from the Evolve Step 4 Review Checklist.
 
+## Step 0.5 — Convergence Gate
+
+Count prior review-driven revision passes via `Grep` on `{PRD-dir}/REVISIONS.md` with pattern `^## .*review-finding` (version-controlled — works on fresh clones). If `REVISIONS.md` is absent, the count is 0.
+
+Apply the Pass-Count Severity Gate from `review-checklist.md` → Convergence Rules:
+
+| Prior review-driven passes | Severities to emit | Decision |
+|----------------------------|---------------------|----------|
+| 0–1 | Critical + Important + Suggestion | Proceed — full review |
+| 2 | Critical + Important (drop Suggestion) | Proceed — gated review |
+| ≥3 | Critical only | See abort condition below |
+
+**Abort condition:** if prior review-driven passes ≥3 AND the most recent matching REVISIONS.md entry's Rationale reports zero remaining Critical findings (or the prior `--revise` ran to completion with no Critical left), do NOT run a new review pass. Report to the user:
+
+> This PRD has completed 3+ remediation passes with no remaining Critical findings. Further review rounds are unlikely to surface correctness issues — remaining gaps are better surfaced by running system-design. Skipping review.
+
+Then exit without writing a REVIEW file.
+
+Otherwise, record the severity gate value and pass it into every dispatched subagent (Step 2) so they only emit findings at or above the gate. The main agent's cross-file pass (Step 3) follows the same gate.
+
 ## Step 1 — Inventory (main agent, minimal reads)
 
 The main agent must **not** read all journey / architecture topic / feature files itself — doing so fills main context unnecessarily and leaves no budget to aggregate subagent findings. Read only:
@@ -50,10 +70,13 @@ Dispatch **one round** of subagents, covering disjoint file sets, split by artif
   4. The findings schema from Step 4 below.
   5. Instruction to skip `prototypes/src/` entirely; list `prototypes/screenshots/` only if needed.
 
-**Subagent prompt template** (copy into each dispatch):
+**Subagent prompt template** (copy into each dispatch, substituting the severity gate from Step 0.5):
 
 ```
 Review the following files against the PRD per-file review dimensions.
+
+**Severity gate for this pass:** {all | critical_important | critical_only}
+Emit ONLY findings at or above this gate. The orchestrator already computed this from prior-pass count — do not re-derive.
 
 Target files (read each exactly once, in parallel):
 - <abs path 1>
@@ -62,6 +85,12 @@ Target files (read each exactly once, in parallel):
 
 Per-file dimensions to check:
 <paste the Per-file row from review-checklist.md Execution Scope table>
+
+**Convergence Rules — apply BEFORE flagging any finding:**
+1. **Pass-Count Severity Gate** — drop findings below the gate value above.
+2. **Dimension Saturation Rules** (see `review-checklist.md` → Convergence Rules) — do NOT flag a dimension whose saturation condition is met. Specifically: Testability (c) does not require per-endpoint p95; Testability (d) does not require enumerating every role×workspace×org combination; Testability (h) does not require prescribed fixture shapes; i18n backend tables do not require one row per EC.
+3. **Scope Boundary partition** — flag scope-boundary violations ONLY for content clearly in the "defer to system-design" column of the partition table (SQL DDL, handler names, concurrency mechanism, library choice). Storage-hint nouns and capability statements are NOT violations.
+4. **Oscillation detection** — read the most recent 2–3 entries' `**Themes:**` sections from `REVISIONS.md` (version-controlled, always available). If a Theme line records a prior pass adding content you're about to flag as violation (or removing content you're about to demand), emit a single `[Critical] Convergence conflict` citing the REVISIONS.md entry date + Theme line, NOT the per-dimension finding. Local `.reviews/*.applied.md` may be consulted as a supplement when present.
 
 For each file, report findings in this exact format:
 
@@ -74,7 +103,8 @@ If a file has no findings, write: `### <path>\n(no issues)`.
 **Dimension names MUST be copied verbatim from `review-checklist.md`** (e.g. `i18n per-feature — backend`, not `Backend Internationalization`). Downstream tooling matches these strings literally to scope delta review.
 
 Rules:
-- You MAY read `<skill-dir>/review-checklist.md` once to look up the exact check text for each per-file dimension.
+- You MUST read `<skill-dir>/review-checklist.md` once to load the Convergence Rules and dimension definitions.
+- You MUST `Grep` the most recent 2–3 entries of `{PRD-dir}/REVISIONS.md` for oscillation detection (skip if file absent). `.reviews/*.applied.md` is OPTIONAL supplementary signal — gitignored and may be missing.
 - Do not Read, Glob, or Grep any other files outside the listed target files.
 - Do not read architecture.md or other feature/journey files for cross-reference — cross-file checks are handled separately.
 - Do not write or edit anything.

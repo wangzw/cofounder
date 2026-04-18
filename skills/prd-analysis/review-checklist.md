@@ -13,6 +13,66 @@ When review is run inline (self-review during initial creation, step 6), both sc
 
 ---
 
+## Convergence Rules
+
+A review that keeps producing fresh findings round after round is churning on subjective dimensions, not improving quality. Apply these rules BEFORE flagging a finding, in both inline self-review and dispatched subagents.
+
+### Pass-Count Severity Gate
+
+Count prior review-driven revision passes from `REVISIONS.md` (version-controlled — the authoritative source). Use `Grep` with pattern `^## .*review-finding` on `REVISIONS.md`; the match count is the number of prior remediation passes. Do NOT rely on `.reviews/*.applied.md` counts — `.reviews/` is gitignored and absent on fresh clones or after cleanup.
+
+| Prior applied passes | Severities to emit |
+|----------------------|---------------------|
+| 0–1 | Critical, Important, Suggestion |
+| 2 | Critical, Important (drop Suggestion) |
+| ≥3 | Critical only |
+
+Rationale: after three passes, remaining non-Critical findings are overwhelmingly judgment drift on subjective dimensions (scope boundary, fixture detail, i18n table shape, per-endpoint NR). If real structural gaps remain, system-design will surface them; do not keep scrubbing the PRD.
+
+### Dimension Saturation Rules
+
+Do NOT flag a finding if the listed saturation condition already holds. These dimensions are the primary sources of infinite regress.
+
+| Dimension | Stop flagging once this holds |
+|-----------|-------------------------------|
+| Testability (c) non-behavioral AC | Feature has ≥1 NR per distinct operational characteristic (e.g. read vs write, steady vs burst). Do NOT demand per-endpoint p95. |
+| Testability (d) authorization EC | Feature has ≥1 unauthorized-access EC per permission boundary (role × scope). Do NOT enumerate every role × workspace × org combination. |
+| Testability (h) test data | Test Data Requirements section exists and a reader can set up the test without reading implementation code. Do NOT prescribe fixture JSON shape, seed-file paths, or generator API signatures. |
+| i18n per-feature — backend | Table covers one row per error category (validation, permission, conflict, not_found). Do NOT demand a row per EC or AC. |
+| i18n per-feature — frontend | Key-naming convention is stated. Do NOT audit individual string keys. |
+| Micro-interactions & motion | Animations reference motion/timing tokens by name. Do NOT demand frame-by-frame choreography or easing math. |
+| Self-containment | Feature contains the capability, contract, and observable behavior needed to implement. Do NOT demand deeper inlining of entities already described at JSON-schema level. |
+| Scope boundary | See partition table below — flag ONLY if content is clearly in the "defer" column. |
+
+### Scope Boundary vs Self-Containment — Authoritative Partition
+
+Self-containment ("inline the context") and scope boundary ("no implementation detail") pull opposite directions. Use this table to resolve. Content on the boundary (storage-hint nouns, capability statements) is the author's judgment — respected, not flagged.
+
+| Inline in feature file (self-contained) | Defer to system-design (scope boundary) |
+|------------------------------------------|------------------------------------------|
+| Entity names, field semantics, types at JSON-schema level | Table names, column physical types, index strategy, SQL DDL blocks |
+| API endpoint path, method, request/response schema | Handler names, middleware composition, framework idioms |
+| State machine states + transitions + system feedback | Concurrency mechanism (goroutine / channel / lock / SELECT FOR UPDATE) |
+| Required behavior under concurrency ("no lost writes under 100 concurrent PATCH") | Implementation mechanism for achieving it |
+| i18n key naming convention + category coverage | i18n library choice, loader config |
+| Error envelope shape + error-type enum | Exception class hierarchy, error-wrapping library |
+| Timeout and retry values, heartbeat intervals | Retry library, circuit breaker config |
+| Storage-hint nouns ("transactional store", "PostgreSQL-backed") | Schema migrations, physical deployment choice |
+
+Flag ONLY when content is clearly in the right-hand column. Storage-hint or capability-level content is NOT a violation.
+
+### Oscillation Detection
+
+Primary source is `REVISIONS.md` — every review-driven pass records a `**Themes:**` summary of what was added or removed (e.g. "Removed SQL DDL blocks", "Added performance NRs", "Tightened authorization ECs"). This is version-controlled and always available.
+
+Before flagging a finding, check the most recent 2–3 `REVISIONS.md` entries for a Theme whose wording is opposite to your Fix (prior pass added what you're removing, or removed what you're adding). If found, do NOT emit the per-dimension finding — emit a single `[Critical] Convergence conflict` citing the conflicting REVISIONS.md entry date and Theme line.
+
+Local `.reviews/*.applied.md` files, if present, may be consulted as a finer-grained supplement — but never as the primary signal, since they are gitignored.
+
+Oscillation is resolved by the main agent via user judgment, not by swinging content back and forth in fix subagents.
+
+---
+
 Applied as step 6 of the process (after writing, before commit). Check each dimension and fix issues directly in the written files:
 
 | Dimension | Check |
