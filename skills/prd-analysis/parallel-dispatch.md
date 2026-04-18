@@ -24,7 +24,7 @@ Sequential dispatch (one Agent call per response, waiting for return before next
 ## Rule 3 — Cluster Sizing (MANDATORY)
 
 - Fix subagents: **≤3 target files** per cluster.
-- Review subagents: **10–15 files** per cluster, grouped by artifact class (`features/`, `journeys/`, `architecture/`).
+- Review subagents: **10–15 files** per cluster, grouped by artifact class (`features/`, `journeys/`, `architecture/`). If a class has ≤15 files total, put all in one cluster (no artificial split). Split only when a class has >15 files, into disjoint ranges.
 - A file with **>8 findings** gets its own 1-file cluster — large edit counts replay more cache_read per turn.
 - No file appears in two clusters.
 
