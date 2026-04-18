@@ -199,7 +199,7 @@ After presenting findings and before the user proceeds to `--revise`, emit this 
 
 **Skip this message if:**
 - No REVIEW file was written (convergence gate aborted in Step 0.5), OR
-- Critical + Important finding count is below 5 (revise is unlikely to be worth running at that point).
+- Combined Critical + Important finding count is below 5 (revise is unlikely to be worth running at that point).
 
 ## Prototypes — How to Handle
 
