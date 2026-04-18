@@ -320,6 +320,14 @@ Read each file exactly once (in parallel). Apply all edits in a single pass. Wri
 **On completion**, report per-file: "applied N edits" or "file not found" or "anchor not found: <anchor>". Do not report prose summaries of what changed — the edits list is the contract.
 ```
 
+### Handling Subagent Returns
+
+Follow `output-discipline.md` Rule 2 (no inter-dispatch commentary) and Rule 3 (TaskUpdate parsimony):
+
+- When Fix subagent returns arrive, the main agent's NEXT action is the next tool call (cross-reference sweep, REVISIONS.md append, or user-facing summary) — NOT a standalone ack response.
+- `TaskUpdate` fires once when all clusters dispatched, once when all returned. Do NOT update per-cluster.
+- When writing REVISIONS.md, use `Write` directly with the full entry body — do NOT echo the body in assistant text first (output-discipline Rule 1).
+
 The orchestrator (main agent) owns the cluster plan — but how it is built depends on mode:
 
 - **Pre-Answered Mode (REVIEW-*.md exists):** the orchestrator MUST delegate the read + group step to the Clustering Subagent described at the top of this file, and consume its YAML manifest. The orchestrator never reads the REVIEW body itself.
