@@ -30,11 +30,11 @@ After detecting the invocation mode, read the corresponding files before proceed
 
 | Mode | Read These Files |
 |------|-----------------|
-| Initial analysis (no flags) | `questioning-phases.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
-| Initial analysis + document input | `questioning-phases.md`, `document-mode.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
-| `--review` | `review-mode.md`, `review-checklist.md` |
-| `--revise` | `revise-mode.md` (load `scope-reference.md` and `review-checklist.md` on demand per revise-mode.md instructions) |
-| `--evolve` | `evolve-mode.md`, `questioning-phases.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Evolve Step 4) |
+| Initial analysis (no flags) | `questioning-phases.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
+| Initial analysis + document input | `questioning-phases.md`, `document-mode.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
+| `--review` | `review-mode.md`, `review-checklist.md`, `parallel-dispatch.md`, `output-discipline.md` |
+| `--revise` | `revise-mode.md`, `parallel-dispatch.md`, `output-discipline.md` (load `scope-reference.md` and `review-checklist.md` on demand per revise-mode.md instructions) |
+| `--evolve` | `evolve-mode.md`, `questioning-phases.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Evolve Step 4) |
 
 Do NOT read files not listed for the current mode — they are not needed and waste context.
 
@@ -151,6 +151,7 @@ Use templates: `prd-template.md` (README), `journey-template.md` (individual jou
 - **README is a stable navigational index, REVISIONS.md tracks history** — README.md is the entry point and should not accumulate revision entries that destabilize navigation across versions. Revision history (entries written by `--revise`) lives in a sibling `REVISIONS.md`, created on first revision and grown thereafter. Both files coexist; the README's References section links to `REVISIONS.md` when present.
 - **No ambiguity** — if a requirement can be interpreted two ways, clarify now
 - **Omit empty sections** — if a section has nothing useful, skip it
+- **Discipline files are non-optional** — `parallel-dispatch.md` (for `--review` / `--revise`) and `output-discipline.md` (all modes) are loaded at mode entry and their rules take precedence over any per-mode wording that conflicts.
 
 ## Next Steps Hint
 
