@@ -301,14 +301,23 @@ Based on the mutability determination from Step 5 (not just Step 1 — Step 5's 
 
 **Review-driven fix pass scope:** If this revision consumed a `.reviews/REVIEW-*.md` file (Pre-Answered Mode), the delta review scope is:
 
-- The **always-run** set below, **plus**
-- Only the dimensions whose tags appeared in the consumed `REVIEW-*.md`.
+- The **always-run cross-file regression sweep** below (mandatory, even if the review tagged none of its dimensions — fixes routinely break aggregations silently), **plus**
+- The dimensions whose tags appeared in the consumed `REVIEW-*.md`.
 
-Do not re-run dimensions the review already validated as passing.
+Per-file dimensions the review already validated as passing and that are NOT in the sweep may be skipped. The cross-file sweep is never skippable.
 
-**Always run (every revision):**
+**Always run (every revision) — cross-file regression sweep:**
+
+Fixes to one module frequently break cross-file invariants elsewhere — observed failure mode: `--revise` applied to N modules closes findings locally but introduces new Important-level inconsistencies in README aggregations. Run this sweep on every revision regardless of which dimensions the consumed review tagged:
+
 - **Consistency** — updated module interfaces match their callers; data models match API contracts
 - **Version integrity** — REVISIONS.md entry is present; README References links to REVISIONS.md; all version paths resolve
+- **Interaction completeness** — Module Index `Deps (direct)` and README `Module Interaction Protocols` are bidirectionally in sync (every dep pair has a protocol row; every protocol row backs a dep pair or a documented cross-cutting note)
+- **Convention translation** — every PRD `architecture/*.md` file still has ≥1 row in README Implementation Conventions; no file silently dropped by the revision
+- **Analytics coverage** — every event in every PRD feature `## Analytics` block still has a row in README Analytics Coverage (or is covered by a named sweep rule); no event orphaned
+- **Dependency sanity** — no reverse-layer import introduced by restructuring; Dependency Layering table still describes the actual module graph
+
+If any of the six sweep dimensions fails, treat it as blocking and fix before Step 8. Do not defer sweep failures to the next revision cycle — that is how regression compounds.
 
 **Run if modules were added, removed, restructured, or boundaries changed:**
 - **Completeness** — every Feature still has module coverage; no orphan features
