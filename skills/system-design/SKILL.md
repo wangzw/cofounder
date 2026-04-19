@@ -23,15 +23,17 @@ Generate system design documents as a **multi-file directory**. Each module spec
 
 ## Mode Routing
 
-Detect mode from the input flags and load only the relevant topic file. The Design Review checklist is shared across modes.
+Detect mode from the input flags and load only the relevant topic file. The Design Review checklist and the Structural Lint checklist are shared across modes.
 
 | Mode | Trigger | Read These Files |
 |------|---------|------------------|
-| **Generate** (default) | No `--review` / `--revise` flag | `generate-mode.md` (load `design-review-checklist.md` on demand at Phase 1 Step 10) |
-| **Review** | `--review <design-dir>` | `review-mode.md` + `design-review-checklist.md` |
-| **Revise** | `--revise <design-dir>` | `revise-mode.md` (load `design-review-checklist.md` on demand per revise-mode.md instructions) |
+| **Generate** (default) | No `--review` / `--revise` flag | `generate-mode.md` (load `structural-lint.md` at Step 9a; load `design-review-checklist.md` at Step 10) |
+| **Review** | `--review <design-dir>` | `review-mode.md` + `design-review-checklist.md` (load `structural-lint.md` at Step 1.5 pre-scan) |
+| **Revise** | `--revise <design-dir>` | `revise-mode.md` (load `structural-lint.md` at Step 7.0 gate; load `design-review-checklist.md` on demand per revise-mode.md instructions) |
 
 Detect the mode first. Read the routing files for that mode only — do not load the others. Templates (`design-template.md`, `module-template.md`, `api-template.md`) are loaded per-section as needed during file generation.
+
+**Structural Lint vs Design Review:** `structural-lint.md` catches deterministic, grep-runnable gaps (placeholder JSON, missing per-endpoint blocks, unfilled Boundary Enforcement columns, dangling hook↔endpoint references). It runs before the semantic `design-review-checklist.md` so mechanical findings never consume reviewer attention. If the checklist keeps flagging a mechanical class across `--revise` cycles, extend `structural-lint.md` rather than accepting the review cost.
 
 ## Output Structure
 
@@ -46,7 +48,10 @@ Detect the mode first. Read the routing files for that mode only — do not load
 │   ├── API-001-{slug}.md  # Self-contained API contract
 │   └── ...
 └── .reviews/              # Transient — not version-controlled (gitignore: docs/raw/design/*/.reviews/)
-    └── REVIEW-*.md        # Review findings produced by --review, consumed by --revise
+    ├── REVIEW-*.md            # Semantic review findings, produced by --review, consumed by --revise
+    ├── REVIEW-*.applied.md    # Same, after --revise consumes it (renamed by Bash mv)
+    ├── LINT-*.md              # Structural-lint findings (L1..L5, X1..X8), produced by generate/review/revise
+    └── LINT-*.applied.md      # Same, after generate/revise fixes and re-runs clean
 ```
 
 Use templates: `design-template.md` (README), `module-template.md` (module specs),
@@ -67,7 +72,7 @@ Use templates: `design-template.md` (README), `module-template.md` (module specs
 - **Copy, don't reference** — relevant data models, interface definitions are copied inline
 - **One question at a time** — don't overwhelm during interactive refinement
 - **Design ≠ Plan** — this skill produces "how to build it" designs, not "who does what in what order" — task assignment and execution are handled by `/autoforge`
-- **Review = improvement** — review finds issues and fixes them directly, no reports
+- **Review writes reports, revise applies them** — `--review` is read-only and produces `REVIEW-*.md` (semantic findings) plus `LINT-*.md` (mechanical gaps) in `.reviews/`. `--revise` consumes the newest REVIEW and re-runs lint to fix the gaps. Generate-mode's Step 10 self-review is the one place where review and fix happen in a single pass.
 - **README is a stable navigational index, REVISIONS.md tracks history** — README.md stays a clean entry point so module/api links are easy to follow across versions; revision entries (written by `--revise`) accumulate in `REVISIONS.md` instead. REVISIONS.md is created on first revision; the README's References section links to it once it exists.
 - **Omit empty sections** — if a section has nothing useful, skip it
 - **Feature-Module mapping** — the mapping matrix is the bridge between requirements and implementation, serving as the key input for the planning phase

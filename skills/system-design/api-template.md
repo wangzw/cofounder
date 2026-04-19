@@ -201,6 +201,15 @@ Omit this file-level summary only when there is exactly one endpoint (all auth c
 - **One file per API group**: group related endpoints together (e.g., all task CRUD in one file), not one file per endpoint
 - **Per-endpoint completeness (REST)**: every endpoint MUST carry its own Authentication & Permissions block, Request table, Request example, Response table, Response example, and Constraints block. A file-level summary does NOT substitute — readers who open a single endpoint must see all of its contract inline. Reviewers reject endpoints where any of these subsections is missing or defers to "see file-level notes above".
 - **Examples must be populated**: `{}` as a request or response body is rejected at review time. Examples must include realistic field values; every field in the corresponding Response table's Body column must appear in the example. For endpoints with no body (e.g. some DELETEs), show the full HTTP request line + headers and the full response envelope (e.g. `{"id":"...","type":"..._deleted"}`).
+- **Forbidden placeholder patterns inside example code blocks** (`structural-lint.md` check L2 greps for these — they fail before review):
+    - `"..."` used as a value
+    - `/* ... */` or `// ...` comments of any kind (JSON has no comments)
+    - A body that is literally `{}` in a Request example or Response example
+    - `"<placeholder>"`, `"TBD"`, `"TODO"` as a value
+    - `"snapshot of above"`, `"same as above"` — paste the content, don't reference it
+    - `...` as the sole content of a value (e.g. `"items": [...]`) — write out at least one realistic element
+
+  The `Response:` table's Body column and the `Response example:` block must be mutually consistent: every field named in the Body column appears as a key in the example, and every key in the example appears in the Body column (aside from envelope fields like `id` / `type` / `created_at` that are standard across responses).
 - **Dual-surface paths**: if endpoints are served on both a public (`/v1/*`) and native (`/api/v1/*`) surface, each endpoint block must list both paths in its `METHOD path` header — a file-level summary note is not sufficient; readers of a single endpoint must see both paths.
 - **Test Scenarios complement examples**: endpoint examples show happy-path usage; Test Scenarios cover boundaries, error paths, and concurrency. Don't duplicate happy-path in Test Scenarios. Focus on cases where the expected behavior is non-obvious or easily missed.
 - **Omit whitelist** (only these sections may be omitted):

@@ -24,6 +24,25 @@ Then enumerate file inventory via `Glob`:
 
 Record the file lists for use in Step 2.
 
+## Step 1.5 — Structural Lint Pre-Scan
+
+Before dispatching review subagents, run `structural-lint.md` checks against the design directory. This is **read-only** in review mode — the lint report goes into `{design-dir}/.reviews/LINT-{timestamp}.md` alongside the review output, but no files are edited.
+
+**Why here:** semantic review subagents systematically re-discover the same mechanical gaps (placeholder JSON, missing per-endpoint Auth/Constraints blocks, unfilled Boundary Enforcement columns, dangling hook↔endpoint references) on every `--review` cycle. When these gaps are pre-declared as a LINT report, subagents can skip the corresponding per-file dimensions and focus on semantic issues that need their judgment — review throughput increases materially.
+
+**Dispatch:** if the design has ≤20 modules, the main agent runs lint checks directly via `Grep` / `Bash`. Otherwise delegate to a `general-purpose` + `sonnet` subagent with the same template structure as a Fix subagent, but writing a read-only LINT report.
+
+**Subagent instructions (if delegating):**
+
+- Read `structural-lint.md` once.
+- Run every per-file check (L1..L5) and cross-file check (X1..X8) against the target directory.
+- Write findings to `{design-dir}/.reviews/LINT-{timestamp}.md` using the format defined in `structural-lint.md`.
+- Return the blocker/mechanical counts only — do not return the full report body.
+
+**LINT file lifecycle in review mode:** review is read-only, so the LINT file stays in `.reviews/` unrenamed. The next `--review` run writes a new timestamped LINT file; the older one is superseded but kept for traceability. The `.applied.md` rename only happens when a lint-fix mode consumes the file (generate-mode Step 9a or revise-mode Step 7.0). Users can periodically clean `.reviews/` since the directory is not version-controlled.
+
+**Effect on Step 2:** include the LINT file path in every review subagent's prompt and instruct them to skip per-file dimensions already fully covered by a matching lint check ID (e.g. "API completeness" is covered by L1+L2+L4 — skip unless L1/L2/L4 passed cleanly on the specific file). Subagents still run semantic per-file dimensions (Implementability, Risk awareness, Self-containment, Testability) regardless.
+
 ## Step 2 — Dispatch Parallel Review Subagents
 
 Dispatch **one round** of subagents, covering disjoint file sets, split by artifact class. **Do not dispatch a second review pass for the same files** — if a subagent's findings are vague, prefer `--revise` over re-reviewing.
@@ -57,6 +76,8 @@ Target files (read each exactly once, in parallel):
 - <abs path 2>
 - ...
 
+Structural lint context: <LINT-*.md absolute path if present>
+
 Per-file dimensions to check:
 <paste the Per-file row from design-review-checklist.md Execution Scope table>
 
@@ -72,7 +93,15 @@ If a file has no findings, write: `### <path>\n(no issues)`.
 
 Rules:
 - You MAY read `<skill-dir>/design-review-checklist.md` once to look up the exact check text for each per-file dimension.
-- Do not Read, Glob, or Grep any other files outside the listed target files.
+- You MAY read the LINT-*.md file (path in Structural lint context) once to orient yourself on what has already been machine-checked. Do NOT re-report a mechanical gap already listed in LINT — those findings are the lint report's job.
+- Dimensions to SKIP entirely (whether lint passed or failed — they belong to lint, not semantic review):
+  - `API completeness` — delegated to lint L1 + L2 + L4
+  - `Enforcement coverage` (per-module) — delegated to lint L3
+- Dimensions to run PARTIALLY:
+  - `Implementability` — skip the "references-to-undefined-types" sub-case (delegated to lint L5); still report TBD markers, missing interface specifics, unclear parameter semantics, and other judgment-based gaps
+- Dimensions to run FULLY (each requires semantic judgment that lint cannot perform):
+  Self-containment · Frontend performance · Backend i18n coverage · Form implementation consistency · Risk awareness · Testability
+- Do not Read, Glob, or Grep any other files outside the listed target files and the LINT file.
 - Do not read README.md or other module/api files for cross-reference — cross-file checks are handled separately.
 - Do not write or edit anything.
 ```
@@ -83,6 +112,10 @@ After subagents return, the main agent runs the **cross-file** dimensions from `
 
 - The already-read README + REVISIONS
 - Per-file findings from Step 2 (not the full file contents)
+- The Step 1.5 LINT-*.md report — use it to scope cross-file work:
+  - Do NOT re-report the structural side of these dimensions (lint owns them): `Interaction completeness`/X1 · `Frontend-backend contract alignment`/X2 · `Convention translation`/X3 · `Analytics coverage`/X4 · `PRD traceability`/X5 · `Dependency sanity`/X6
+  - DO run the semantic side of each: e.g. `Interaction completeness` semantic side asks whether Method/Data/Error Strategy cells make sense for the actual call pattern; `Analytics coverage` semantic side asks whether Emitting Channel and Responsible Module assignments are appropriate
+  - Dimensions with no lint coverage (`Completeness`, `Consistency`, `NFR coverage`, `UI coverage`, `Prototype coverage`, `PRD interaction design alignment`, `Infrastructure module coverage`, `PRD-Design freshness`, `Version integrity`, `Bootstrap self-sufficiency`, `Task entry points`, `Testability README-side`) run fully
 - Targeted reads of specific files only when a cross-file check requires it (e.g. verifying a cross-module interface alignment for Consistency)
 - Targeted reads of PRD files (for PRD traceability, Analytics coverage, NFR coverage, Convention translation, PRD-Design freshness) — read the PRD README and the specific feature/architecture topic file needed, not the whole PRD
 
@@ -150,14 +183,16 @@ Version context:
 
 Then present:
 
-- Summary counts (Critical / Important / Suggestion).
-- The top ~10 findings by severity as a table (inline) with a pointer to the full `.reviews/REVIEW-{timestamp}.md` file.
+- Summary counts (Critical / Important / Suggestion) for the semantic REVIEW.
+- Structural lint summary from Step 1.5 (blocker / mechanical counts) with pointer to the LINT file.
+- The top ~10 semantic findings by severity as a table (inline) with a pointer to the full `.reviews/REVIEW-{timestamp}.md` file.
 - Do not dump the full findings table inline for large designs — the file is the source of truth.
 
 Group the inline top-N by theme (completeness, consistency, implementability, etc.) rather than raw checklist order. Lead with Critical, then Important, then Suggestions.
 
 ## Step 6 — Recommend Next Step
 
+- If LINT reported blocker/mechanical findings: recommend `--revise {design-dir}`. Revise-mode Pre-Answered Mode Step 2 re-runs structural lint on the current design (it does not read the review's LINT file — it produces its own) and fixes every mechanical gap in a batch before the semantic Clustering Subagent and Fix subagents touch anything. The net effect is the same as "auto-consuming" but the LINT artifact is regenerated so it always reflects current state.
 - Issues are minor (wording, missing cross-links): note them for the next revision cycle.
 - Issues are significant (missing modules, interface mismatches, coverage gaps): recommend `--revise {design-dir}`. Tell the user the revise command will auto-consume the latest `.reviews/REVIEW-*.md` in Pre-Answered Mode — no need to re-enumerate findings.
 - Reviewing an older version: note that the latest version should be reviewed instead, unless the user explicitly requested this version.

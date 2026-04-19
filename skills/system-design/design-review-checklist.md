@@ -2,11 +2,19 @@
 
 This checklist is shared by three flows:
 
-- **Phase 1 Step 10 self-review** (generate mode) — apply during initial generation.
-- **`--review` mode** — apply read-only against an existing design directory.
-- **`--revise` Step 7** — apply against a freshly revised design.
+- **Phase 1 Step 10 self-review** (generate mode) — apply during initial generation, **after** Step 9a structural lint passes.
+- **`--review` mode** — apply read-only against an existing design directory, **after** Step 1.5 structural lint pre-scan.
+- **`--revise` Step 7** — apply against a freshly revised design, **after** Step 7.0 structural lint gate passes.
 
 The checklist itself is identical; the surrounding workflow differs (see `generate-mode.md`, `review-mode.md`, `revise-mode.md`).
+
+## Mechanical vs Semantic findings
+
+`structural-lint.md` is run before this checklist in every mode. It catches deterministic gaps (placeholder `...` JSON, missing per-endpoint blocks, unfilled Boundary Enforcement columns, dangling hook↔endpoint references, PRD↔design coverage). **Those gaps never appear as findings here** — they are fixed in the lint batch.
+
+When applying the checklist, for each dimension first check whether any lint check fully covers the dimension's mechanical surface. Dimensions with lint coverage carry an italicized trailing note in the `Check` cell (e.g. "*Structural side covered by lint X6 — here evaluate whether the layer assignment itself still reflects architectural intent.*"). When present, you only evaluate the **semantic** side of the dimension — whether the row's content is appropriate, whether the mapping is architecturally correct, whether the error strategy makes sense. The structural side (presence, column fill, path resolution) was already enforced upstream.
+
+**Regression signal:** if this checklist ever re-finds a gap that a lint check should have caught, something is wrong. Either lint was skipped (re-run it) or the rule's grep pattern is weak (update `structural-lint.md`). Never accept "the reviewer found this so it's a valid Important" as a reason — mechanical gaps must be auto-detected, not reviewed-for.
 
 ## Execution Scope — Per-File vs Cross-File
 
@@ -14,10 +22,11 @@ When review is run via parallel subagents (see `review-mode.md` Steps 2–3), ea
 
 | Scope | Dimensions |
 |-------|-----------|
-| **Per-file** | Self-containment · Implementability · API completeness · Frontend performance · Backend i18n coverage · Form implementation consistency · Risk awareness (per-module mitigations) · Enforcement coverage (per-module conventions) · Testability (per-module isolation + test double strategy) |
-| **Cross-file** | Completeness · Consistency · Dependency sanity · PRD traceability · NFR coverage · Interaction completeness · UI coverage · Prototype coverage · PRD interaction design alignment · Analytics coverage · Frontend-backend contract alignment · Convention translation · Infrastructure module coverage · PRD-Design freshness · Version integrity · Bootstrap self-sufficiency · Task entry points · Testability (README Test Strategy) |
+| **Per-file (semantic)** | Self-containment · Implementability (aside from L5's undefined-type sub-case) · Frontend performance · Backend i18n coverage · Form implementation consistency · Risk awareness (per-module mitigations) · Testability (per-module isolation + test double strategy) |
+| **Cross-file (semantic)** | Completeness · Consistency · NFR coverage · UI coverage · Prototype coverage · PRD interaction design alignment · Infrastructure module coverage · PRD-Design freshness · Version integrity · Bootstrap self-sufficiency · Task entry points · Testability (README Test Strategy) — plus the semantic sides of: Dependency sanity · PRD traceability · Interaction completeness · Analytics coverage · Frontend-backend contract alignment · Convention translation |
+| **Fully covered by structural lint** (no semantic dimension to run here) | API completeness (L1+L2+L4) · Enforcement coverage (L3) |
 
-When review is run inline (Phase 1 Step 10 self-review during initial creation, or `--revise` Step 7 delta review), both scopes are checked together by the main agent — no split needed.
+When review is run inline (Phase 1 Step 10 self-review during initial creation, or `--revise` Step 7 delta review), both scopes are checked together by the main agent — no split needed. The "Fully covered by structural lint" row is never semantically reviewed in any mode; it appears in the table only to make the delegation explicit.
 
 ---
 
@@ -29,28 +38,28 @@ When review is run inline (Phase 1 Step 10 self-review during initial creation, 
 | Consistency | Module interfaces match each other; data models match API contracts |
 | Self-containment | Each module file can be read independently |
 | Implementability | Interface definitions are specific enough for a coding agent; no TBD/TODO |
-| Dependency sanity | No circular dependencies; dependency direction is reasonable; all module dependencies comply with README's Dependency Layering — no reverse-layer imports |
-| PRD traceability | Every module traces back to at least one Feature; every cross-journey pattern from the PRD (shared infrastructure needs, repeated touchpoints) is addressed by at least one module (or section omitted in PRD for single-journey products) |
+| Dependency sanity | No circular dependencies; dependency direction is reasonable; all module dependencies comply with README's Dependency Layering — no reverse-layer imports. *Structural side covered by lint X6 — here evaluate whether the layer assignment itself still reflects architectural intent.* |
+| PRD traceability | Every module traces back to at least one Feature; every cross-journey pattern from the PRD (shared infrastructure needs, repeated touchpoints) is addressed by at least one module (or section omitted in PRD for single-journey products). *Structural side (feature ↔ module row presence) covered by lint X5 — here evaluate whether the mapping is architecturally appropriate, whether cross-journey patterns are meaningfully addressed versus superficially ticked.* |
 | NFR coverage | Every PRD NFR is decomposed to at least one module's NFR section with concrete, measurable constraints; README's NFR Allocation table is consistent with module-level NFR sections |
-| Interaction completeness | **Bidirectional sync required.** Every `(caller, callee)` pair in any module's Module Index `Deps (direct)` cell must have a matching row in README's Module Interaction Protocols, and every Protocols row must map back to a declared Deps pair (or a documented cross-cutting note). Sync/async and error strategy are specified on every row. Missing rows in either direction are findings |
+| Interaction completeness | **Bidirectional sync required.** Every `(caller, callee)` pair in any module's Module Index `Deps (direct)` cell must have a matching row in README's Module Interaction Protocols, and every Protocols row must map back to a declared Deps pair (or a documented cross-cutting note). Sync/async and error strategy are specified on every row. Missing rows in either direction are findings. *Row presence covered by lint X1 — here evaluate whether Method/Data Format/Error Strategy cells make semantic sense for the actual call pattern.* |
 | UI coverage | (Skip if no user-facing interface) Every PRD journey Screen/View appears in README's View / Screen Index; every frontend module has a UI Architecture section with component tree, routing, state management, key interactions, frontend performance, a11y implementation, and i18n implementation; Design System Conventions references PRD design tokens and specifies token-to-code implementation, responsive approach (**web**: sidebar behavior, grid system, mobile considerations; **TUI**: terminal width detection, sidebar auto-hide, minimum terminal size), dark mode/theming strategy (if applicable), and component patterns (loading, error, empty, toast/notification, modal/overlay, form/input) |
 | Prototype coverage | (Skip if PRD has no prototypes) Every PRD prototype component (web or TUI) is accounted for in Prototype-to-Production Mapping; each entry has an Action (Reuse/Refactor/Rewrite) and Gap Description for non-Reuse items; every frontend module with Action = Reuse or Refactor has a Prototype Reuse Guide in its UI Architecture section listing specific files to copy and adaptations needed; prototype visual records (browser screenshots or teatest golden files) have been reviewed against state machines |
 | Frontend performance | (Skip if no user-facing interface) Every frontend module has performance targets (**web**: LCP, INP, CLS, bundle size; **TUI**: render latency, input-response time, memory); targets are consistent with PRD NFRs; optimization strategies are specified |
 | PRD interaction design alignment | (Skip if no user-facing interface) System-design does not redefine what PRD owns (design tokens, component contracts, state machines, a11y specs, i18n specs); frontend modules reference PRD feature specs for interaction design and specify how to implement them |
 | Backend i18n coverage | (Skip if single-language backend) Every backend module that returns locale-dependent text (API errors, validation messages, notifications) has a Backend i18n Implementation section specifying locale resolution, message catalog access, and timezone conversion; decisions are consistent with README Key Technical Decisions (backend i18n rows); module interfaces that return user-visible text include a locale parameter or document how locale context is propagated |
-| Analytics coverage | (Skip if no features define analytics events) **Enumerate every event** in every PRD feature file's `## Analytics` block and verify each has a row (or a named sweep rule) in README's Analytics Coverage. Do NOT pass the dimension by confirming the section merely exists — count events and match against row count. Orphaned events or unnamed sweep rules ("all backend features emit audit events" without feature IDs or channel) are findings |
-| API completeness | (Skip if no APIs) **Per-endpoint** completeness (not file-level): every endpoint in every `api/API-*.md` file carries its own Authentication & Permissions block, Request table, Request example (populated — `{}` is a finding), Response table, Response example (populated), and Constraints block. File-level summary blocks do NOT substitute. Additionally: every HTTP-facing module has an API Surface table with Method+Path, Auth & Role, Success, Error Codes, Request+Response example links, and Constraints filled on every row |
+| Analytics coverage | (Skip if no features define analytics events) **Enumerate every event** in every PRD feature file's `## Analytics` block and verify each has a row (or a named sweep rule) in README's Analytics Coverage. Do NOT pass the dimension by confirming the section merely exists — count events and match against row count. Orphaned events or unnamed sweep rules ("all backend features emit audit events" without feature IDs or channel) are findings. *Row presence + sweep-rule structure covered by lint X4 — here evaluate whether the `Emitting Channel` and `Responsible Module` assignment makes sense.* |
+| API completeness | (Skip if no APIs) **Per-endpoint** completeness (not file-level): every endpoint in every `api/API-*.md` file carries its own Authentication & Permissions block, Request table, Request example (populated — `{}` is a finding), Response table, Response example (populated), and Constraints block. File-level summary blocks do NOT substitute. Additionally: every HTTP-facing module has an API Surface table with Method+Path, Auth & Role, Success, Error Codes, Request+Response example links, and Constraints filled on every row. *Fully covered by lint L1 + L2 + L4 — this dimension should never produce a semantic finding; if it does, lint was skipped or a rule is weak.* |
 | Testability | Every module can be tested in isolation (dependencies are injectable or replaceable); README's Test Strategy section exists and is consistent with module-level Testing sections; every module with external dependencies specifies a test double strategy; every Module Interaction Protocol has a contract test approach; NFR verification methods are specified for runtime-verifiable NFRs |
 | Risk awareness | Every high-likelihood or high-impact risk from the PRD has a corresponding design mitigation in the affected module's Error Handling, NFR, or Interaction Protocols |
 | Version integrity | If `REVISIONS.md` exists: every Previous Version path resolves to an actual directory; Summary of Changes is present for each entry; README's References section links to `REVISIONS.md`. If sibling directories with the same product slug exist in the parent directory: this version's `REVISIONS.md` accounts for them (links to predecessor, or is itself the first version). Skip this dimension during the Phase 1 Step 10 self-review of initial creation — it only applies to `--review` mode and `--revise` Step 7 (post-change review) |
 | Bootstrap self-sufficiency | README or module Implementation Constraints specifies all setup steps (install, configure, seed) — an agent can bootstrap the project without external knowledge or tribal context; no implicit "ask someone" steps |
 | Task entry points | README's Test Strategy or a dedicated section lists concrete build / test / lint commands — an agent knows exactly how to validate its changes without guessing |
 | Form implementation consistency | (Skip if no forms) Every frontend module with forms uses the same form library, validation framework, and error display pattern as specified in Design System Conventions; form implementation strategy is consistent across views |
-| Frontend-backend contract alignment | (Skip if no user-facing interface) Every frontend module's state management (API call entries) corresponds to an API contract in API Index; endpoint signatures match, error handling covers contract error codes, response parsing matches schema |
-| Convention translation | Every PRD architecture.md convention section (Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration) has corresponding stack-specific implementation patterns in README's Implementation Conventions; module-level Relevant Conventions reference implementation patterns, not raw PRD policies; no PRD convention section is silently ignored |
+| Convention translation | Every PRD architecture.md convention section (Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration) has corresponding stack-specific implementation patterns in README's Implementation Conventions; module-level Relevant Conventions reference implementation patterns, not raw PRD policies; no PRD convention section is silently ignored. *Row-presence structural side covered by lint X3 — here evaluate whether the translated `Implementation Pattern` and `Enforcement` columns are appropriate for the chosen stack.* |
 | Infrastructure module coverage | A "Development Infrastructure" module spec exists covering convention enforcement artifacts (linter config, CI pipeline, test helpers, pre-commit hooks, CLAUDE.md, security scanning, benchmark harness) from the PRD's Development Infrastructure feature; a "Deployment Infrastructure" module spec exists (if PRD has Deployment Infrastructure feature) covering deployment artifacts; Deployment Architecture sub-sections from PRD (environments, local dev setup, environment parity, config management, data migration, CD pipeline, environment isolation, IaC) have corresponding concrete tooling decisions in the design |
 | PRD-Design freshness | If a source PRD exists: compare PRD directory's latest modification date (or latest entry date in the PRD's `REVISIONS.md`, if present) against this design's creation/revision date; if PRD is newer, flag as "PRD may have been revised since this design was created — consider running --revise to check for upstream changes" |
-| Enforcement coverage | Every Dependency Layering rule and every convention in Key Technical Decisions or module-level Relevant Conventions specifies how it is enforced. In module Boundary Enforcement tables, **every row MUST fill all four columns with grep-able identifiers** — Constraint (concrete rule), Tool/Lint/Test (named rule id, not "custom lint"), File Path (resolves to a real config/test file), CI Job (matches a job in the CI pipeline). Descriptive English in any column ("custom structural check", "lint rule") is a finding. Unenforced conventions are moved to Implementation Constraints as advisory, not left in Boundary Enforcement |
+| Enforcement coverage | Every Dependency Layering rule and every convention in Key Technical Decisions or module-level Relevant Conventions specifies how it is enforced. In module Boundary Enforcement tables, **every row MUST fill all four columns with grep-able identifiers** — Constraint (concrete rule), Tool/Lint/Test (named rule id, not "custom lint"), File Path (resolves to a real config/test file), CI Job (matches a job in the CI pipeline). Descriptive English in any column ("custom structural check", "lint rule") is a finding. Unenforced conventions are moved to Implementation Constraints as advisory, not left in Boundary Enforcement. *Fully covered by lint L3 — this dimension should never produce a semantic finding; if it does, lint was skipped.* |
+| Frontend-backend contract alignment | (Skip if no user-facing interface) Every frontend module's state management (API call entries) corresponds to an API contract in API Index; endpoint signatures match, error handling covers contract error codes, response parsing matches schema. *Existence of the endpoint covered by lint X2 — here evaluate whether error handling and response parsing are correct given the contract's error codes and response shape.* |
 
 ### Severity Levels
 
@@ -62,21 +71,33 @@ Apply the level **by rule, not by intuition**. Recurring reviewer drift — same
 | **Important** | Degrades quality or creates maintenance risk | Should fix; document reason if deferred |
 | **Suggestion** | Improves clarity or consistency but doesn't affect correctness | Fix if time permits; safe to defer |
 
-**Critical examples** (memorize these — any finding matching one of these classes is Critical, not Important):
-- A frontend module references an API endpoint that does not exist in any `api/API-*.md` (frontend-backend contract gap)
-- Two files give contradictory values for the same field (e.g. `GET /system/version` listed as both Admin-only and Public; same endpoint with two different rate limits)
-- A module's `Deps (direct)` imports a module in a higher layer than itself (reverse-layer import) with no documented cross-cutting exemption
-- A module's Interface Definition references a type, function, or field that is not defined anywhere in the design (`WithTxRetry` called but not declared; `SetSinkForTest` referenced but no signature given)
-- An API endpoint declared at method+path X in module M, not present at method+path X in the API contract file (or vice versa) — the implementation contract is ambiguous
-- A PRD feature, journey touchpoint, or NFR with zero module allocation (feature orphaned) — not "under-specified", *missing*
+**Critical examples — semantic** (memorize these — any finding matching one of these classes is Critical, not Important. These require judgment; lint cannot catch them):
+- Two files give contradictory values for the same field (e.g. `GET /system/version` listed as both Admin-only and Public; same endpoint with two different rate limits) — contradiction detection requires understanding that both values describe the same thing
+- An implementation pattern in README's Implementation Conventions is wrong for the chosen stack (e.g. a Go-specific `fmt.Errorf` pattern after the stack switched to TypeScript)
+- An NFR budget allocation is numerically plausible but architecturally wrong (e.g. storage layer budgeted 10% of a P99 that is dominated by storage I/O)
+- A journey touchpoint or PRD interaction-design requirement has a module allocated, but the module's Responsibility / Interface does not actually deliver the touchpoint's behavior (allocation is nominal, not substantive)
+
+**Critical examples — caught by structural lint upstream** (these classes should never reach a semantic reviewer — lint is the first line of defense. If you catch one here, lint was skipped; re-run it instead of filing the finding):
+- A module's `Deps (direct)` imports a module in a higher layer than itself (reverse-layer import) with no documented cross-cutting exemption → lint X6
+- A module's Interface Definition references a type, function, or field that is not defined anywhere in the design → lint L5 (single-language strict mode)
+- A frontend module references an endpoint literal (method+path) not defined in any `api/API-*.md` → lint X2
+- An API endpoint declared at method+path X in module M, not present at method+path X in the API contract file (or vice versa) → lint X2
+- A PRD feature with zero module allocation (feature orphaned) → lint X5
+- ID-prefix SoT violation (e.g. `agv_` declared locally while another module owns all prefixes) → lint X7
 
 **Important examples** (these are Important, not Critical — resist escalating):
-- An endpoint's example uses `{}` placeholder instead of a populated JSON body
-- A module's Boundary Enforcement row has vague Tool/File/CI columns ("custom lint")
 - A backend module returning error messages has no Backend i18n Implementation section and no explicit N/A note
-- Module Interaction Protocols table missing a row that Module Index Deps implies
-- Analytics Coverage missing an event defined in a PRD feature's `## Analytics` block
-- API endpoint missing its per-endpoint Authentication & Permissions or Constraints block (content exists at file level but not per endpoint)
+- An NFR allocation has a budget that is technically plausible but architecturally suspicious (e.g. storage layer allocated 10% of the P99 budget when the operation is primarily I/O bound)
+- A test double strategy is specified but does not match the interface the production code will actually call
+
+**Caught by structural lint, not by semantic review** (these were historically reported as Important, but should now be caught by `structural-lint.md` before review runs — if you catch one here, flag that lint was skipped and re-run it):
+- An endpoint's example uses `{}` placeholder instead of a populated JSON body → lint L2
+- A module's Boundary Enforcement row has vague Tool/File/CI columns ("custom lint") → lint L3
+- Module Interaction Protocols table missing a row that Module Index Deps implies → lint X1
+- Analytics Coverage missing an event defined in a PRD feature's `## Analytics` block → lint X4
+- API endpoint missing its per-endpoint Authentication & Permissions or Constraints block → lint L1
+- API Surface row with unfilled columns → lint L4
+- Frontend module references a hook/endpoint not defined in any API file → lint X2 (this is a blocker)
 
 **Suggestion examples** (keep these at Suggestion even if they feel annoying):
 - A typo in documentation (e.g. `limit_event_id` should be `last_event_id`)

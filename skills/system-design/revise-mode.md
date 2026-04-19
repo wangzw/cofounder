@@ -6,18 +6,19 @@ Interactively modify an existing design — whether it's still pre-implementatio
 
 If the invocation prompt already provides answers to Steps 1–5 (downstream state confirmed, PRD change detection resolved, design overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–5 entirely** and jump directly to Step 6. Do not re-ask questions or re-run analysis that is already settled.
 
-**Review-driven fix pass:** If `{design-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input.
+**Review-driven fix pass:** If `{design-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input. Structural lint always runs first (Flow step 2 below) — this is unconditional, even when the REVIEW file came from a Step 1.5-enabled review that already stripped mechanical findings, because lint is cheap and catches any gaps the prior review missed. An observed 100-finding review typically reduces to ≤20 semantic findings after lint — the savings compound across Fix subagent clusters.
 
 **DO NOT read the REVIEW file in the main agent.** For a design with ~20–40 modules the file routinely exceeds 800–1500 lines (~20–40k tokens) and, once loaded, stays in the main-agent prompt cache for every subsequent turn (15–20 turns × main-agent cache_read = the largest single avoidable cost line in a revise session). Delegate the read + cluster step to a Sonnet subagent and consume only its compact manifest.
 
 **Flow:**
 
 1. **Select the REVIEW file** — list `{design-dir}/.reviews/REVIEW-*.md`, sort by timestamp, pick the newest file that does NOT end in `.applied.md`. This is a directory-listing step (`Glob` / `Bash ls`), not a file read — the REVIEW body itself is not loaded into main context.
-2. **Dispatch the Clustering Subagent** (see template below). It reads the REVIEW file, parses per-file findings, packs files into ≤3-file clusters, and returns a structured manifest. The manifest is typically **2–4k tokens** — small enough to stay in main context cheaply.
-3. **Consume the manifest directly** — no further reads of the REVIEW file by the main agent. Use `cluster.target_files` and `cluster.dimensions_tagged` to drive Step 6 dispatch and Step 7 delta-review scoping.
-4. **Jump to Step 6** and dispatch one Fix subagent per cluster using Template A (Template A points each Fix subagent at the REVIEW file itself — Fix subagents read only the sections they need).
-5. **Step 7 delta-review scope** comes from the manifest's union of `dimensions_tagged` plus the always-run checks. Do not re-run dimensions the review already validated as passing.
-6. **After all edits succeed**, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` (`Bash mv`) so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 6.
+2. **Run structural lint first (unconditional)** — execute every check in `structural-lint.md` against the current design directory. Write findings to `.reviews/LINT-{timestamp}.md`. Fix all lint failures in place via `MultiEdit` / Fix subagent (same dispatch rules as Step 6's Fix subagents). Rename the LINT file to `.applied.md` once clean. This is identical to Step 7.0 below and MUST run before the Clustering Subagent — mechanical findings in the REVIEW file become no-ops after lint fixes land, dramatically reducing cluster count. **Stale-finding handling:** because lint fixes files before clustering runs, Fix subagents in Step 5 may encounter REVIEW findings whose anchor no longer matches (the gap was already fixed by lint). The Fix-subagent contract already covers this — they report `anchor not found: <anchor>` and move on, which is the correct behavior for already-fixed findings.
+3. **Dispatch the Clustering Subagent** (see template below). It reads the REVIEW file, parses per-file findings, packs files into ≤3-file clusters, and returns a structured manifest. The manifest is typically **2–4k tokens** — small enough to stay in main context cheaply.
+4. **Consume the manifest directly** — no further reads of the REVIEW file by the main agent. Use `cluster.target_files` and `cluster.dimensions_tagged` to drive Step 6 dispatch and Step 7 delta-review scoping.
+5. **Jump to Step 6** and dispatch one Fix subagent per cluster using Template A (Template A points each Fix subagent at the REVIEW file itself — Fix subagents read only the sections they need).
+6. **Step 7 delta-review scope** comes from the manifest's union of `dimensions_tagged` plus the always-run checks. Do not re-run dimensions the review already validated as passing. Step 7.0 (structural lint) is typically a fast no-op here because Step 2 already cleared it, but still run it — fixes applied in Step 5 can re-introduce mechanical regressions.
+7. **After all edits succeed**, rename the consumed REVIEW file to `.reviews/REVIEW-{timestamp}.applied.md` (`Bash mv`) so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 6.
 
 **Clustering-Subagent dispatch template** (main agent emits this):
 
@@ -299,49 +300,64 @@ Based on the mutability determination from Step 5 (not just Step 1 — Step 5's 
 
 **Do NOT run the full Design Review checklist.** Run only the dimensions relevant to what actually changed. Load `design-review-checklist.md` only if you need to reference a dimension's exact wording.
 
+Step 7 has three ordered sub-steps — **7.0 structural-lint gate** (mandatory first), **7.1 semantic regression sweep** (always run), and **7.2 change-scoped semantic checks** (conditional on what changed). Do not skip 7.0 or 7.1 under any circumstances; 7.2 may skip blocks whose trigger condition did not fire this revision.
+
 **Review-driven fix pass scope:** If this revision consumed a `.reviews/REVIEW-*.md` file (Pre-Answered Mode), the delta review scope is:
 
-- The **always-run cross-file regression sweep** below (mandatory, even if the review tagged none of its dimensions — fixes routinely break aggregations silently), **plus**
-- The dimensions whose tags appeared in the consumed `REVIEW-*.md`.
+- Mandatory: 7.0 structural lint + 7.1 semantic sweep (both below).
+- Additional: 7.2 dimensions matching tags that appeared in the consumed `REVIEW-*.md`. Many review tags now resolve upstream at 7.0 — any review finding under "API completeness", "Enforcement coverage", or the structural sides of "Interaction completeness / Analytics coverage / Convention translation / PRD traceability / Dependency sanity" is already fixed by the lint pass; do not re-run those in 7.2.
 
-Per-file dimensions the review already validated as passing and that are NOT in the sweep may be skipped. The cross-file sweep is never skippable.
+Per-file dimensions the review already validated as passing and that are NOT listed in 7.1 or triggered in 7.2 may be skipped.
 
-**Always run (every revision) — cross-file regression sweep:**
+**7.0 Structural lint gate (mandatory — first sub-step of Step 7):**
 
-Fixes to one module frequently break cross-file invariants elsewhere — observed failure mode: `--revise` applied to N modules closes findings locally but introduces new Important-level inconsistencies in README aggregations. Run this sweep on every revision regardless of which dimensions the consumed review tagged:
+Before any semantic check runs, execute every check in `structural-lint.md` (L1..L5, X1..X8) against the revised design. Most mechanical regressions from fix batches — placeholder JSON re-introduced by a careless example replacement, a newly-added endpoint missing from a module's API Surface, a fresh `Deps` pair without a Module Interaction Protocols row, a CI-job name change that orphans a Boundary Enforcement row — are caught here deterministically.
 
-- **Consistency** — updated module interfaces match their callers; data models match API contracts
+Dispatch a single `general-purpose` + `sonnet` subagent if the design has >20 modules; otherwise the main agent runs the checks via `Grep` / `Bash`. Write aggregated failures to `{design-dir}/.reviews/LINT-{timestamp}.md` (create `.reviews/` if absent). For each failure, apply the fix in place (use `MultiEdit` when a file has ≥2 fixes), re-run the lint, and repeat until the output is empty. Rename the consumed LINT file to `.applied.md` on success.
+
+**Do not proceed to the semantic sweep below until structural lint is clean.** A mechanical gap that reaches the semantic review will compound — it inflates review-finding counts, drowns out real blockers, and guarantees another `--revise` cycle.
+
+*Note:* in Pre-Answered Mode, Step 2 of the Flow already ran lint to completion before the Clustering Subagent. Step 7.0 still runs here — it is typically a fast no-op but catches mechanical regressions introduced by Step 6's Fix subagents (e.g. an example JSON that got a new field added without the matching Response table update).
+
+**7.1 Semantic cross-file regression sweep (every revision):**
+
+After 7.0's structural lint is clean, fixes can still break semantic invariants that `grep` cannot evaluate. Run this sweep on every revision regardless of which dimensions the consumed review tagged:
+
+- **Consistency** — updated module interfaces semantically match caller expectations (beyond type names — behavior, error propagation, retry semantics); data-model constraints match API contract validation rules
 - **Version integrity** — REVISIONS.md entry is present; README References links to REVISIONS.md; all version paths resolve
-- **Interaction completeness** — Module Index `Deps (direct)` and README `Module Interaction Protocols` are bidirectionally in sync (every dep pair has a protocol row; every protocol row backs a dep pair or a documented cross-cutting note)
-- **Convention translation** — every PRD `architecture/*.md` file still has ≥1 row in README Implementation Conventions; no file silently dropped by the revision
-- **Analytics coverage** — every event in every PRD feature `## Analytics` block still has a row in README Analytics Coverage (or is covered by a named sweep rule); no event orphaned
-- **Dependency sanity** — no reverse-layer import introduced by restructuring; Dependency Layering table still describes the actual module graph
+- **Interaction completeness (semantic)** — structural lint X1 already verifies every Deps pair has a row; here verify each row's `Method`, `Data Format`, and `Error Strategy` cells make sense for the actual call pattern (sync vs async, retry vs fail-fast)
+- **Convention translation (semantic)** — structural lint X3 verifies every PRD architecture topic has a row; here verify the row's `Implementation Pattern` still matches the current tech stack (e.g. a Go-specific pattern after switching to TypeScript is a semantic failure the lint will not catch)
+- **Analytics coverage (semantic)** — structural lint X4 verifies every event has a row or sweep match; here verify the `Emitting Channel` and `Responsible Module` remain appropriate after module restructuring
+- **Dependency sanity (semantic)** — structural lint X6 verifies no reverse-layer imports; here verify the Dependency Layering *layer assignments* still reflect architectural intent (a module that moved from Service to Runtime changes the layer's semantic meaning)
 
-If any of the six sweep dimensions fails, treat it as blocking and fix before Step 8. Do not defer sweep failures to the next revision cycle — that is how regression compounds.
+If any semantic sweep dimension fails, treat it as blocking and fix before Step 8. Do not defer sweep failures to the next revision cycle — that is how regression compounds.
+
+**7.2 Change-scoped semantic checks:**
+
+Run only when the trigger condition for a block fired this revision. Dimensions listed below focus on **semantic** aspects that structural lint cannot evaluate. The structural sides (row presence, column fill, path resolution) are already covered by 7.0 and are not repeated here.
 
 **Run if modules were added, removed, restructured, or boundaries changed:**
-- **Completeness** — every Feature still has module coverage; no orphan features
-- **Dependency sanity** — no circular dependencies; Dependency Layering table still valid; no reverse-layer imports
-- **PRD traceability** — every module still traces back to at least one Feature
-- **Interaction completeness** — all cross-module interactions in README's Module Interaction Protocols are in sync with updated interfaces
-- **Testability** — changed modules remain independently testable; test double strategies still valid
-- **Enforcement coverage** — changed modules' Boundary Enforcement sections reference valid constraints
+- **Completeness** — every Feature still has *meaningful* module coverage (not just a mapping matrix entry but substantive implementation); no orphan features
+- **PRD traceability** — every module still traces back to at least one Feature with a plausible responsibility match (not a vestigial `Source Features:` header from a deleted mapping)
+- **Testability** — changed modules remain independently testable; test double strategies still match the new dependency graph
+- **Dependency sanity (semantic)** — layer assignment still reflects architectural intent after restructuring; a module that moved across layers did not silently change the layer's meaning (lint X6 already caught reverse-layer edges)
+- **Interaction completeness (semantic)** — Method/Data Format/Error Strategy cells on Protocols rows still make sense after restructuring (lint X1 already caught missing rows)
 
 **Run if interfaces changed:**
-- **API completeness** — API contracts referencing the changed interface have updated schemas, error codes, and examples
-- **Frontend-backend contract alignment** — frontend modules' API call entries match the updated API contracts
+- **Consistency** — caller behavior, error propagation, retry semantics match the new interface beyond just type-name agreement
+- **Frontend-backend contract alignment (semantic)** — frontend error handling and response parsing remain correct for the updated contract's error codes and response shape (lint X2 already caught dangling endpoint literals)
 
 **Run if NFR budgets were reallocated:**
-- **NFR coverage** — all PRD NFRs still decomposed to at least one module; reallocated budgets don't exceed PRD-level targets
+- **NFR coverage** — all PRD NFRs still decomposed to at least one module; reallocated budgets don't exceed PRD-level targets; budget distribution makes architectural sense (e.g. I/O-bound operation's budget isn't dominated by CPU-bound modules)
 
 **Run if technology decisions changed:**
-- **Convention translation** — README's Implementation Conventions patterns still valid for the changed stack; module Relevant Conventions updated to match
+- **Convention translation (semantic)** — README's Implementation Conventions patterns still valid for the changed stack (e.g. after Go→TypeScript switch, `fmt.Errorf` pattern must be replaced); module Relevant Conventions updated to match (lint X3 already caught topic-row omissions)
 
 **Run if frontend modules changed:**
-- **UI coverage** — changed frontend modules have complete UI Architecture sections
+- **UI coverage** — changed frontend modules have complete UI Architecture sections and views map back to PRD journey touchpoints
 - **Frontend performance** — performance targets consistent with PRD NFRs after restructuring
 - **Form implementation consistency** — form patterns still consistent across changed views
-- **Analytics coverage** — all PRD analytics events still mapped to a responsible module
+- **Analytics coverage (semantic)** — Emitting Channel / Responsible Module assignments remain appropriate after restructuring (lint X4 already caught missing rows)
 
 Fix any issues found. Present change summary to user.
 
