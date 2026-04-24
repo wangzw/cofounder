@@ -181,3 +181,68 @@ The rule of thumb: every routing decision the orchestrator made should be
 reconstructable from these files **without reading any artifact leaf**. If you find
 yourself opening an artifact leaf to answer "why did X happen?", that's a signal the
 archive is missing an expected record — file it as a generator-internal bug.
+
+---
+
+## Run history for this skill
+
+Keep this section append-only. Each delivery entry below is a summary of the
+corresponding `versions/<N>.md` + the round sequence that produced it.
+
+### Delivery 1 — rounds 1–2 — FromScratch generation
+- **Trigger**: generator invoked with a sparse 29-word prompt describing "a skill
+  that converts sparse product ideas into self-contained multi-file PRDs for AI
+  coding agents", with `@skills/prd-analysis.backup` as a reference.
+- **Round 1**: planner emitted a 10-leaf `add:` plan (SKILL.md, review-criteria,
+  domain-glossary, artifact-template, 5 sub-agent prompts + 1 reviser prompt).
+  Writer fan-out of 10 produced the leaves; all 10 self-reviews FULL_PASS.
+  Script-tier `run-checkers` filed 11 `CR-META-missing-checker` issues (the
+  writer-authored criteria declared `script_path`s for scripts not shipped in
+  this delivery).
+- **Round 2**: reviser rewrote `common/review-criteria.md` to convert the 11
+  affected CRs from `checker_type: script` → `checker_type: llm` with
+  `script_pending:` pointers. Cross-reviewer verified → 11 × status=resolved.
+- **Verdict**: `converged` (round-2). Tag: `delivery-1-first-delivery-of-prd-analysis-generativ`.
+- **Authoritative record**: `versions/1.md`.
+
+### Delivery 2 — rounds 3–8 — Post-generation `--review` cycle
+- **Trigger**: generator invoked in `--review --full` mode on the already-delivered
+  skill to audit semantic-tier conformance.
+- **Round 3** (`--review --full`): `run-checkers` 0 issues; full cross-reviewer
+  over all 48 leaves found 6 issues (5 error + 1 warning), all against
+  writer-authored leaves — CR-L01 self-contained violations (artifact-template
+  referenced the external backup; planner referenced non-existent templates)
+  and CR-L11 criteria-internally-consistent violations (stale / invented /
+  misnamed CR IDs across the sub-agent prompts).
+- **Round 4** (incremental `--review`): no files changed, skip-set put all 48
+  leaves in `cross_reviewer_skip` → no cross-reviewer dispatch; `run-checkers`
+  Phase A carry-forward inherited R3's 6 open issues as status=persistent.
+  Verdict=progressing (correctly blocked from converged by coverage=0 safeguard
+  AND by the now-propagated persistent count of 6).
+- **Round 5** (revise): 5 parallel reviser dispatches, one per file-group, fixed
+  all 6 issues in place.
+- **Round 6** (`--review`): cross-reviewer verified 6 × status=resolved; its
+  class-based scan surfaced 1 new finding (R6-007: adversarial-reviewer and
+  per-issue-reviser hadn't been updated in R5 when cross-reviewer's schema was
+  unified — same CR-L11 class). Verdict=progressing.
+- **Round 7** (revise): 2 parallel reviser dispatches completed the schema
+  alignment across the two sibling prompts.
+- **Round 8** (`--review`): cross-reviewer verified R8-001 × status=resolved
+  (closes R6-007). All 6 hard convergence conditions satisfied:
+  `open_issues=0`, `coverage_percent=100`, `critical_count=0`, `error_count=0`,
+  `regressed_count=0`, `writer_fail_count_sum=0`.
+- **Verdict**: `converged` (round-8). Tag: `delivery-2-post-generation-review-cycle-7-issues-c`.
+- **Authoritative record**: `versions/2.md`.
+
+### Aggregate totals
+- Deliveries committed: 2. Total rounds executed: 8 (round-0 bootstrap + rounds 1–8).
+- Sub-agent dispatches recorded in `traces/round-*/dispatch-log.jsonl`: ~30 traces
+  (1 consultant, 1 planner, 10 writers, 3 cross-reviewers, 6 summarizers, 2 judges, 7 revisers).
+- See `metrics/delivery-1.metrics.yml` and `metrics/delivery-2.metrics.yml` for
+  per-role cost + latency breakdowns. **Caveat (2026-04-24)**: the generator's
+  `aggregate.py` strict-model JOIN fix (Bug #13) causes under-attribution for
+  some primary-JOIN events (the event's `model` string in the harness JSONL
+  doesn't always match the dispatch-log's `model` string verbatim). Treat the
+  cost numbers in these files as a lower bound until the JOIN path is
+  re-validated; the open-issue trajectory, round sequence, and verdict
+  progression above are authoritative.
