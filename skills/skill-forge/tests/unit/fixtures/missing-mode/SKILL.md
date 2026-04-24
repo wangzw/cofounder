@@ -1,7 +1,7 @@
 ---
-name: test-skill
+name: missing-mode-skill
 version: 0.1.0
-description: Use when you need to test the skill-forge checker scripts.
+description: Use when testing mode coverage.
 ---
 
 ## Mode Routing
@@ -11,6 +11,5 @@ description: Use when you need to test the skill-forge checker scripts.
 | generate | (no args) | generate/*.md |
 | review | --review | review/*.md |
 | revise | --revise | revise/*.md |
-| diagnose | --diagnose | common/review-criteria.md |
 
-<!-- snippet-c-fingerprint: dispatch-log-v1 -->
+(fourth mode row intentionally omitted)
