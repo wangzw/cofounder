@@ -44,8 +44,11 @@ input_md_path   = round0_dir / "input.md"
 meta_yml_path   = round0_dir / "input-meta.yml"
 
 # ── 1. Find @path refs and http(s):// URLs ──────────────────────────────────
-path_refs = re.findall(r'@(\S+)', prompt_text)
-url_refs  = re.findall(r'https?://\S+', prompt_text)
+# @path: must start with alnum/_, then legal filesystem chars. Stops at punctuation
+# like `)`, `,`, `;` so "See @notes.md." and "use @foo.md)" both match `notes.md` / `foo.md`.
+path_refs = re.findall(r'@([A-Za-z0-9_][A-Za-z0-9._/\-]*)', prompt_text)
+# URLs: strip trailing punctuation that's commonly adjacent to URLs in prose
+url_refs  = [u.rstrip(').,;:!?\'"') for u in re.findall(r'https?://\S+', prompt_text)]
 
 # ── 2. Expand references ────────────────────────────────────────────────────
 expanded_sections = []
@@ -94,7 +97,7 @@ input_md_path.write_text(input_md_content, encoding="utf-8")
 word_count        = len(prompt_text.split())
 has_code_block    = "```" in prompt_text
 has_structured    = bool(re.search(r'\n[-*] |\n\d+\. ', "\n" + prompt_text))
-generated_at      = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+generated_at      = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 # ── 5. Write input-meta.yml ─────────────────────────────────────────────────
 def bool_str(b):

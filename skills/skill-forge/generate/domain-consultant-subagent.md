@@ -106,6 +106,15 @@ Example path: `.review/round-0/clarification/2026-04-24T10-15-00Z.yml`
 Content shape:
 
 ```yaml
+# Flat placeholder keys — REQUIRED top-level mapping consumed by scripts/scaffold.sh.
+# Must be derived from the resolved R-001..R-003 values. scaffold.sh's parse_yaml_simple
+# reads only top-level flat `KEY: "value"` lines; these four keys must be present
+# BEFORE any nested block.
+SKILL_NAME: "<R-001 slug>"                    # e.g. "decision-log"
+SKILL_VERSION: "0.1.0"                        # always 0.1.0 for FromScratch; consultant may override if user asks
+SKILL_DESCRIPTION: "<one-line 'Use when' description>"
+ARTIFACT_ROOT: "<R-003 artifact root path>"   # e.g. "docs/raw/decision-log/"
+
 clarification_at: "2026-04-24T10:15:00Z"
 normalized_requirements:
   R-001:  # target skill name and namespace
@@ -134,6 +143,10 @@ domain_terms_aligned:
     user_clarification: "<what user said>"
     resolved_to: "<canonical term from domain-glossary.md>"
 ```
+
+**The four flat placeholder keys are mandatory** — `scripts/scaffold.sh` halts if any are absent,
+and any `{{SKILL_NAME}}` / `{{ARTIFACT_ROOT}}` / `{{SKILL_VERSION}}` / `{{SKILL_DESCRIPTION}}` marker
+in the skeleton will be left un-substituted, silently polluting the scaffolded artifact.
 
 ### Dialogue Behavior
 

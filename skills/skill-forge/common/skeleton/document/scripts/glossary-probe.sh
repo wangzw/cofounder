@@ -149,7 +149,7 @@ sparse_input  = (word_count < 50) and (not has_code_block) and (not has_structur
 sparse_reason = f"word_count={word_count} < 50" if sparse_input else None
 
 # ── 6. Write trigger-flags.yml ──────────────────────────────────────────────
-generated_at = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+generated_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def bool_str(b):
     return "true" if b else "false"
