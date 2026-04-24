@@ -100,8 +100,12 @@ generated_at      = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 def bool_str(b):
     return "true" if b else "false"
 
+def yaml_str(s):
+    """Escape a string for embedding in a YAML double-quoted scalar."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
 fetch_errors_yaml = "[]" if not fetch_errors else (
-    "\n" + "".join(f'  - "{e}"\n' for e in fetch_errors)
+    "\n" + "".join(f'  - "{yaml_str(e)}"\n' for e in fetch_errors)
 )
 
 meta_yml = (

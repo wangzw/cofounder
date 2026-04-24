@@ -130,11 +130,12 @@ for entry in entries:
         for line_no in alias_hits:
             hit_records.append({"term": term, "line": line_no, "alias_matched": alias})
 
-# Deduplicate by (term, line)
+# Deduplicate by (term, line, alias_matched) so same-line primary + alias both
+# survive — losing alias info would hide disambiguation signal the consultant needs.
 seen = set()
 deduped = []
 for r in hit_records:
-    key = (r["term"], r["line"])
+    key = (r["term"], r["line"], r["alias_matched"])
     if key not in seen:
         seen.add(key)
         deduped.append(r)
@@ -153,6 +154,10 @@ generated_at = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 def bool_str(b):
     return "true" if b else "false"
 
+def yaml_str(s):
+    """Escape a string for embedding in a YAML double-quoted scalar."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
 lines_out = [
     f'generated_at: "{generated_at}"',
     f'glossary_hit: {bool_str(glossary_hit)}',
@@ -161,16 +166,16 @@ lines_out = [
 
 if hit_records:
     for r in hit_records:
-        lines_out.append(f'  - term: "{r["term"]}"')
+        lines_out.append(f'  - term: "{yaml_str(r["term"])}"')
         lines_out.append(f'    line: {r["line"]}')
         if r["alias_matched"] is not None:
-            lines_out.append(f'    alias_matched: "{r["alias_matched"]}"')
+            lines_out.append(f'    alias_matched: "{yaml_str(r["alias_matched"])}"')
 else:
     lines_out[-1] = 'hit_terms: []'
 
 lines_out.append(f'sparse_input: {bool_str(sparse_input)}')
 if sparse_reason is not None:
-    lines_out.append(f'sparse_reason: "{sparse_reason}"')
+    lines_out.append(f'sparse_reason: "{yaml_str(sparse_reason)}"')
 else:
     lines_out.append('sparse_reason: null')
 
