@@ -1,0 +1,9 @@
+# sha256 pins for verbatim-copied scripts from attachments/metrics-aggregate/
+# Source: ~/Documents/mind/raw/guide/attachments/metrics-aggregate/
+# Updated: 2026-04-24
+# Check enforced by scripts/check-scaffold-sha.sh (CR-S12)
+files:
+  scripts/metrics-aggregate.sh:
+    sha256: 70d2c3dad1d974ea2804002959465b29e1ca513d412acc59a04e5c812fc2a19f
+  scripts/lib/aggregate.py:
+    sha256: 5a470b4b21b6257d7e2caf5ba64c38b96200bf92d4e2018c848b73c13d9e605f
