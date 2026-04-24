@@ -6,6 +6,10 @@ description: "{{SKILL_DESCRIPTION}}"
 
 # {{SKILL_NAME}} — A Generative Skill
 
+## Artifact Variant: Hybrid
+
+This skill generates mixed artifacts (documents + code + config). Review criteria route per file type; cross-type consistency checks (e.g., "documented API matches implementation") are required. Per guide Appendix F.3, `run-checkers.sh` dispatches per-file-type checker subsets.
+
 ## Mode Routing
 
 | Mode | Args | Loaded Files | Semantics |

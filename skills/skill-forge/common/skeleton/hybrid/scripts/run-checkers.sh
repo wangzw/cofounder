@@ -5,6 +5,16 @@
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
 
+# ====================================================================
+# VARIANT: hybrid
+# Phase B SHOULD route checkers by file type:
+#   - markdown → run document checkers (existing check-*.sh)
+#   - source code → run code variant checkers
+#   - schemas → run schema variant checkers
+#   - cross-type consistency: `documented API matches implementation`
+# These dispatch rules are not wired for v1 — writer sub-agent adds them.
+# ====================================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET="${1:-}"

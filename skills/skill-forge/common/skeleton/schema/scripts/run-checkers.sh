@@ -5,6 +5,14 @@
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
 
+# ====================================================================
+# VARIANT: schema
+# Phase B SHOULD additionally invoke (when target is schema-type):
+#   - `jsonschema validate <schema>`       (JSON Schema validity)
+#   - breaking-change detection vs prev delivery
+# These are not wired for v1 — writer sub-agent adds them during generate.
+# ====================================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET="${1:-}"

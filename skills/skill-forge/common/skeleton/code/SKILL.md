@@ -6,6 +6,10 @@ description: "{{SKILL_DESCRIPTION}}"
 
 # {{SKILL_NAME}} — A Generative Skill
 
+## Artifact Variant: Code
+
+This skill generates source-code artifacts (functions, modules, packages). Review criteria emphasize compile/lint/type-check gates. Per guide Appendix F.1, the pyramid index shape is `README.md → module `__init__.py`/barrel file → source files`.
+
 ## Mode Routing
 
 | Mode | Args | Loaded Files | Semantics |

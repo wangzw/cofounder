@@ -5,6 +5,16 @@
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
 
+# ====================================================================
+# VARIANT: code
+# Phase B SHOULD additionally invoke (when target is code-type):
+#   - `ruff check` / `ruff format --check`  (Python)
+#   - `tsc --noEmit`                         (TypeScript)
+#   - `golangci-lint run`                    (Go)
+#   - `cargo clippy`                         (Rust)
+# These are not wired for v1 — writer sub-agent adds them during generate.
+# ====================================================================
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET="${1:-}"

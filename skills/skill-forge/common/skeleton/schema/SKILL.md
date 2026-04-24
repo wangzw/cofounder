@@ -6,6 +6,10 @@ description: "{{SKILL_DESCRIPTION}}"
 
 # {{SKILL_NAME}} — A Generative Skill
 
+## Artifact Variant: Schema
+
+This skill generates API contracts and data schemas (OpenAPI, JSON Schema, protobuf). Review criteria emphasize schema validity and breaking-change detection. Per guide Appendix F.2, versioning may diverge from the default in-place delivery model — versioned parallel directories are a deferred extension.
+
 ## Mode Routing
 
 | Mode | Args | Loaded Files | Semantics |
