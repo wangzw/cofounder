@@ -9,5 +9,5 @@ files:
     sha256: 70d2c3dad1d974ea2804002959465b29e1ca513d412acc59a04e5c812fc2a19f
     snapshot_date: 2026-04-24
   scripts/lib/aggregate.py:
-    sha256: fbe49caac470b9073226d892e6d0f03b2ee59f5522e8d0ea76286c9fed0fd2b1
+    sha256: ef316d46da7c156b621966a6f8626ad9b2b8c0316c6eaa6a9d56bf8708b9c50b
     snapshot_date: 2026-04-24

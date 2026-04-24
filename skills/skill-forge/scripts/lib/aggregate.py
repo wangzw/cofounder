@@ -355,14 +355,38 @@ def load_harness_events(
                         continue
                     t = e.get("type")
                     if t == "user":
-                        txt = _extract_text((e.get("message") or {}).get("content"))
-                        m = TRACE_ID_RE.search(txt)
-                        if m:
-                            current_trace_hint = m.group(1)
-                        # A user turn WITHOUT a marker invalidates the prior hint —
-                        # we don't want to leak a hint across unrelated turns.
+                        content = (e.get("message") or {}).get("content")
+                        # In Claude Code sub-agent transcripts, tool-result returns
+                        # are logged as `type: "user"` per the Anthropic API turn
+                        # protocol. Those turns carry ONLY `tool_result` parts and
+                        # no fresh natural-language instructions. Invalidating the
+                        # trace_id hint on such turns wipes out the hint for 90%+
+                        # of sub-agent sessions (typical shape: one primary user
+                        # turn at the top, followed by dozens of tool-call/result
+                        # round-trips) — leaving primary JOIN unable to attribute
+                        # the assistant turns that do the actual work. Only clear
+                        # the hint when a NEW topical user turn (one with a text
+                        # or plain-string part) arrives without a marker.
+                        has_text_part = False
+                        if isinstance(content, list):
+                            for c in content:
+                                if isinstance(c, dict) and c.get("type") == "text":
+                                    has_text_part = True
+                                    break
+                        elif isinstance(content, str) and content.strip():
+                            has_text_part = True
+                        if not has_text_part:
+                            # Tool-result-only turn (or empty) — keep current hint.
+                            pass
                         else:
-                            current_trace_hint = None
+                            txt = _extract_text(content)
+                            m = TRACE_ID_RE.search(txt)
+                            if m:
+                                current_trace_hint = m.group(1)
+                            else:
+                                # Topical user turn without a marker starts a new
+                                # untagged task — invalidate the prior hint.
+                                current_trace_hint = None
                     elif t == "assistant":
                         msg = e.get("message") or {}
                         usage = msg.get("usage") or {}

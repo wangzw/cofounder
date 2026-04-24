@@ -1,4 +1,4 @@
-generated_at: 2026-04-24T16:26:01Z
+generated_at: 2026-04-24T17:09:11Z
 scope:
   key: round
   value: 4
@@ -7,21 +7,21 @@ scope:
 delivery_id: 1
 pricing_source: /Users/wangzw/workspace/cofounder/skills/skill-forge/common/config.yml
 cost:
-  total_usd: 4.077121
+  total_usd: 3.628876
   by_role:
     judge:
-      input_tokens: 21
-      output_tokens: 6241
-      cache_read_tokens: 1984634
-      cache_creation_tokens: 88211
-      usd: 3.765619
+      input_tokens: 330
+      output_tokens: 5670
+      cache_read_tokens: 2335336
+      cache_creation_tokens: 192369
+      usd: 1.13757
       calls: 1
     summarizer:
-      input_tokens: 18
-      output_tokens: 8
-      cache_read_tokens: 21356
-      cache_creation_tokens: 32168
-      usd: 0.311502
+      input_tokens: 65
+      output_tokens: 3435
+      cache_read_tokens: 449983
+      cache_creation_tokens: 165138
+      usd: 2.491306
       calls: 1
   by_criterion: {}
 latency_seconds:
@@ -35,7 +35,7 @@ join_stats:
   unmatched_ratio: 0
 traces:
   - trace_id: R4-J-001
-    usd: 3.765619
+    usd: 1.13757
   - trace_id: R4-S-001
-    usd: 0.311502
+    usd: 2.491306
 warnings: []

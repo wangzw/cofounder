@@ -1,4 +1,4 @@
-generated_at: 2026-04-24T15:44:06Z
+generated_at: 2026-04-24T17:10:11Z
 scope:
   key: delivery
   value: 1
@@ -7,58 +7,58 @@ scope:
     - 1
     - 2
 delivery_id: 1
-pricing_source: none
+pricing_source: /Users/wangzw/workspace/cofounder/skills/skill-forge/common/config.yml
 cost:
-  total_usd: 0
+  total_usd: 97.167311
   by_role:
     domain_consultant:
-      input_tokens: 41
-      output_tokens: 34296
-      cache_read_tokens: 2509054
-      cache_creation_tokens: 151059
-      usd: 0
+      input_tokens: 14135
+      output_tokens: 5591
+      cache_read_tokens: 432498
+      cache_creation_tokens: 161044
+      usd: 4.299672
       calls: 1
     judge:
-      input_tokens: 29
-      output_tokens: 4409
-      cache_read_tokens: 1309549
-      cache_creation_tokens: 28409
-      usd: 0
+      input_tokens: 71
+      output_tokens: 2365
+      cache_read_tokens: 206423
+      cache_creation_tokens: 90962
+      usd: 2.193612
       calls: 2
     planner:
-      input_tokens: 24
-      output_tokens: 317
-      cache_read_tokens: 21632
-      cache_creation_tokens: 39704
-      usd: 0
+      input_tokens: 80
+      output_tokens: 11139
+      cache_read_tokens: 978858
+      cache_creation_tokens: 204505
+      usd: 6.139381
       calls: 1
     reviewer:
-      input_tokens: 24
-      output_tokens: 10
-      cache_read_tokens: 19706
-      cache_creation_tokens: 40000
-      usd: 0
+      input_tokens: 106
+      output_tokens: 16434
+      cache_read_tokens: 4280844
+      cache_creation_tokens: 537053
+      usd: 17.72515
       calls: 1
     reviser:
-      input_tokens: 12
-      output_tokens: 181
-      cache_read_tokens: 0
-      cache_creation_tokens: 30292
-      usd: 0
+      input_tokens: 41
+      output_tokens: 5744
+      cache_read_tokens: 848743
+      cache_creation_tokens: 114630
+      usd: 3.853842
       calls: 1
     summarizer:
-      input_tokens: 24
-      output_tokens: 4
-      cache_read_tokens: 39412
-      cache_creation_tokens: 20106
-      usd: 0
+      input_tokens: 84
+      output_tokens: 4370
+      cache_read_tokens: 648119
+      cache_creation_tokens: 150865
+      usd: 4.129907
       calls: 2
     writer:
-      input_tokens: 206
-      output_tokens: 899
-      cache_read_tokens: 392403
-      cache_creation_tokens: 240261
-      usd: 0
+      input_tokens: 12227
+      output_tokens: 155427
+      cache_read_tokens: 14490088
+      cache_creation_tokens: 2217536
+      usd: 58.825747
       calls: 10
   by_criterion: {}
 latency_seconds:
@@ -77,40 +77,40 @@ join_stats:
   unmatched_ratio: 0
 traces:
   - trace_id: R0-C-001
-    usd: 0
+    usd: 4.299672
   - trace_id: R1-J-001
-    usd: 0
+    usd: 0.872008
   - trace_id: R1-P-001
-    usd: 0
+    usd: 6.139381
   - trace_id: R1-R-001
-    usd: 0
+    usd: 3.853842
   - trace_id: R1-S-001
-    usd: 0
+    usd: 2.430368
   - trace_id: R1-W-001
-    usd: 0
+    usd: 7.499085
   - trace_id: R1-W-002
-    usd: 0
+    usd: 5.919377
   - trace_id: R1-W-003
-    usd: 0
+    usd: 5.882378
   - trace_id: R1-W-004
-    usd: 0
+    usd: 4.540412
   - trace_id: R1-W-005
-    usd: 0
+    usd: 5.00719
   - trace_id: R1-W-006
-    usd: 0
+    usd: 3.669666
   - trace_id: R1-W-007
-    usd: 0
+    usd: 6.642499
   - trace_id: R1-W-008
-    usd: 0
+    usd: 6.063231
   - trace_id: R1-W-009
-    usd: 0
+    usd: 5.393683
   - trace_id: R1-W-010
-    usd: 0
+    usd: 8.208226
   - trace_id: R2-J-001
-    usd: 0
+    usd: 1.321604
   - trace_id: R2-S-001
-    usd: 0
+    usd: 1.69954
   - trace_id: R2-V-001
-    usd: 0
+    usd: 17.72515
     reviewer_variant: cross
 warnings: []

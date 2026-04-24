@@ -239,10 +239,12 @@ corresponding `versions/<N>.md` + the round sequence that produced it.
 - Sub-agent dispatches recorded in `traces/round-*/dispatch-log.jsonl`: ~30 traces
   (1 consultant, 1 planner, 10 writers, 3 cross-reviewers, 6 summarizers, 2 judges, 7 revisers).
 - See `metrics/delivery-1.metrics.yml` and `metrics/delivery-2.metrics.yml` for
-  per-role cost + latency breakdowns. **Caveat (2026-04-24)**: the generator's
-  `aggregate.py` strict-model JOIN fix (Bug #13) causes under-attribution for
-  some primary-JOIN events (the event's `model` string in the harness JSONL
-  doesn't always match the dispatch-log's `model` string verbatim). Treat the
-  cost numbers in these files as a lower bound until the JOIN path is
-  re-validated; the open-issue trajectory, round sequence, and verdict
-  progression above are authoritative.
+  per-role cost + latency breakdowns. The end-to-end cost of producing the two
+  deliveries came out around **$97 (delivery 1)** and **$70 (delivery 2)** under
+  the generator's real runtime model (`claude-opus-4-7` — sub-agents inherit
+  the parent session's model rather than the configured `balanced / heavy /
+  light` tier). A prior snapshot reported under-attributed figures (around
+  $14 / $0) before Bug #14 in `aggregate.py` was fixed: the primary-JOIN
+  trace_id hint was being cleared by tool-result user turns in Claude Code
+  sub-agent transcripts, stranding ~95% of assistant events unattributed.
+  The figures above are post-fix and verified idempotent.
