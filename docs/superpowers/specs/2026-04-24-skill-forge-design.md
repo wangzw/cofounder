@@ -98,7 +98,18 @@ skills/skill-forge/
 ### 1.2 Key architectural call-outs
 
 - **`common/skeleton/<variant>/`** is the mechanical boilerplate tree per guide §12 (script-first). Writers never regenerate these files; `scaffold.sh` copies them on Round 0.
-- **Writers only fill 4 domain-specific files per target skill**: target `review-criteria.md`, target `domain-glossary.md`, target subagent prompts (writer + reviewer + reviser), target `common/templates/artifact-template.md`.
+- **Writers fill the domain-specific files per target skill** — typically 7–9 files depending on artifact variant, flagged as `{{DOMAIN_FILL}}` in the skeleton:
+  - `common/review-criteria.md` (domain-specific CR list)
+  - `common/domain-glossary.md` (target-skill's own glossary)
+  - `common/templates/artifact-template.md` (per-variant)
+  - `generate/domain-consultant-subagent.md` (target-skill's consultant flow)
+  - `generate/writer-subagent.md` (what target artifact leaves look like)
+  - `generate/in-generate-review.md` (target-skill's self-review checklist)
+  - `review/cross-reviewer-subagent.md` (domain-specific semantic checks)
+  - `review/adversarial-reviewer-subagent.md` (target-skill's adversarial angles)
+  - `revise/per-issue-reviser-subagent.md` (domain-aware revise instructions)
+
+  All other files (SKILL.md template, config.yml template, planner/summarizer/judge prompts, scripts, `generate/from-scratch.md`, `generate/new-version.md`, `review/index.md`, `revise/index.md`) are skeleton-only with `{{placeholder}}` substitution via `scaffold.sh`. Planner decides the exact fan-out per the `{delete, modify, add, keep}` plan.
 - **`scripts/check-*.sh`** enforce the guide's structural invariants as scripts — not LLM checks (per §12 脚本优先).
 
 ## 2. Modes and CLI surface
@@ -201,7 +212,7 @@ After R-002 is confirmed, consultant reads `common/skeleton/<variant>/README.md`
 | **orchestrator** | balanced | Pure dispatch. Reads `state.yml`, dispatches, reads ACKs, appends `dispatch-log.jsonl`, decides next phase by judge verdict. Never reads generated leaves. |
 | **domain-consultant** | heavy | §6.2. Turns sparse user intent → structured `clarification.yml` with R-001..R-007. Only role with `user-interaction: true`. |
 | **planner** | heavy | Reads `clarification.yml` + existing `skills/<target>/` (new-version only). Outputs `{delete, modify, add, keep}` over the 4 domain-specific files only (skeleton files are always `keep` — scaffold.sh owns them). Plan goes to HITL `Plan Approval` gate. |
-| **writer** | balanced | One writer per domain-specific file (4 fan-out by default). Writer prompt loads `common/skeleton/<variant>/<corresponding-skeleton-file>.md` as the "what shape" reference and `clarification.yml` as "what content." |
+| **writer** | balanced | One writer per domain-specific file (typically 7–9 fan-outs per FromScratch; NewVersion fan-out = size of planner's `modify + add` set). Writer prompt loads the corresponding template from `common/templates/` as the "what shape" reference and `clarification.yml` as "what content." |
 | **reviewer (cross)** | heavy | Reads target skill tree (post-scaffold + post-writer). Runs structural CR-S\* via `scripts/check-*.sh` (phase A+B per §12.5), semantic CR-L\* via LLM. |
 | **reviewer (adversarial)** | heavy | Triggered on critical writer self-review items. Hunts for "orchestrator leaks" (SKILL.md accidentally telling main agent to "read the leaves"), forbidden phrases, missing IPC footer. |
 | **reviser** | balanced | Reads issues + current target files + resolved-issues history (regression protection §14.1). Rewrites only files flagged by issues. Skeleton files never touched (orchestrator strips skeleton-path issues as `CR-META-skip-violation`). |
@@ -213,7 +224,7 @@ After R-002 is confirmed, consultant reads `common/skeleton/<variant>/README.md`
 | Role | `filesystem` | `network` | `execute` | `user-interaction` |
 |---|---|---|---|---|
 | orchestrator | `read-all + write-state + write-dispatch-log` | false | `allow-scripts` | false |
-| domain_consultant | `read-review-input + read-domain-glossary + write-review-clarification` | false | false | **true** |
+| domain_consultant | `read-review-input + read-artifact-readme-only + read-domain-glossary + read-skeleton-readme + write-review-clarification` | false | false | **true** |
 | planner | `read-artifact + read-review-readme-only + read-review-input + read-review-clarification + write-round-plan` | false | false | false |
 | writer | `read-artifact + read-round-issues + read-review-clarification + write-target-domain-files + write-round-self-review` | false | false | false |
 | reviewer | `read-artifact + read-review + write-round-issues` | false | `allow-scripts` | false |
@@ -321,11 +332,18 @@ Round 1 (plan + scaffold):
   orchestrator → HITL: Plan Approval gate
   orchestrator → scripts/scaffold.sh <variant> skills/<target>/
 
-Round 1 (domain-content writer fan-out, 4 parallel):
+Round 1 (domain-content writer fan-out, 7–9 parallel per planner's plan):
   R1-W-001: target/common/review-criteria.md
   R1-W-002: target/common/domain-glossary.md
-  R1-W-003: target/generate/writer-subagent.md + reviewer prompts
-  R1-W-004: target/common/templates/artifact-template.md
+  R1-W-003: target/common/templates/artifact-template.md
+  R1-W-004: target/generate/domain-consultant-subagent.md
+  R1-W-005: target/generate/writer-subagent.md
+  R1-W-006: target/generate/in-generate-review.md
+  R1-W-007: target/review/cross-reviewer-subagent.md
+  R1-W-008: target/review/adversarial-reviewer-subagent.md
+  R1-W-009: target/revise/per-issue-reviser-subagent.md
+  (skeleton-only files: SKILL.md, config.yml, scripts/, planner/summarizer/judge prompts
+   — scaffold.sh handles {{placeholder}} substitution; no writer dispatched)
 
 Round 1 (review):
   orchestrator → scripts/run-checkers.sh                   (phase A + B)
