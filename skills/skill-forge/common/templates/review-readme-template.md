@@ -81,7 +81,7 @@ presence depends on what step of the round executed.
 | `depgraph.yml` | `run-checkers` (script) Phase A | Leaf dependency graph used by skip-set propagation. |
 | `skip-set.yml` | `run-checkers` (script) Phase A | `cross_reviewer_focus` + `cross_reviewer_skip` lists. `forced_full: true` when invoked via `--full`. |
 | `issues/round-checker-output.json` | `run-checkers` (script) Phase B | Raw JSON array of all issues produced by script-type checkers. Machine-readable source of truth. |
-| `issues/R<N>-<NNN>.md` | `run-checkers` (script-source) **and** `cross-reviewer` / `adversarial-reviewer` (llm-source) | One file per issue, YAML frontmatter (`id`, `status`, `severity`, `criterion_id`, `file`, `round`, `source`, optional `missing_script_path`, `resolved_script_path`, `resolves`). Summarizer and judge read **frontmatter only**; they never open issue bodies. |
+| `issues/R<N>-<NNN>.md` | `run-checkers` (script source **or** carry-forward from skipped-leaf open issues) **and** `cross-reviewer` / `adversarial-reviewer` (llm source) | One file per issue, YAML frontmatter: `id`, `status`, `severity`, `criterion_id`, `file`, `round`, `source` (`script` \| `carry-forward` \| `cross-reviewer` \| `adversarial-reviewer` \| `self-review-escalation`), optional `missing_script_path` (script source), `resolved_script_path` (when marked resolved), `resolves: R<M>-<NNN>` (cross-reviewer when closing a prior-round issue), `carries_from: R<M>-<NNN>` (carry-forward when inheriting a prior-round open issue whose file is in this round's `cross_reviewer_skip`). Summarizer and judge read **frontmatter only**; they never open issue bodies. |
 | `clarification/<ts>.yml` | `domain-consultant` (sub-agent, new-version deliveries) | Present when a delivery-N start required fresh clarification on top of the previous baseline. |
 | `dismissed-fails/<trace_id>-<cr-id>.md` | `cross-reviewer` (sub-agent) | Written when a writer self-review FAIL row is explicitly dismissed (instead of escalated to an issue). |
 | `index.md` | `summarizer` (sub-agent) | YAML frontmatter with aggregate counts (`open_issues`, `resolved_this_round`, `critical_count`, `error_count`, `warning_count`, `coverage_percent`, `skip_set_utilization`, `writer_fail_count_sum`) + prose. Judge reads the frontmatter only. Severity counts are scoped to OPEN issues (status ∈ {new, persistent, regressed}) so resolved issues never block convergence. |
@@ -97,9 +97,24 @@ summarizer, and judge):
 - `resolved` — existed in round N-1 but no longer detectable this round
 - `regressed` — was `resolved` in round N-1 but detected again this round
 
-The script checker emits fresh issues as `new`. Transitions are set by the
-cross-reviewer in the **next** round (never by the summarizer, never by the script
-checker).
+Transition rules (who sets what, per round N):
+
+- **`new`** — emitted by `run-checkers` (script source) or by a reviewer (llm source) on
+  first detection.
+- **`persistent`** — set two ways. (a) the cross-reviewer re-evaluates a leaf in its focus
+  list and finds the same `criterion_id + file` still detectable — writes a new record
+  with `source: cross-reviewer`. (b) `run-checkers` Phase A carries the prior-round issue
+  forward because its `file` is in the **current** round's `cross_reviewer_skip` and no
+  one re-evaluated it — writes a new record with `source: carry-forward` and
+  `carries_from: R<N-1>-<NNN>`. Carry-forward guarantees open issues never vanish from the
+  summarizer's `open_issues` count just because cross-reviewer didn't re-look at them
+  (incremental-review correctness).
+- **`resolved`** — set by the cross-reviewer when a prior-round issue is no longer
+  detectable. Writes a new record with `status: resolved`, `resolves: R<N-1>-<NNN>`.
+- **`regressed`** — set by the cross-reviewer when an issue that was `resolved` in
+  round N-1 is detected again.
+
+The summarizer and the judge never set status — they only read it.
 
 ### Issue-ID format
 
