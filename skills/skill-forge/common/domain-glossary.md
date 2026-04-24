@@ -30,7 +30,7 @@ All entries carry `disambiguation_required: true`. Terms are grouped by the ambi
 
 ```yaml
 - term: "delivery"
-  aliases: ["semantic version", "semver", "release", "major version", "v1", "bump version", "version bump", "版本", "发布"]
+  aliases: ["semantic version", "semver", "release", "release v2", "release v3", "major version", "minor version", "v1", "bump version", "version bump", "bump major", "bump minor", "版本", "发布"]
   disambiguation_required: true
   definition: "In this skill system, 'delivery' is a monotonic integer counter (D001, D002, ...) that increments each time the convergence judge emits 'converged' and the artifact is committed. It is NOT semantic versioning. Users who say 'v1' or 'release' mean delivery in this context."
 ```
@@ -82,7 +82,7 @@ All entries carry `disambiguation_required: true`. Terms are grouped by the ambi
 
 ```yaml
 - term: "sub-agent"
-  aliases: ["subagent", "agent", "sub agent", "worker agent", "role agent", "子 agent", "子代理"]
+  aliases: ["subagent", "agent", "sub agent", "worker agent", "role agent", "子 agent", "子agent", "子代理"]
   disambiguation_required: true
   definition: "A Claude Code sub-session spawned by the orchestrator via the Task tool to execute exactly one role's work in a round. Each sub-agent reads its prompt file, performs its work, writes output to a final path, and returns exactly one ACK line."
 

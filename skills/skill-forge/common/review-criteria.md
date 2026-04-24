@@ -71,6 +71,8 @@ All 8 required sub-agent prompts MUST be present: orchestrator (inline in SKILL.
   severity: critical
   conflicts_with: []
   priority: 1
+  # full_scan: per_file would miss deletions; spec §5.3 lists S03/S08/S09
+  # but same rationale applies to subagent-inventory (spec update pending).
   incremental_skip: full_scan
 ```
 
