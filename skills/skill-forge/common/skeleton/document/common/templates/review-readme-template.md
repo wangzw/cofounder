@@ -6,9 +6,9 @@ The target skill itself lives at the parent level (`SKILL.md`, `common/`, `gener
 runtime by the skill — it exists purely for audit, debugging, metrics, and future-round
 context.
 
-> Authoritative spec for this layout: `../SKILL.md` (mode routing, orchestrator core
-> contract) and `../generate/from-scratch.md` / `../generate/new-version.md` /
-> `../review/index.md` / `../revise/index.md` (per-mode step sequences). All paths are
+> Authoritative spec for this layout: `SKILL.md` (mode routing, orchestrator core
+> contract) and `generate/from-scratch.md` / `generate/new-version.md` /
+> `review/index.md` / `revise/index.md` (per-mode step sequences). All paths are
 > relative to the parent skill directory — this archive is self-contained.
 
 ---
@@ -23,7 +23,7 @@ context.
 ├── round-1/, round-2/ …    ← per-round work (plan | issues | self-reviews | skip-set | index | verdict)
 ├── traces/round-<N>/       ← dispatch-log.jsonl for that round (one JSONL line per launched/completed event)
 ├── versions/<N>.md         ← on-converge delivery summaries (only written by the summarizer when verdict=converged)
-├── metrics/                ← aggregated metrics from `../scripts/metrics-aggregate.sh --diagnose`
+├── metrics/                ← aggregated metrics from `scripts/metrics-aggregate.sh --diagnose`
 ├── dismissed-fails/        ← writer self-review FAIL rows the cross-reviewer explicitly dismissed
 └── hitl/                   ← human-in-the-loop override records (force-continue, regression justification, etc.)
 ```
@@ -31,7 +31,7 @@ context.
 Rounds are **cross-delivery monotonic**: delivery-1 uses round-1..k, delivery-2 starts
 at round-k+1. Round-0 is the **one-off bootstrap** scoped to input and clarification —
 it does not recur per delivery (it gets re-used as the bootstrap subdir for new-version
-deliveries via `../scripts/prepare-input.sh --bootstrap-subdir`).
+deliveries via `scripts/prepare-input.sh --bootstrap-subdir`).
 
 ## `state.yml`
 
@@ -40,7 +40,7 @@ Single source of truth for the orchestrator's own bookkeeping. Keys:
 | Key | Purpose |
 |---|---|
 | `current_round` | Monotonically incremented; read by run-checkers/skip-set/cross-reviewer. |
-| `current_delivery` | Bumped when a verdict=converged triggers `../scripts/commit-delivery.sh`. |
+| `current_delivery` | Bumped when a verdict=converged triggers `scripts/commit-delivery.sh`. |
 | `mode` | One of `generate-from-scratch`, `generate-new-version`, `review`, `revise`. |
 | `phase` (optional) | Set to `on-converge` just before the summarizer's on-converge phase is dispatched. |
 | `forced_full_cross_review` (optional) | `true` during the first `--review` dispatch of a delivery. |
@@ -51,13 +51,13 @@ it.
 
 ## `round-0/` — Bootstrap
 
-Produced during FromScratch Step 2-4 of `../generate/from-scratch.md`. Contents:
+Produced during FromScratch Step 2-4 of `generate/from-scratch.md`. Contents:
 
 | File | Writer | Purpose |
 |---|---|---|
-| `input.md` | `../scripts/prepare-input.sh` | Normalized user prompt + any `@path` / `http://` references expanded inline. Directory refs are walked and inlined under a per-directory size budget. |
-| `input-meta.yml` | `../scripts/prepare-input.sh` | `word_count`, `has_code_block`, `has_structured_lists`, `expanded_references`, `fetch_errors`. |
-| `trigger-flags.yml` | `../scripts/glossary-probe.sh` | `glossary_hit`, `sparse_input`, `hit_terms[]`. Orchestrator routes the clarification step off this file. |
+| `input.md` | `scripts/prepare-input.sh` | Normalized user prompt + any `@path` / `http://` references expanded inline. Directory refs are walked and inlined under a per-directory size budget. |
+| `input-meta.yml` | `scripts/prepare-input.sh` | `word_count`, `has_code_block`, `has_structured_lists`, `expanded_references`, `fetch_errors`. |
+| `trigger-flags.yml` | `scripts/glossary-probe.sh` | `glossary_hit`, `sparse_input`, `hit_terms[]`. Orchestrator routes the clarification step off this file. |
 | `clarification/<ISO-ts>.yml` | domain-consultant sub-agent | Flat `SKILL_NAME`/`SKILL_VERSION`/`SKILL_DESCRIPTION`/`ARTIFACT_ROOT` keys + `normalized_requirements` R-001..R-007. Planner + writers read this. |
 
 If multiple clarification files exist (e.g., user revised mid-dialogue), the
@@ -73,11 +73,11 @@ presence depends on what step of the round executed.
 |---|---|---|
 | `plan.md` | planner sub-agent | First round of a delivery; after plan approval it drives writer fan-out. New-version deliveries include `delete`/`modify`/`add`/`keep` lists. |
 | `self-reviews/R<N>-W-<NNN>.md` | writer sub-agent | One per writer dispatch. CR-by-CR PASS/FAIL checklist + `self_review_status` + `fail_count`. Summarizer reads `fail_count` for `writer_fail_count_sum`. |
-| `manifest.yml` | `../scripts/run-checkers.sh` Phase A | Leaf inventory for the round (hash + last-mod). |
-| `depgraph.yml` | `../scripts/run-checkers.sh` Phase A | Leaf dependency graph used by skip-set propagation. |
-| `skip-set.yml` | `../scripts/run-checkers.sh` Phase A | `cross_reviewer_focus` + `cross_reviewer_skip` lists. `forced_full: true` when invoked via `--full`. |
-| `issues/round-checker-output.json` | `../scripts/run-checkers.sh` Phase B | Raw JSON array of all issues produced by script-type checkers. Machine-readable source of truth. |
-| `issues/R<N>-<NNN>.md` | `../scripts/run-checkers.sh` (script-source) **and** cross-/adversarial-reviewer (llm-source) | One file per issue, YAML frontmatter (`id`, `status`, `severity`, `criterion_id`, `file`, `round`, `source`, optional `missing_script_path`, `resolved_script_path`, `resolves`). Summarizer and judge read **frontmatter only**; they never open issue bodies. |
+| `manifest.yml` | `scripts/run-checkers.sh` Phase A | Leaf inventory for the round (hash + last-mod). |
+| `depgraph.yml` | `scripts/run-checkers.sh` Phase A | Leaf dependency graph used by skip-set propagation. |
+| `skip-set.yml` | `scripts/run-checkers.sh` Phase A | `cross_reviewer_focus` + `cross_reviewer_skip` lists. `forced_full: true` when invoked via `--full`. |
+| `issues/round-checker-output.json` | `scripts/run-checkers.sh` Phase B | Raw JSON array of all issues produced by script-type checkers. Machine-readable source of truth. |
+| `issues/R<N>-<NNN>.md` | `scripts/run-checkers.sh` (script-source) **and** cross-/adversarial-reviewer (llm-source) | One file per issue, YAML frontmatter (`id`, `status`, `severity`, `criterion_id`, `file`, `round`, `source`, optional `missing_script_path`, `resolved_script_path`, `resolves`). Summarizer and judge read **frontmatter only**; they never open issue bodies. |
 | `clarification/<ts>.yml` | domain-consultant (new-version deliveries) | Present when a delivery-N start required fresh clarification on top of the previous baseline. |
 | `dismissed-fails/<trace_id>-<cr-id>.md` | cross-reviewer | Written when a writer self-review FAIL row is explicitly dismissed (instead of escalated to an issue). |
 | `index.md` | summarizer | YAML frontmatter with aggregate counts (`open_issues`, `resolved_this_round`, `critical_count`, `error_count`, `warning_count`, `coverage_percent`, `skip_set_utilization`, `writer_fail_count_sum`) + prose. Judge reads the frontmatter only. Severity counts are scoped to OPEN issues (status ∈ {new, persistent, regressed}) so resolved issues never block convergence. |
@@ -93,7 +93,7 @@ summarizer, and judge):
 - `resolved` — existed in round N-1 but no longer detectable this round
 - `regressed` — was `resolved` in round N-1 but detected again this round
 
-`../scripts/run-checkers.sh` emits fresh issues as `new`. Transitions are set by the
+`scripts/run-checkers.sh` emits fresh issues as `new`. Transitions are set by the
 cross-reviewer in the **next** round (never by the summarizer, never by the script
 checker).
 
@@ -117,20 +117,20 @@ Role letters (the single letter after the round number in `trace_id`): `C`
 domain-Consultant · `P` Planner · `W` Writer · `V` reViewer (cross or adversarial —
 distinguished by `reviewer_variant`) · `R` Reviser · `S` Summarizer · `J` Judge.
 
-`../scripts/metrics-aggregate.sh --diagnose` reads this file plus the harness
+`scripts/metrics-aggregate.sh --diagnose` reads this file plus the harness
 transcripts to produce `metrics/<scope>.metrics.yml`.
 
 ## `versions/<N>.md`
 
 Written by the summarizer's on-converge phase when the judge verdict is `converged`.
-Sits alongside the annotated git tag produced by `../scripts/commit-delivery.sh`. Each
+Sits alongside the annotated git tag produced by `scripts/commit-delivery.sh`. Each
 file is a frozen snapshot of `quality_at_delivery` (final issue counts, coverage,
 regressed count, writer fail count) — the authoritative "what did we ship and how clean
 was it" record.
 
 ## `metrics/`
 
-Output of `../scripts/metrics-aggregate.sh --diagnose`. Pure-script, never LLM-written.
+Output of `scripts/metrics-aggregate.sh --diagnose`. Pure-script, never LLM-written.
 Scope is either a round (`round-<N>.metrics.yml`) or a delivery
 (`delivery-<N>.metrics.yml`). Contents: latency, cost, tier distribution, coverage-gap
 warnings. `README.md` under this subdir is a rolling trend table appended by the
@@ -154,7 +154,7 @@ minimum `decided_at`, `decision`, and `rationale`.
 4. **What did the checks find?** — `round-<N>/issues/*.md` frontmatter. Start from
    `round-<N>/index.md` for the aggregate view.
 5. **What did the judge decide, and why?** — `round-<N>/verdict.yml` evidence block.
-6. **How expensive was it?** — `metrics/` (run `../scripts/metrics-aggregate.sh
+6. **How expensive was it?** — `metrics/` (run `scripts/metrics-aggregate.sh
    --diagnose` if not already written).
 7. **Did anyone override the judge?** — `hitl/`.
 
