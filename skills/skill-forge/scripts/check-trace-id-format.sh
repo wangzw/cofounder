@@ -40,7 +40,7 @@ VALID_PATTERN = re.compile(r'\btrace_id[=:\s]+R\d+-[CPWVRSJ]-\d{3}\b')
 ANY_TRACE = re.compile(r'\btrace_id[=:\s]+(\S+)')
 
 for fpath in sorted(files):
-    rel = fpath if os.path.isabs(target) and os.path.isfile(target) else os.path.relpath(fpath, target if os.path.isdir(target) else os.path.dirname(target))
+    rel = os.path.relpath(fpath, os.path.dirname(target) if os.path.isfile(target) else target)
     try:
         content = open(fpath, encoding="utf-8", errors="replace").read()
     except OSError:

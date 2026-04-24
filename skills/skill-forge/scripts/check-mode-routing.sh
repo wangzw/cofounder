@@ -90,6 +90,19 @@ for mode_name, patterns in REQUIRED_MODES:
             "suggested_fix": f"Add a row for '{mode_name}' mode in the Mode Routing table"
         })
 
+# Check for 'Loaded Files' column header — search only in the table header row
+# (table_rows[0] is the header; skip separator rows that start with |---)
+header_rows = [r for r in table_rows if not re.match(r'^\|[-| ]+\|', r)]
+header_text = header_rows[0] if header_rows else ""
+if not re.search(r'[Ll]oaded\s+[Ff]iles', header_text):
+    issues.append({
+        "criterion_id": "CR-S02",
+        "file": "SKILL.md",
+        "severity": "error",
+        "description": "Mode Routing table missing 'Loaded Files' column",
+        "suggested_fix": "Add a 'Loaded Files' column header to the Mode Routing table"
+    })
+
 print(json.dumps(issues, indent=2))
 sys.exit(1 if issues else 0)
 PYEOF

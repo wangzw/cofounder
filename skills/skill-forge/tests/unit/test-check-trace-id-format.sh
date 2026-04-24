@@ -63,4 +63,19 @@ OUT=$("$SCRIPT" "$EMPTYDIR" 2>/dev/null)
 CODE=$?
 [ "$CODE" -eq 0 ] || { echo "FAIL: exit $CODE (expected 0) for empty dir"; exit 1; }
 
+# Test 6: absolute file path — file field in issues must be basename-only (not absolute path)
+ABS_BAD_DIR=$(mktemp -d)
+trap "rm -rf $ABS_BAD_DIR" EXIT
+ABS_BAD="$ABS_BAD_DIR/abs-bad.md"
+cat > "$ABS_BAD" <<'MD'
+trace_id: R1-X-001
+MD
+OUT=$("$SCRIPT" "$ABS_BAD" 2>/dev/null) || CODE=$?
+CODE=${CODE:-0}
+run_json "$OUT"
+[ "$CODE" -eq 1 ] || { echo "FAIL: exit $CODE (expected 1) for absolute-file-path test"; exit 1; }
+FILE_FIELD=$(python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(d[0]['file'] if d else '')" <<< "$OUT")
+BASENAME=$(basename "$ABS_BAD")
+[ "$FILE_FIELD" = "$BASENAME" ] || { echo "FAIL: file field '$FILE_FIELD' is not basename-only '$BASENAME'"; exit 1; }
+
 echo "PASS test-check-trace-id-format.sh"

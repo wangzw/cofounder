@@ -15,7 +15,7 @@ those lines.
 
 For **every** sub-agent dispatch the orchestrator MUST:
 
-1. **Assign a `trace_id`** in the format `R<round>-<role-letter>-<nnn>` where:
+1. **Assign a `trace_id`** in the format `R{round}-{role-letter}-{nnn}` where:
    - `round` is the integer round number
    - `role-letter` is the single-letter code from the table below (**no two-letter forms**)
    - `nnn` is a zero-padded 3-digit sequence counter, per-round per-role (`001`, `002`, …)
@@ -43,7 +43,7 @@ For **every** sub-agent dispatch the orchestrator MUST:
 
 4. **Inject `trace_id`** as the **literal first line** of the sub-agent's first user message:
    ```
-   trace_id: R<N>-<role>-<nnn>
+   trace_id: R3-W-007
    ```
 
 ### `launched` event schema
@@ -115,9 +115,9 @@ The IPC model is **Direct Write + ACK**:
 - The sub-agent writes to final paths **in its own sub-session** using the Write tool (one or
   multiple writes per dispatch, depending on role — see table below).
 - The sub-agent's Task return is **exactly one line** (the ACK):
-  - `OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>`
+  - `OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>`
   - Writer-only extras appended to the OK ACK: `self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>`
-  - On technical failure: `FAIL trace_id=<id> reason=<one-line>`
+  - On technical failure: `FAIL trace_id=R3-W-007 reason=<one-line>`
 
 ### Role → final-path mapping
 
@@ -162,7 +162,7 @@ These map to §16 `retry_policy` (re-dispatch may be effective: new sub-session,
 MUST return:
 
 ```
-OK trace_id=<id> role=writer linked_issues=<...> self_review_status=PARTIAL fail_count=<N>
+OK trace_id=R3-W-007 role=writer linked_issues=R3-012 self_review_status=PARTIAL fail_count=1
 ```
 
 Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /

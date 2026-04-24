@@ -40,4 +40,12 @@ FOUND=$(python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(any('
 "$SCRIPT" /nonexistent/path 2>/dev/null && { echo "FAIL: expected exit 2"; exit 1; } || CODE=$?
 [ "$CODE" -eq 2 ] || { echo "FAIL: exit $CODE (expected 2)"; exit 1; }
 
+# Test 5: missing-loaded-files-col fixture — all mode rows present but no Loaded Files column — expect CR-S02 with 'Loaded Files' in description
+OUT=$("$SCRIPT" "$FIXTURES/missing-loaded-files-col" 2>/dev/null) || CODE=$?
+CODE=${CODE:-0}
+run_json "$OUT"
+[ "$CODE" -eq 1 ] || { echo "FAIL: exit $CODE (expected 1) for missing-loaded-files-col"; exit 1; }
+FOUND=$(python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(any('Loaded Files' in i.get('description','') for i in d))" <<< "$OUT")
+[ "$FOUND" = "True" ] || { echo "FAIL: 'Loaded Files' column missing not reported; out=$OUT"; exit 1; }
+
 echo "PASS test-check-mode-routing.sh"
