@@ -1,0 +1,5 @@
+current_round: 2
+current_delivery: 1
+mode: generate-from-scratch
+phase: on-converge
+git_sha: e9488ce7db1e082213372a035999400cace93161

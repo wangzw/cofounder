@@ -1,0 +1,13 @@
+# NOTE: lib/aggregate.py has drifted from upstream by one fix — support for
+# guide §3.8 two-event dispatch-log format (launched+completed merged by trace_id).
+# The upstream attachment expects only combined-format records. See commit that
+# introduced this drift for details. A future upstream sync should reconcile.
+# sha256 pins for verbatim-copied scripts from attachments/metrics-aggregate/
+# Check enforced by scripts/check-scaffold-sha.sh (CR-S12)
+files:
+  scripts/metrics-aggregate.sh:
+    sha256: 70d2c3dad1d974ea2804002959465b29e1ca513d412acc59a04e5c812fc2a19f
+    snapshot_date: 2026-04-24
+  scripts/lib/aggregate.py:
+    sha256: dee1c434206a2c5471d2ca9bfc8bd3cf9e6610f70f13bdecb1690ba48fd9c9aa
+    snapshot_date: 2026-04-24

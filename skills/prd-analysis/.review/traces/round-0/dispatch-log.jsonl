@@ -1,0 +1,2 @@
+{"event": "launched", "trace_id": "R0-C-001", "role": "domain_consultant", "reviewer_variant": null, "tier": "heavy", "model": "claude-opus-4-5", "delivery_id": 1, "dispatched_at": "2026-04-24T13:45:59Z", "prompt_hash": "sha256:33182e111f27323f2373d7495bf3a541f930b43feddd09f01aba3e74149580be", "linked_issues": []}
+{"event": "completed", "trace_id": "R0-C-001", "role": "domain_consultant", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-24T13:48:31Z"}
