@@ -1,76 +1,92 @@
-# in-generate-review.md — Writer Self-Review Checklist (T3)
+# In-Generate Self-Review Checklist — prd-analysis
 
-Every writer traverses this checklist in a **single pass** after composing the leaf body, before emitting the output. Any `FAIL` must be fixed in-place or escalated via `regression_justified`.
+This file is referenced by `generate/writer-subagent.md`. It defines which CRs apply to which
+PRD artifact file types, the PASS/FAIL format each writer must follow, the four `blocker_scope`
+values, and an example complete self-review.
 
-This is embedded in the writer's system prompt and referenced in `generate/writer-subagent.md`.
+`in-generate-review.md` is not a sub-agent prompt. It is an instruction reference read by the
+writer within its dispatch context. After producing each leaf file, the writer runs this checklist
+immediately and reports PASS/FAIL per applicable CR. For every FAIL row the writer MUST select
+exactly one `blocker_scope` value and provide a one-sentence note. CRs not listed for a file type
+are NOT applicable and must NOT be checked — checking inapplicable CRs is noise that wastes
+reviewer bandwidth.
 
 ---
 
-## Traversal rules
+## CR Applicability Table
 
-1. Run only criteria from `applicable_criteria` (orchestrator selects them per leaf_kind).
-2. For each criterion, emit one line: `- <id> <name>: PASS | FAIL — "<reason>" → fixed. | N/A`
-3. If a criterion has an explicit saturation rule (e.g. "one EC per permission boundary is sufficient") and you've hit the minimum, PASS even if the reviewer could arguably want more — that's the rule, not laziness.
-4. Order criteria by severity: `critical` first, then `error`, `warning`, `info`.
-5. After the last criterion, emit `regression_justified: false` (or `true` with a one-line reason) as the final self-review line.
+| File type | Applicable CRs | Severity floor |
+|-----------|---------------|----------------|
+| `README.md` | CR-PRD-S01 (frontmatter), CR-PRD-S05 (index consistency), CR-PRD-L06 (cross-journey patterns) | error for S01/S05; warning for L06 |
+| `journeys/J-NNN-<slug>.md` | CR-PRD-S03 (J-NNN ID), CR-PRD-S08 (≤300 lines), CR-PRD-L02 (mapped-feature backref) | error for S03/L02; warning for S08 |
+| `features/F-NNN-<slug>.md` | CR-PRD-S02 (F-NNN ID), CR-PRD-L01 (self-contained), CR-PRD-S06 (wikilink targets exist), CR-PRD-S08 (≤300 lines), CR-PRD-L02 (journey backref), CR-PRD-L03 (MVP discipline), CR-PRD-L04 (boundaries clear) | error for S02/L01/S06/L02/L03/L04; warning for S08 |
+| `architecture.md` | CR-PRD-S05 (index matches topic files) | error |
+| `architecture/<topic>.md` | CR-PRD-L05 (NFR covers perf/security/a11y), CR-PRD-S06 (wikilink targets exist) | error |
+| `REVISIONS.md` | CR-PRD-S07 (revision log consistency) — only if file exists | warning |
+| `prototypes/` | _(no applicable CRs — optional artifacts)_ | — |
 
-## Authoring pass vs. review pass — what's in scope here
+---
 
-The in-generate self-review is deliberately **narrow**:
-- Structural / header metadata / basic completeness (CR-001, CR-002, CR-007).
-- Leaf-type-specific mandatory sections (e.g. user-facing feature → Interaction Design, state machine, a11y).
-- Self-containment (CR-020, CR-021) — does this file stand alone?
-- Testability (CR-030, CR-031, CR-032, CR-033) — are ACs observable?
-- Obvious traceability (CR-010 script half) — does the leaf cross-reference what it should?
+## PASS/FAIL Line Format
 
-The in-generate self-review does **not** run cross-file criteria (CR-045 cross-feature event flow, CR-041 screen-name-consistency, CR-011 metrics-have-verification across README + feature, etc.) — those require the full artifact view and are the cross-reviewer's job.
+Each applicable CR gets exactly one line in the self-review checklist:
 
-## Leaf-kind mapping (which criteria apply)
+```
+- <CR-ID> <cr-name>: PASS
+- <CR-ID> <cr-name>: FAIL — blocker_scope: <value> — note: <one-sentence reason>
+```
 
-| Leaf Kind | Always | If user-facing | If has Permission | If has Dependencies | If has Notifications |
-|-----------|--------|----------------|-------------------|---------------------|----------------------|
-| readme | CR-001, CR-002, CR-007 | CR-011 | — | — | — |
-| journey | CR-001, CR-002, CR-007, CR-034, CR-036, CR-049 | — | — | — | — |
-| feature | CR-001, CR-002, CR-007, CR-020, CR-021, CR-030, CR-031, CR-032 | CR-040, CR-042, CR-043, CR-047, CR-048, CR-049, CR-050, CR-051, CR-052, CR-053, CR-055, CR-057 | CR-033 | CR-035 | CR-090 |
-| architecture-topic | CR-001, CR-002, CR-007 | — | — | — | — |
-| tombstone | CR-001, CR-007 | — | — | — | — |
+Examples:
 
-Topic-file specific:
+```
+- CR-PRD-S02 features-have-ids: PASS
+- CR-PRD-L01 feature-files-self-contained: FAIL — blocker_scope: cross-artifact-dep — note: data model referenced in F-003 not yet inlined here, requires cross-reviewer to verify
+- CR-PRD-L03 mvp-discipline: FAIL — blocker_scope: needs-human-decision — note: section "Future Ideas" in feature body may be in-scope or out-of-scope depending on stakeholder decision not recorded in clarification.yml
+```
 
-| Topic file | Criterion |
-|-----------|-----------|
-| coding-conventions.md | CR-060 |
-| test-isolation.md | CR-061 |
-| dev-workflow.md | CR-062 |
-| security.md | CR-063 |
-| backward-compat.md | CR-064 |
-| git-strategy.md | CR-065 |
-| code-review.md | CR-066 |
-| observability.md | CR-067 |
-| performance.md | CR-068 |
-| deployment.md | CR-069 |
-| ai-agent-config.md | CR-070 |
-| privacy.md | CR-091 |
-| auth-model.md | CR-092 |
-| accessibility.md | CR-050 |
-| i18n.md | CR-052 |
+---
 
-## FAIL handling
+## Blocker-Scope Taxonomy
 
-- **Fixable without escalation**: edit the body in-place and flip the line to `FAIL → fixed.` Do NOT leave a genuine FAIL in the footer unless there's a substantive reason.
-- **Design conflict** (e.g. the saturation-rule boundary IS violated, but the requirements say so explicitly): emit `FAIL — "<reason>"`; do NOT fix; the cross-reviewer will judge.
-- **Regression into a resolved issue**: set `regression_justified: true` with a concise reason; HITL will decide.
+Every FAIL row MUST select exactly one `blocker_scope`:
 
-## Saturation rules (inherited from CR-### narrative)
+| `blocker_scope` | One-line definition |
+|-----------------|---------------------|
+| `global-conflict` | This leaf conflicts with another leaf or another criterion — requires a cross-artifact view outside writer scope; do NOT force-fix in-place |
+| `cross-artifact-dep` | This leaf depends on a fact from another leaf not yet produced in this round — the dependency will be resolved once the other writer completes |
+| `needs-human-decision` | The choice requires information only a human stakeholder can provide — no skill-internal evidence can resolve it |
+| `input-ambiguity` | The input spec is ambiguous or incomplete; a clarification not yet covered by domain-consultant output is needed |
 
-Respect the following so that repeated `--revise` rounds don't generate ever-tighter demands for non-improvement:
+**Critical rule**: NEVER attempt to resolve a `global-conflict` in-place ("硬修"). Write the FAIL
+row, set `self_review_status: PARTIAL` in the ACK, and let the cross-reviewer + reviser loop handle it.
 
-| Criterion | Saturation |
-|-----------|------------|
-| CR-032 non-behavioral-criterion-present | ≥1 NR per distinct operational characteristic (read vs write, steady vs burst). Do NOT demand per-endpoint p95. |
-| CR-033 authorization-edge-case | ≥1 unauthorized-access EC per permission boundary (role × scope). Do NOT enumerate every combination. |
-| CR-037 test-data-requirements | Reader can set up the test without reading implementation. Do NOT prescribe fixture JSON shape. |
-| CR-053 i18n-per-feature-frontend | Key-naming convention stated once. Do NOT audit individual keys. |
-| CR-054 i18n-per-feature-backend | One row per error category (validation / permission / conflict / not_found). |
-| CR-048 micro-interactions-use-tokens | Animations reference motion tokens. Do NOT demand frame-by-frame choreography. |
-| CR-020 feature-self-contained | Feature contains the capability, contract, and observable behavior. Do NOT demand deeper inlining of entities already present at JSON-schema level. |
+---
+
+## Example: Complete Self-Review for a `features/F-001-auth.md` Leaf
+
+```markdown
+# Self-Review — R1-W-005
+
+**File reviewed**: `features/F-001-auth.md`
+**Round**: 1
+**Timestamp**: 2026-04-24T12:00:00Z
+
+## Checklist
+
+- CR-PRD-S02 features-have-ids: PASS
+- CR-PRD-L01 feature-files-self-contained: PASS
+- CR-PRD-S06 wikilink-targets-exist: PASS
+- CR-PRD-S08 leaf-size-within-limit: PASS
+- CR-PRD-L02 feature-to-journey-mapping: PASS
+- CR-PRD-L03 mvp-discipline: PASS
+- CR-PRD-L04 feature-boundaries-clear: FAIL — blocker_scope: global-conflict — note: F-001 and F-002 both describe session token management; boundary overlap requires cross-reviewer to adjudicate which feature owns the behavior
+
+## Summary
+
+**FULL_PASS**: no
+**fail_count**: 1
+**Scope notes**: CR-PRD-L04 FAIL is a global-conflict between F-001 and F-002. Writer did not
+force-fix. Cross-reviewer should compare both feature files and determine which one exclusively
+owns session token management, then file a reviser issue for the other to remove the overlapping
+section.
+```

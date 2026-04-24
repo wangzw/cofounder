@@ -1,169 +1,148 @@
 ---
 name: prd-analysis
-description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'."
+version: 0.1.0
+description: "Use when the user needs to create a Product Requirements Document from sparse notes or conversation — produces a multi-file PRD directory with journey specs, self-contained feature specs, and architecture topic files for AI coding agents to consume."
 ---
 
-# PRD Analysis — AI-Coding-Ready Requirements
+# prd-analysis — A Generative Skill
 
-Generate PRDs as a **multi-file directory**. Each feature spec is a self-contained file — coding agents read only the file they need, minimizing context consumption.
+## Artifact Variant: Document
 
-## Scope
-
-PRD captures **product-level decisions**: what to build, for whom, why, and at what priority. It does NOT specify implementation-level details — those belong to system-design. See `scope-reference.md` for the full PRD vs. system-design boundary table (loaded in authoring modes).
-
-## Input Modes
-
-```
-/prd-analysis                          # interactive mode
-/prd-analysis path/to/notes.md         # document-based mode
-/prd-analysis --output docs/raw/prd/my-project  # custom output dir
-/prd-analysis notes.md --output ./prd  # both
-/prd-analysis --review docs/raw/prd/xxx/        # review existing PRD
-/prd-analysis --revise docs/raw/prd/xxx/        # change management for existing PRD
-/prd-analysis --evolve docs/raw/prd/xxx/        # incremental PRD for new iteration
-/prd-analysis --evolve docs/raw/prd/xxx/ notes.md  # evolve with document input
-```
+This skill generates markdown-based documents (PRDs, design docs, wikis, specs). Baseline generative-skill shape per guide §7.1; no variant-specific extensions.
 
 ## Mode Routing
 
-After detecting the invocation mode, read the corresponding files before proceeding:
+| Mode | Args | Loaded Files | Semantics |
+|------|------|-------------|-----------|
+| generate (from scratch) | `/cofounder:prd-analysis "<description>"` | `generate/from-scratch.md`, `common/review-criteria.md` | New artifact from sparse description; domain-consultant clarifies intent, planner plans, writers fan-out |
+| generate (new version) | `/cofounder:prd-analysis --target <path> "<change>"` | `generate/new-version.md`, `common/review-criteria.md` | Evolve existing artifact; planner emits delta plan; forced full cross-review on first round |
+| review | `/cofounder:prd-analysis --review --target <path>` | `review/index.md`, `common/review-criteria.md` | Script-type checks + LLM cross/adversarial review; produces issue files under `.review/round-<N>/issues/` |
+| revise | `/cofounder:prd-analysis --revise --target <path>` | `revise/index.md`, `common/review-criteria.md` | Per-issue revise loop driven by open issues from last review round |
+| `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
-| Mode | Read These Files |
-|------|-----------------|
-| Initial analysis (no flags) | `questioning-phases.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
-| Initial analysis + document input | `questioning-phases.md`, `document-mode.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Step 6) |
-| `--review` | `review-mode.md`, `review-checklist.md`, `parallel-dispatch.md`, `output-discipline.md` |
-| `--revise` | `revise-mode.md`, `parallel-dispatch.md`, `output-discipline.md` (load `scope-reference.md` and `review-checklist.md` on demand per revise-mode.md instructions) |
-| `--evolve` | `evolve-mode.md`, `questioning-phases.md`, `output-discipline.md` (load `scope-reference.md` on demand if scope boundary questions arise; load `review-checklist.md` on demand at Evolve Step 4) |
+## Bootstrap Precheck
 
-Do NOT read files not listed for the current mode — they are not needed and waste context.
+Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (non-zero exit): skill exits; does NOT enter any generate/review/revise mode.
 
-## Process
+- Verifies `git ≥ 2.0`, `bash ≥ 4.0`, `python3 ≥ 3.8`
+- If cwd is not a git repo, auto-runs `git init` + empty bootstrap commit
+- During Bootstrap Precheck, orchestrator MUST write `skill_forge_dir: <absolute path to the skill-forge directory>` to `<target>/.review/state.yml` so downstream sub-agents can locate skill-forge's own scripts.
 
-1. **Gather requirements** — interactive questioning or parse provided document
-2. **Fill gaps** — ask targeted follow-up questions for missing info
-3. **Generate PRD files** — using templates in this skill directory
-4. **Cross-link** — backfill cross-references that couldn't exist during initial generation: journey Mapped Feature columns, feature Deps, feature Journey Context links, Cross-Journey Patterns "Addressed by Feature" column
-5. **Write files** — write all generated files to disk (not yet committed)
-6. **Self-review** — read each written file against the review checklist (see Review Checklist below), fix issues directly in files
-7. **User review** — user reviews files in their editor, confirms or requests changes
-8. **Commit** — commit all files to git
+## Core Contract
 
-### Review Checklist
+- Orchestrator is **pure dispatch + bookkeeping only**. Forbidden: reading artifact leaves, summarizing content, computing convergence verdicts, rewriting artifacts, analyzing issue priority.
+- Hard dependencies: `git ≥ 2.0`, `bash ≥ 4.0`, `python3 ≥ 3.8`. NEVER add `pyyaml` / `jq` / `slugify` / any third-party package.
+- Target artifact in-place mutated. History through git tags (`delivery-<N>-<slug>` annotated tags) + `.review/versions/<N>.md` + target `CHANGELOG.md`.
+- `.review/` lives at target root. Pyramid-indexed: `round-<N>/` + `metrics/` + `versions/`.
+- Round numbers are cross-delivery monotonic. Delivery-1 round-1..k, delivery-2 starts at round-k+1.
+- Metrics aggregated ONLY by `scripts/metrics-aggregate.sh` via `--diagnose` mode, never by a sub-agent.
 
-See `review-checklist.md` (loaded via mode routing for initial analysis, `--review`, `--revise`, and `--evolve` modes). Applied as step 6 of the process (after writing, before commit) — check each dimension and fix issues directly in the written files.
+## Orchestrator Dispatch Contract
 
-### Immutability Rule
+<!-- snippet-c-fingerprint: dispatch-log-v1 -->
 
-Whether PRD files can be modified in place depends on their **downstream consumption state** — what has been built on top of them:
+### Per every dispatch (mandatory)
 
-| Downstream State | Modify in Place? | Rationale |
-|-----------------|-----------------|-----------|
-| No design exists | Yes | No downstream consumers to break |
-| Design exists, not implemented | Yes + append entry to `REVISIONS.md` (create the file if this is the first revision) | Design team needs the change record to update design accordingly |
-| Implementation exists | No — create new version | Modifying in place would invalidate implemented code |
+For **every** sub-agent dispatch the orchestrator MUST:
 
-Steps 6-7 (self-review, user review) always occur before commit and are part of the creation process — modifying files during these steps is expected regardless of downstream state.
+1. **Assign a `trace_id`** in the format `R{round}-{role-letter}-{nnn}` where:
+   - `round` is the integer round number
+   - `role-letter` is the single-letter code from the table below (**no two-letter forms**)
+   - `nnn` is a zero-padded 3-digit sequence counter, per-round per-role (`001`, `002`, …)
 
-**Evolve mode note:** `--evolve` always creates a new directory (new date) — it never modifies the predecessor PRD. The predecessor is read-only input.
+   | Role | Letter | Notes |
+   |------|--------|-------|
+   | domain-Consultant | `C` | |
+   | Planner | `P` | |
+   | Writer | `W` | |
+   | reViewer (cross + adversarial) | `V` | Single letter for both reviewer variants; distinguish via `reviewer_variant` in dispatch-log |
+   | Reviser | `R` | |
+   | Summarizer | `S` | |
+   | Judge | `J` | |
 
-## Output Structure
+   > Example: `R3-W-007` = Round 3, writer, 7th call. `R5-V-003` = Round 5, reviewer, 3rd call
 
-```
-{output-dir}/YYYY-MM-DD-{product-name}/
-├── README.md                # Product overview + journey index + feature index + roadmap
-├── REVISIONS.md             # Revision history (only present after first --revise)
-├── journeys/
-│   ├── J-001-{slug}.md      # Individual journey spec
-│   └── ...
-├── architecture.md          # INDEX ONLY (~50-80 lines) — diagram + links to topic files
-├── architecture/            # Topic files — each standalone, independently readable
-│   ├── tech-stack.md
-│   ├── design-tokens.md     # (omit if no UI)
-│   ├── navigation.md        # (omit if no UI)
-│   ├── accessibility.md     # (omit if no UI)
-│   ├── i18n.md
-│   ├── data-model.md
-│   ├── external-deps.md
-│   ├── coding-conventions.md
-│   ├── test-isolation.md
-│   ├── security.md
-│   ├── dev-workflow.md
-│   ├── git-strategy.md
-│   ├── code-review.md
-│   ├── observability.md
-│   ├── performance.md
-│   ├── backward-compat.md   # (omit for v1)
-│   ├── ai-agent-config.md
-│   ├── deployment.md
-│   ├── shared-conventions.md
-│   ├── auth-model.md        # (omit if single-role)
-│   ├── privacy.md           # (omit if no personal data)
-│   └── nfr.md
-├── features/
-│   ├── F-001-{slug}.md      # Self-contained feature spec
-│   └── ...
-├── prototypes/              # Interactive prototypes (seed code for production)
-│   ├── src/                 # Runnable prototype source
-│   └── screenshots/         # Key state screenshots per feature
-└── .reviews/                # Transient — not version-controlled (gitignore: docs/raw/prd/*/.reviews/)
-    └── REVIEW-*.md          # Review findings produced by --review, consumed by --revise
+2. **Before dispatch — append a `launched` event** to
+   `.review/traces/round-<N>/dispatch-log.jsonl` (one JSONL line, see schema below).
+
+3. **After dispatch — append a `completed` event** to the same file once the ACK is received.
+
+4. **Inject `trace_id`** as the **literal first line** of the sub-agent's first user message:
+   ```
+   trace_id: R3-W-007
+   ```
+
+### `launched` event schema
+
+One JSONL line appended before dispatch:
+
+```jsonl
+{"event": "launched", "trace_id": "R3-W-007", "role": "writer", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-20T10:15:30Z", "prompt_hash": "sha256:...", "linked_issues": ["R3-012"], "session_file": "/Users/me/.claude/projects/my-project/abc-def.jsonl"}
 ```
 
-Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture index + topic files), and `feature-template.md` (feature specs). Evolve mode uses `evolve-readme-template.md` instead of `prd-template.md` for the README; all other templates are reused with the addition of the Change Annotation Convention (defined in `evolve-mode.md`).
+Required fields: `event`, `trace_id`, `role`, `reviewer_variant`, `tier`, `model`, `delivery_id`, `dispatched_at`, `prompt_hash`, `linked_issues`, `session_file`.
 
-**Agent consumption:** read README.md (~concise overview) → read one feature file → implement. Each feature file copies all needed context inline (data models, conventions, journey context), so the feature file alone is sufficient for implementation. Agents do NOT need to read architecture.md or architecture/ files — those are source-of-truth for the PRD author, not for coding agents. The feature file is the coding agent's only input.
+### `completed` event schema
 
-**Evolve mode output** — only delta files present:
+One JSONL line appended after ACK is received:
 
-```
-{output-dir}/YYYY-MM-DD-{product-name}/
-├── README.md                # Incremental README (baseline ref + change summary + full indexes)
-├── journeys/
-│   ├── J-{NNN}-{slug}.md   # Only new or modified journeys
-│   └── ...
-├── architecture.md          # Incremental index (changed → local, unchanged → baseline ref)
-├── architecture/
-│   ├── {changed-topic}.md   # Only changed topic files
-│   └── ...
-├── features/
-│   ├── F-{NNN}-{slug}.md   # New features, modified features, or tombstones (deprecated)
-│   └── ...
-├── prototypes/              # Only new/modified feature prototypes
-│   ├── src/
-│   └── screenshots/
+```jsonl
+{"event": "completed", "trace_id": "R3-W-007", "role": "writer", "ack_status": "OK", "linked_issues": ["R3-012"], "self_review_status": "PARTIAL", "fail_count": 1, "returned_at": "2026-04-20T10:16:10Z"}
 ```
 
-**Agent consumption (evolve mode):** read incremental README.md → for a new/modified feature, read the local feature file (self-contained). For an unchanged feature, follow the `→ baseline` link to the predecessor PRD's feature file.
+Required fields: `event`, `trace_id`, `role`, `ack_status`, `linked_issues`, `returned_at`. Writer-only: `self_review_status`, `fail_count`.
 
-## Output Path
+### FORBIDDEN
 
-- **Default:** `docs/raw/prd/YYYY-MM-DD-{product-name}/`
-- **Custom:** `--output <dir>` overrides the directory
-- Confirm path with user before writing
+The orchestrator MUST NOT:
 
-## Key Principles
+- **Read artifact leaves** — no reading of `<artifact-path>` content; those paths belong to sub-agents
+- **Summarize or compute verdicts** from artifact content
+- **Rewrite or generate artifacts** (production content belongs to sub-agents only)
+- **Write to `.review/` business archive files** (self-reviews, issues, plan, verdict) — those are sub-agent write targets
 
-- **One question at a time** — don't overwhelm
-- **MVP ruthlessly** — push back on scope creep
-- **Minimal context** — agents read one small file, not a giant document
-- **Copy, don't reference** — feature files include relevant data models, conventions, and journey context inline
-- **README is a stable navigational index, REVISIONS.md tracks history** — README.md is the entry point and should not accumulate revision entries that destabilize navigation across versions. Revision history (entries written by `--revise`) lives in a sibling `REVISIONS.md`, created on first revision and grown thereafter. Both files coexist; the README's References section links to `REVISIONS.md` when present.
-- **No ambiguity** — if a requirement can be interpreted two ways, clarify now
-- **Omit empty sections** — if a section has nothing useful, skip it
-- **Discipline files are non-optional** — `parallel-dispatch.md` (for `--review` / `--revise`) and `output-discipline.md` (all modes) are loaded at mode entry and their rules take precedence over any per-mode wording that conflicts.
+The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl`.
 
-## Next Steps Hint
+### Permitted Actions
 
-After committing, print the following guidance to the user:
+1. Dispatch one sub-agent via Task tool
+2. Fan-out multiple sub-agents in parallel
+3. Decide next step from ACK / judge verdict / failure classification
+4. Internal bookkeeping: Edit/Write to `.review/state.yml` + `.review/traces/round-*/dispatch-log.jsonl`; call `scripts/` deterministic scripts
 
-**Initial creation and revise mode:**
-```
-PRD complete: {output path}
+## `--diagnose` Mode
 
-Next steps:
-  Interactive — /system-design {output path}
-  Automated  — claude -p "generate system design based on {output path}" --auto
-```
+**Pure script mode. MUST NOT** load any sub-agent prompt. **MUST NOT** read artifact leaves, `.review/versions/`, or `review-criteria.md`.
 
-**Evolve mode** — use the cascade notification from Evolve Step 5 instead.
+### Execution Steps (FORBIDDEN to deviate)
+
+1. **Validate**: check that `scripts/metrics-aggregate.sh` exists and is executable.
+2. **Pass-through args**: forward user-provided `--round N` / `--delivery N` / `--since <iso>` verbatim.
+3. **Invoke**:
+   ```bash
+   scripts/metrics-aggregate.sh --diagnose "$@" \
+     --review-dir ./.review \
+     --harness-dir "${CLAUDE_HARNESS_DIR:-$HOME/.claude/projects}" \
+     --config common/config.yml
+   ```
+4. **Handle exit codes**: 0=success; 1=argument error; 2=input error; 3=JOIN coverage < 50%.
+5. **No LLM post-processing**: relay script output verbatim.
+
+## Model Tiers
+
+Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml`.
+
+## Configuration & Subagent Files
+
+- **Config**: `common/config.yml`
+- **Review criteria**: `common/review-criteria.md`
+- **Domain glossary**: `common/domain-glossary.md`
+- **Sub-agent prompts**:
+  - `generate/domain-consultant-subagent.md`
+  - `generate/planner-subagent.md`
+  - `generate/writer-subagent.md`
+  - `review/cross-reviewer-subagent.md`
+  - `review/adversarial-reviewer-subagent.md`
+  - `revise/per-issue-reviser-subagent.md`
+  - `shared/summarizer-subagent.md`
+  - `shared/judge-subagent.md`

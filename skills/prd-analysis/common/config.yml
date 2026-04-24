@@ -1,0 +1,98 @@
+skill_version: 0.1.0
+review_criteria_version: 1.0.0
+artifact_template_version: 1.0.0
+
+convergence:
+  max_iterations: 5
+  converged_warning_threshold: 5
+  accepted_verdicts: [converged]
+  retriable_verdicts: [progressing]
+  abort_verdicts: [oscillating, diverging, stalled]
+
+model_tier_defaults:
+  orchestrator:      balanced
+  domain_consultant: heavy
+  planner:           heavy
+  writer:            balanced
+  reviewer:          heavy
+  reviser:           balanced
+  summarizer:        light
+  judge:             light
+
+model_mapping:
+  heavy:    claude-opus-4-5
+  balanced: claude-sonnet-4-5
+  light:    claude-haiku-4-5
+
+pricing:
+  models:
+    claude-opus-4:    {input_per_1m: 15.0, output_per_1m: 75.0, cache_read_per_1m: 1.50, cache_creation_per_1m: 18.75}
+    claude-sonnet-4:  {input_per_1m: 3.0,  output_per_1m: 15.0, cache_read_per_1m: 0.30, cache_creation_per_1m: 3.75}
+    claude-haiku-4:   {input_per_1m: 0.8,  output_per_1m: 4.0,  cache_read_per_1m: 0.08, cache_creation_per_1m: 1.0}
+
+priority_order: [quality, cost, performance]
+
+adversarial_review:
+  triggered_by: [critical]
+  tier: heavy
+
+domain_consultant:
+  trigger:
+    on_interactive_flag: true
+    on_glossary_disambiguation: true
+    on_sparse_input: true
+    min_words_without_consultant: 50
+
+delivery_commit:
+  tag_enabled: true
+  tag_slug_max_len: 40
+  tag_date_fallback: "%Y%m%d"
+  tag_force_overwrite: false
+
+retention:
+  traces_retention_rounds: 20
+  insights_recent_count: 10
+
+regression_gate:
+  diverging_threshold: 3
+  max_injected_resolved: 20
+  recent_rounds_window: 5
+
+retry_policy:
+  transient_max_retries: 3
+  backoff_ms: [1000, 3000, 10000]
+  schema_retry_upgrade_tier: true
+
+partial_failure_policy:
+  generate_phase: continue_with_failures
+  review_phase: abort_round
+  revise_phase: continue_with_failures
+  max_failure_rate: 0.3
+
+hitl:
+  auto_approve: []
+  require_approval:
+    - plan_approval
+    - force_continue
+    - regression_justification
+    - stalled_release
+
+tool_permissions:
+  orchestrator:      {filesystem: "read-all + write-state + write-dispatch-log", network: false, execute: "allow-scripts", user-interaction: false}
+  domain_consultant: {filesystem: "read-review-input + read-artifact-readme-only + read-domain-glossary + read-skeleton-readme + write-review-clarification", network: false, execute: false, user-interaction: true}
+  planner:           {filesystem: "read-artifact + read-review-readme-only + read-review-input + read-review-clarification + write-round-plan", network: false, execute: false, user-interaction: false}
+  writer:            {filesystem: "read-artifact + read-round-issues + read-review-clarification + write-target-domain-files + write-round-self-review", network: false, execute: false, user-interaction: false}
+  reviewer:          {filesystem: "read-artifact + read-review + write-round-issues", network: false, execute: "allow-scripts", user-interaction: false}
+  reviser:           {filesystem: "read-artifact + read-review + write-target-domain-files + write-round-revision", network: false, execute: false, user-interaction: false}
+  summarizer:
+    filesystem: "read-artifact + read-review + write-artifact-index + write-artifact-changelog + write-review-versions + write-review-round-index + write-review-metrics-readme"
+    network: false
+    execute: "allow-scripts"
+    user-interaction: false
+  judge:             {filesystem: "read-review-readme + read-round-index + read-round-issues-frontmatter + write-review-round-verdict", network: false, execute: false, user-interaction: false}
+
+incremental_review:
+  enabled: true
+  force_full_every_n_rounds: 5
+  depgraph: on
+  coverage_gap_verdict: stalled
