@@ -57,8 +57,7 @@ if git -C "$TARGET" rev-parse "$TAG" >/dev/null 2>&1; then
 fi
 
 # Stage target dir (including .review/)
-git -C "$TARGET" add "${TARGET}/" "${TARGET}/.review/" 2>/dev/null || \
-  git add "${TARGET}/" "${TARGET}/.review/" 2>/dev/null || true
+git -C "$TARGET" add --all
 
 # Commit
 git -C "$TARGET" commit -m "feat(skill-forge): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"

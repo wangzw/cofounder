@@ -139,6 +139,7 @@ CRITERIA_JSON=$("${SCRIPT_DIR}/extract-criteria.sh" "$TARGET" 2>/dev/null) || {
   exit 2
 }
 
+set +e
 SKILL_FORGE_SCRIPTS_DIR="$SCRIPT_DIR" python3 - "$TARGET" "$ROUND_DIR" "$CRITERIA_JSON" <<'PYEOF'
 import sys, os, json, subprocess, re
 
@@ -220,9 +221,19 @@ for c in criteria:
     try:
         result = subprocess.run(
             [full_script, target],
-            capture_output=True, text=True, timeout=60
+            capture_output=True, timeout=60
         )
-        stdout = result.stdout.strip()
+        if result.returncode == 2:
+            stderr_snippet = result.stderr.decode("utf-8", errors="replace").strip()[:200]
+            all_issues.append({
+                "criterion_id": cid,
+                "file": "scripts/" + script_path.rsplit("/", 1)[-1],
+                "severity": "error",
+                "description": f"{cid} checker script exited 2 (internal error); criterion not evaluated: {stderr_snippet}",
+                "suggested_fix": f"inspect script {script_path} stderr for root cause"
+            })
+            continue
+        stdout = result.stdout.decode("utf-8", errors="replace").strip()
         if stdout:
             try:
                 checker_issues = json.loads(stdout)
@@ -252,8 +263,8 @@ has_blocking = any(i.get('severity') in ('critical', 'error') for i in all_issue
 if has_blocking:
     sys.exit(1)
 PYEOF
-
 EXIT_CODE=$?
+set -e
 if [ $EXIT_CODE -eq 1 ]; then
   echo "INFO: checkers found critical/error issues (exit 1)" >&2
 fi

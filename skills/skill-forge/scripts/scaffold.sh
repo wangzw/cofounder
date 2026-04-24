@@ -106,12 +106,28 @@ def parse_yaml_simple(path):
                 result[key] = val
     return result
 
+def sha256_bytes(data):
+    return hashlib.sha256(data).hexdigest()
+
 def sha256_file(path):
-    h = hashlib.sha256()
     with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
-            h.update(chunk)
-    return h.hexdigest()
+        return sha256_bytes(f.read())
+
+def expected_target_bytes(skeleton_path, placeholders, is_sha_pinned):
+    """Return the expected content of the target file after substitution."""
+    raw = open(skeleton_path, 'rb').read()
+    if is_sha_pinned:
+        return raw
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError:
+        # Binary file — no substitution
+        return raw
+    for key in SUPPORTED_PLACEHOLDERS:
+        placeholder = '{{' + key + '}}'
+        if placeholder in text:
+            text = text.replace(placeholder, placeholders.get(key, placeholder))
+    return text.encode('utf-8')
 
 def substitute_placeholders(content, values):
     """Replace {{KEY}} with values[KEY] for supported placeholders."""
@@ -127,16 +143,21 @@ clarification = parse_yaml_simple(clarification_yml)
 # Check if target exists — drift check
 if os.path.exists(target_path):
     drift = []
+    no_sub_norm = {p.replace('\\', '/') for p in NO_SUBSTITUTE}
     for dirpath, dirnames, filenames in os.walk(skeleton_dir):
         dirnames[:] = [d for d in dirnames if not d.startswith('.')]
         for fname in filenames:
             skel_file = os.path.join(dirpath, fname)
             rel = os.path.relpath(skel_file, skeleton_dir)
+            rel_norm = rel.replace('\\', '/')
             tgt_file = os.path.join(target_path, rel)
             if not os.path.isfile(tgt_file):
                 drift.append(f"MISSING: {rel}")
             else:
-                if sha256_file(skel_file) != sha256_file(tgt_file):
+                is_sha_pinned = rel_norm in no_sub_norm
+                expected = expected_target_bytes(skel_file, clarification, is_sha_pinned)
+                target_bytes = open(tgt_file, 'rb').read()
+                if sha256_bytes(expected) != sha256_bytes(target_bytes):
                     drift.append(f"MODIFIED: {rel}")
     if drift:
         sys.stderr.write("ERROR: target path exists with drift from skeleton:\n")
