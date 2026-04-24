@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # run-checkers.sh — master checker runner §12.5 Phase A + Phase B
-# Usage: run-checkers.sh <target-skill-dir> <round-N>
+# Usage: run-checkers.sh [--full] <target-skill-dir> <round-N>
+# Flags:
+#   --full   forced-full review (guide §8.6): skip-set includes every leaf in
+#            single_file_focus AND cross_reviewer_focus; skip lists empty;
+#            depgraph propagation short-circuited. Triggers: criteria major
+#            version bump, new-version first round, converged→first --review,
+#            distance since last full review ≥ N, user --full.
 # Writes: manifest.yml, depgraph.yml, skip-set.yml, issues/round-checker-output.json
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
@@ -14,6 +20,18 @@ set -euo pipefail
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+FORCED_FULL=0
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --full) FORCED_FULL=1; shift ;;
+    --) shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
+    -*) echo "ERROR: unknown flag: $1" >&2; exit 2 ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
 
 TARGET="${1:-}"
 ROUND="${2:-}"
@@ -45,12 +63,13 @@ mkdir -p "${ROUND_DIR}/issues"
 # Phase A: manifest + depgraph + skip-set
 # ─────────────────────────────────────────────
 
-python3 - "$TARGET" "$ROUND_DIR" "$PREV_ROUND_DIR" <<'PYEOF'
+FORCED_FULL="$FORCED_FULL" python3 - "$TARGET" "$ROUND_DIR" "$PREV_ROUND_DIR" <<'PYEOF'
 import sys, os, hashlib, json
 from datetime import datetime, timezone
 
 target = sys.argv[1]
 round_dir = sys.argv[2]
+forced_full = os.environ.get('FORCED_FULL', '0') == '1'
 prev_round_dir = sys.argv[3]
 
 def should_exclude(rel_path):
@@ -119,7 +138,12 @@ if os.path.isfile(prev_manifest_path):
 
 # Write unchanged files to skip-set
 # (skip-set used by Phase B for per_file criteria)
-unchanged = [f for f, info in leaves.items() if prev_leaves.get(f) == info['sha256']]
+# Forced-full (§8.6) short-circuits: no leaf is "unchanged" for skip purposes even if
+# hash matches — the whole target gets re-reviewed.
+if forced_full:
+    unchanged = []
+else:
+    unchanged = [f for f, info in leaves.items() if prev_leaves.get(f) == info['sha256']]
 
 # We'll write skip-set after loading criteria (Phase B will use it)
 # For now, emit as JSON for the Phase B python to read
@@ -129,6 +153,7 @@ state = {
     'manifest_path': manifest_path,
     'round_dir': round_dir,
     'now_iso': now_iso,
+    'forced_full': forced_full,
 }
 state_path = os.path.join(round_dir, '_phase_a_state.json')
 with open(state_path, 'w') as f:
@@ -169,6 +194,7 @@ with open(state_path, 'r') as f:
 leaves = state['leaves']
 unchanged = state['unchanged']
 now_iso = state.get('now_iso', '')
+forced_full = state.get('forced_full', False)
 
 # Build skip-set
 # Per guide §8.5 / §12.5.1, skip-set has two granularities:
@@ -275,6 +301,7 @@ with open(skip_set_path, 'w', encoding='utf-8') as f:
     f.write(f"round: {round_num}\n")
     f.write(f"generated_at: {now_iso}\n")
     f.write(f"depgraph_available: {'true' if depgraph_available else 'false'}\n")
+    f.write(f"forced_full: {'true' if forced_full else 'false'}\n")
     write_list(f, "single_file_focus", single_file_focus)
     write_list(f, "single_file_skip",  single_file_skip)
     write_list(f, "cross_reviewer_focus", cross_reviewer_focus)
