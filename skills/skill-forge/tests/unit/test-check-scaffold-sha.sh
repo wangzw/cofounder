@@ -22,17 +22,17 @@ ISSUES=$(python3 -c "import sys,json; print(len(json.loads(sys.stdin.read())))" 
 
 # Test 2: no manifest — expect 0 issues (no-op), exit 0
 TMP=$(mktemp -d); trap "rm -rf $TMP" EXIT
-mkdir -p "$TMP/no-manifest/common/skeleton"
+mkdir -p "$TMP/no-manifest/common"
 OUT=$("$SCRIPT" "$TMP/no-manifest" 2>/dev/null)
 CODE=$?
 run_json "$OUT"
 [ "$CODE" -eq 0 ] || { echo "FAIL: exit $CODE (expected 0) for no-manifest"; exit 1; }
 
 # Test 3: manifest with wrong sha256 — expect CR-S12, exit 1
-mkdir -p "$TMP/wrong-sha/common/skeleton"
+mkdir -p "$TMP/wrong-sha/common"
 mkdir -p "$TMP/wrong-sha/scripts"
 echo "dummy content" > "$TMP/wrong-sha/scripts/metrics-aggregate.sh"
-cat > "$TMP/wrong-sha/common/skeleton/shared-scripts-manifest.yml" <<'YAML'
+cat > "$TMP/wrong-sha/common/shared-scripts-manifest.yml" <<'YAML'
 files:
   scripts/metrics-aggregate.sh:
     sha256: 0000000000000000000000000000000000000000000000000000000000000000
