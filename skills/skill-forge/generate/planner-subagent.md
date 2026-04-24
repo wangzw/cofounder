@@ -54,7 +54,10 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
 
 **FromScratch mode** (`mode: from-scratch` in plan.md):
 
-- Input: `clarification.yml` (most recent) OR `input.md` directly if consultant was skipped
+- Input: most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` — selection
+  rule: lexicographic max by filename (ISO-8601 timestamps sort correctly, so the last entry
+  alphabetically is the most recent). Fallback: if no clarification file exists (consultant was
+  skipped per `trigger-flags.yml` conditions), read `<target>/.review/round-0/input.md` directly.
 - Constraint: `delete` and `keep` lists MUST be empty (no existing files to preserve or remove)
 - `add` list typically contains 7–9 domain-specific files:
   - `SKILL.md`
@@ -70,7 +73,9 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
 
 **NewVersion mode** (`mode: new-version` in plan.md):
 
-- Input: `clarification.yml` (or `input.md`), PLUS:
+- Input: most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` (same
+  selection rule as above) or `<target>/.review/round-0/input.md` if no clarification file,
+  PLUS:
   - `<target>/README.md`
   - `<target>/CHANGELOG.md`
   - `<target>/.review/versions/<N-1>.md` (last converged version summary)

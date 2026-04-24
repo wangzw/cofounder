@@ -22,6 +22,7 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 
 - Verifies `git ≥ 2.0`, `bash ≥ 4.0`, `python3 ≥ 3.8` (guide §21.0)
 - If cwd is not a git repo, auto-runs `git init` + empty bootstrap commit (guide §8.3)
+- During Bootstrap Precheck, orchestrator MUST write `skill_forge_dir: <absolute path to this skill-forge directory>` to `<target>/.review/state.yml` so downstream sub-agents (summarizer especially) can locate skill-forge's own scripts.
 
 ## Core Contract
 

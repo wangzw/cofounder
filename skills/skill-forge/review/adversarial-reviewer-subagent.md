@@ -102,8 +102,18 @@ the cross-reviewer has already filed it; distinct perspective warrants a separat
 
 Dispatched by orchestrator ONLY when `config.yml adversarial_review.triggered_by` threshold is
 met (default: any in-generate critical or error issue). Check `state.yml` for the
-`adversarial_review_triggered: true` flag before beginning — if absent, emit an ACK with
-`linked_issues=` empty and return immediately (do not file false issues).
+`adversarial_review_triggered: true` flag before beginning — if absent, emit a no-op ACK and
+return immediately (do not file false issues).
+
+No-op ACK form (when trigger flag absent in `state.yml`):
+
+```
+OK trace_id=<id> role=reviewer linked_issues=
+```
+
+This carries the `reviewer_variant: adversarial` metadata via dispatch-log.jsonl (orchestrator's
+responsibility), not the ACK line itself. Metrics-aggregate counts this as one adversarial
+dispatch regardless of issue count.
 
 ### Input Contract
 
@@ -131,10 +141,20 @@ checks — they are skill-forge's structural anti-patterns.
 - Criterion: CR-L01 (orchestrator-pure-dispatch).
 
 **2. Soft Language on Hard Checks**
-- In reviewer and reviser prompts, look for hedge phrases on what should be binary
-  pass/fail checks: "try to verify", "ideally check", "prefer to ensure", "you may want to".
-- Hard checks (IPC fingerprint present, ACK one-line, no HTML envelopes in artifacts) must
-  use mandatory language: "MUST", "FORBIDDEN", "required".
+
+**Search patterns — these phrases, when found in any reviewer or reviser prompt, are CR-L07 violations:**
+
+- `try to` / `try and`
+- `prefer to` / `preferably`
+- `ideally` / `ideally verify`
+- `you may want to`
+- `should probably`
+
+These phrases are listed here as *strings to search for*, not as permitted language in this prompt. The adversarial reviewer's own language MUST remain in MUST/FORBIDDEN/MUST NOT form.
+
+- In reviewer and reviser prompts, look for these hedge phrases on what should be binary
+  pass/fail checks. Hard checks (IPC fingerprint present, ACK one-line, no HTML envelopes in
+  artifacts) MUST use mandatory language: "MUST", "FORBIDDEN", "required".
 - Criterion: CR-L04 (hard-check-language) or CR-L05 as appropriate.
 
 **3. Missing IPC Footer on Sub-agent Prompts**

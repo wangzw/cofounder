@@ -55,9 +55,10 @@ constraints, so they do not conflict).
 ### Step 4 — Summarizer: Update Issue Status
 
 - **Dispatches**: `shared/summarizer-subagent.md` (update-status phase)
-- The summarizer re-reads all issue files and the freshly revised leaves, then updates issue
-  status fields (new → persistent | resolved; resolved → regressed if re-introduced).
-- It also updates `<target>/.review/round-<N>/index.md` with revised coverage percentage.
+- The summarizer aggregates from `round-N/issues/*.md` frontmatter (status field on each issue)
+  and writes `round-N/index.md` with the issue-count summary. Status transitions
+  (new → resolved, resolved → regressed, etc.) are set by the cross-reviewer in the next review
+  round — NOT by summarizer. Summarizer does NOT read artifact leaves.
 - **Orchestrator action on ACK**: proceed to Step 5.
 
 ### Step 5 — Judge: Evaluate New Round Verdict

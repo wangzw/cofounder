@@ -159,8 +159,17 @@ Each applicable CR gets exactly one line: `- <CR-ID> <name>: PASS` or
 2. Apply only the CRs relevant to this file type (see `generate/in-generate-review.md` table).
 3. For PASS: brief evidence is sufficient ("frontmatter present and starts with 'Use when'").
 4. For FAIL: MUST specify exactly one `blocker_scope` from the taxonomy above.
-5. If ANY FAIL row has `blocker_scope: global-conflict` or `cross-artifact-dep` → set
-   `self_review_status: PARTIAL` in ACK. Do NOT attempt to fix — write the FAIL row and move on.
+5. **PARTIAL ACK trigger: if ANY FAIL row exists in the self-review file, set
+   `self_review_status: PARTIAL` and `fail_count: <N>` in the ACK.** The 4 `blocker_scope`
+   values are:
+   - `global-conflict` — conflict with another leaf or cross-cutting concern
+   - `cross-artifact-dep` — depends on a file outside writer's scope
+   - `needs-human-decision` — requires a policy/preference call beyond writer's scope
+   - `input-ambiguity` — clarification.yml is silent or contradictory on this point
+
+   All four equally count toward `fail_count`. The distinction determines downstream action
+   (which path in the review/revise loop consumes the blocker), not whether the ACK is PARTIAL.
+   Do NOT attempt to fix any FAIL row in-place — write it and move on.
 6. If ALL rows are PASS → set `self_review_status: FULL_PASS`, `fail_count: 0`.
 7. FORBIDDEN: marking a row PASS when you have genuine uncertainty. If uncertain, mark FAIL with
    `blocker_scope: input-ambiguity` and let the cross-reviewer adjudicate.
