@@ -1,0 +1,14 @@
+round: 3
+delivery_id: 1
+verdict: progressing
+next_action: revise
+evidence:
+  open_issues: 6
+  critical_count: 0
+  error_count: 5
+  regressed_count: 0
+  coverage_percent: 100
+  writer_fail_count_sum: 0
+  rounds_elapsed: 3
+  oscillating_pairs: []
+notes: First --review-mode round for delivery 1 surfaced 6 new issues (5 error, 1 warning) with full coverage and no writer fan-out; converged forbidden (error_count != 0), no oscillation or regression, not stalled.

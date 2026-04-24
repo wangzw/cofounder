@@ -166,7 +166,7 @@ CRITERIA_JSON=$("${SCRIPT_DIR}/extract-criteria.sh" "$TARGET" 2>/dev/null) || {
 }
 
 set +e
-SKILL_FORGE_SCRIPTS_DIR="$SCRIPT_DIR" python3 - "$TARGET" "$ROUND_DIR" "$CRITERIA_JSON" <<'PYEOF'
+CHECKER_SCRIPTS_DIR="$SCRIPT_DIR" python3 - "$TARGET" "$ROUND_DIR" "$CRITERIA_JSON" <<'PYEOF'
 import sys, os, json, subprocess, re
 
 target = sys.argv[1]
@@ -322,17 +322,14 @@ with open(skip_set_path, 'w', encoding='utf-8') as f:
 
 # Run script-type checkers
 all_issues = []
-scripts_dir = os.path.join(os.path.dirname(__file__) if '__file__' in dir() else os.getcwd())
-
-# Resolve scripts dir from the script itself
-scripts_dir = os.path.join(target, '..', '..', 'scripts')
-# Actually use the this skill scripts dir
-# We need to find the scripts dir relative to run-checkers.sh
-# run-checkers.sh is in skills/this skill/scripts/ — same dir as the checkers
-# Pass it as an env var
-scripts_dir = os.environ.get('SKILL_FORGE_SCRIPTS_DIR', '')
+# Resolve the scripts dir that holds the checker implementations.
+# Priority: explicit env override → target's own scripts/ (self-hosted case) →
+# runtime fall-back to the target dir. The runner script itself already
+# computes its own dir via $SCRIPT_DIR at the shell level (exported below as
+# CHECKER_SCRIPTS_DIR); we honor that when present so sibling check-*.sh
+# files resolve even when the script is invoked via a symlink or a copy.
+scripts_dir = os.environ.get('CHECKER_SCRIPTS_DIR', '')
 if not scripts_dir or not os.path.isdir(scripts_dir):
-    # Fallback: find scripts dir relative to target or via PATH
     scripts_dir = os.path.join(target, 'scripts')
 
 for c in criteria:
@@ -351,7 +348,7 @@ for c in criteria:
     # Resolve script path relative to target
     full_script = os.path.join(target, script_path)
     if not os.path.isfile(full_script):
-        # Also try relative to scripts_dir (this skill's scripts)
+        # Also try relative to scripts_dir (the resolved checker scripts dir)
         full_script = os.path.join(scripts_dir, os.path.basename(script_path))
     if not os.path.isfile(full_script):
         # Missing checker => structured meta-issue so it surfaces in review loop
@@ -369,7 +366,7 @@ for c in criteria:
             "severity": "error",
             "description": (
                 f"{cid} declares script_path {script_path!r} but no such script exists "
-                f"in the target or this skill scripts/ directory; criterion was not evaluated"
+                f"in the target or resolved scripts/ directory; criterion was not evaluated"
             ),
             "suggested_fix": (
                 f"Edit common/review-criteria.md: change {cid}.checker_type to 'llm' if the "
@@ -491,6 +488,95 @@ for issue in all_issues:
         f.write(frontmatter + body)
 
 print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
+
+# ────────────────────────────────────────────────────────────────────────────
+# Carry-forward: for each leaf in THIS round's cross_reviewer_skip list, copy
+# any prior-round open issues (status ∈ {new, persistent, regressed}) into
+# THIS round's issues/ as status=persistent. This closes the incremental-review
+# carry-forward gap — without it, issues on skipped leaves would vanish from
+# the summarizer's open_issues count and the judge could falsely see a
+# converged round just because the cross-reviewer wasn't re-dispatched.
+# ────────────────────────────────────────────────────────────────────────────
+carried_forward = 0
+if round_num > 1:
+    prev_round_dir = os.path.join(
+        os.path.dirname(round_dir), f"round-{round_num - 1}")
+    prev_issues_dir = os.path.join(prev_round_dir, "issues")
+    # Parse skip-list — we look in skip-set.yml's cross_reviewer_skip section.
+    skip_set_path = os.path.join(round_dir, "skip-set.yml")
+    cross_skip: list = []
+    if os.path.isfile(skip_set_path):
+        in_skip = False
+        for line in open(skip_set_path, encoding="utf-8"):
+            s = line.rstrip("\n")
+            if s.startswith("cross_reviewer_skip:"):
+                in_skip = True
+                continue
+            if in_skip:
+                if s.startswith("  - "):
+                    leaf = s[4:].strip().strip('"').strip("'")
+                    cross_skip.append(leaf)
+                elif s and not s.startswith("  "):
+                    in_skip = False
+    if os.path.isdir(prev_issues_dir) and cross_skip:
+        cross_skip_set = set(cross_skip)
+        for fname in sorted(os.listdir(prev_issues_dir)):
+            m = re.match(r'^R(\d+)-(\d{3})\.md$', fname)
+            if not m:
+                continue
+            prev_path = os.path.join(prev_issues_dir, fname)
+            try:
+                text = open(prev_path, encoding="utf-8").read()
+            except OSError:
+                continue
+            if not text.startswith("---\n"):
+                continue
+            # Split frontmatter
+            end = text.find("\n---\n", 4)
+            if end < 0:
+                continue
+            fm_text = text[4:end]
+            body_text = text[end + 5:]
+            fm: dict = {}
+            for ln in fm_text.split("\n"):
+                if ":" in ln:
+                    k, _, v = ln.partition(":")
+                    fm[k.strip()] = v.strip().strip('"').strip("'")
+            # Carry-forward filter: open status + file is skipped this round
+            if fm.get("status") not in ("new", "persistent", "regressed"):
+                continue
+            leaf = fm.get("file", "")
+            if leaf not in cross_skip_set:
+                # Leaf was re-evaluated this round; do NOT carry forward.
+                # Cross-reviewer will explicitly mark resolved/persistent.
+                continue
+            new_id = f"R{round_num}-{next_seq:03d}"
+            next_seq += 1
+            out_md_path = os.path.join(issues_dir, new_id + ".md")
+            # Rewrite frontmatter with updated id/round/status/source.
+            carries_from = fm.get("id", "")
+            new_fm_lines = [
+                "---",
+                f"id: {new_id}",
+                f"status: persistent",
+                f"severity: {fm.get('severity', 'error')}",
+                f"criterion_id: {fm.get('criterion_id', 'UNKNOWN')}",
+                f"file: {_yaml_escape(fm.get('file', ''))}",
+                f"round: {round_num}",
+                f"source: carry-forward",
+                f"carries_from: {carries_from}",
+            ]
+            for extra_key in ("missing_script_path", "resolved_script_path",
+                              "resolves", "reviewer_variant"):
+                if extra_key in fm and fm[extra_key] not in (None, ""):
+                    new_fm_lines.append(
+                        f"{extra_key}: {_yaml_escape(fm[extra_key])}")
+            new_fm_lines.append("---\n")
+            with open(out_md_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(new_fm_lines) + "\n" + body_text)
+            carried_forward += 1
+if carried_forward:
+    print(f"OK carry-forward: {carried_forward} open issues inherited from round-{round_num-1}")
 
 # Clean up temp state
 try:

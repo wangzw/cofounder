@@ -242,8 +242,7 @@ topic content lives here.
 ## Architecture Topic Template — `architecture/{topic}.md`
 
 One file per topic. Each file is standalone — agents read only the topics relevant to the
-feature they are implementing. The canonical topic set and per-topic section skeleton is
-inherited from `prd-analysis.backup/architecture-template.md` and MUST be used verbatim for:
+feature they are implementing. The canonical topic set is:
 
 - `tech-stack.md`, `design-tokens.md` (omit if no UI), `navigation.md` (omit if no UI or
   single-view), `accessibility.md` (omit if no UI), `i18n.md`, `data-model.md`, `external-deps.md`,
@@ -277,8 +276,13 @@ inherited from `prd-analysis.backup/architecture-template.md` and MUST be used v
 Every topic leaf MUST include:
 
 1. **Header** — `# {Topic Title}`.
-2. **One or more tables or sub-sections** as specified in the backup canonical skeleton
-   (see backup `architecture-template.md` for the exact section list per topic).
+2. **One or more tables or sub-sections** covering the topic's policy surface. The exact
+   section list is topic-specific; author the minimum set of tables/sub-sections needed to
+   make the topic independently actionable by a coding agent (e.g., `security.md` needs an
+   Aspect/Policy table covering input validation, secrets, auth enforcement, TLS, and
+   at-rest encryption — see the example below; `data-model.md` needs an entity table plus
+   relationships; `nfr.md` needs a Dimension/Target/Rationale table). Policy rows MUST be
+   concrete enough to be verifiable.
 3. **Policy statements only** — no code samples, no framework-specific APIs, no file paths
    that assume a particular project layout.
 

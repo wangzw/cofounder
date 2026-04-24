@@ -125,7 +125,15 @@ as orphan journeys and overlapping features — but MUST NOT write to any of the
 
 For each focus leaf, actively hunt for these failure patterns. These are not generic quality
 checks — they are prd-analysis's structural anti-patterns. Each attack angle names the
-canonical criterion_id that the resulting issue file MUST cite.
+canonical `criterion_id` from `common/review-criteria.md` that the resulting issue file MUST
+cite.
+
+> **Canonical CR IDs only.** The adversarial reviewer MUST cite `criterion_id` values that
+> actually exist in `common/review-criteria.md` (CR-L01 through CR-L11 for the LLM-type set
+> at this revision). The reviewer is FORBIDDEN from inventing new criterion IDs. Each attack
+> angle below is deliberately mapped to the existing canonical CR whose scope best covers it;
+> the attack angle is a narrower red-team lens over the broader canonical criterion, not a
+> separate criterion.
 
 **1. Scope Drift into System-Design Territory**
 
@@ -150,7 +158,7 @@ The PRD-vs-system-design boundary is authoritative: PRD specifies policy and obs
 contract; system-design specifies the mechanism. Any leaf that blurs this line is a scope
 drift violation.
 
-- Criterion: `CR-L11` (prd-vs-system-design-scope).
+- Criterion: `CR-L02` (scope-discipline-prd-vs-design).
 
 **2. Vague Acceptance Criteria**
 
@@ -168,7 +176,7 @@ Acceptance criteria MUST be precise enough to write a test assertion against. At
 Every acceptance criterion must be testable in isolation: a reader armed only with the feature
 file must be able to write the corresponding test.
 
-- Criterion: `CR-L12` (acceptance-criteria-testable).
+- Criterion: `CR-L06` (acceptance-criteria-testable).
 
 **3. Untestable NFRs (Non-Functional Requirements)**
 
@@ -185,10 +193,11 @@ NFRs that lack concrete measurement are aspirations, not requirements. Attack ve
 - Observability NFRs without the mandatory-logging-event list or SLO target. "Observable" is
   not observable — name the events, the fields, the SLO.
 
-Every NFR must carry either a measurable threshold OR a named policy (e.g. "WCAG 2.1 AA")
-with verification method. Policies without verification are not requirements.
+Every NFR topic must be present with either a measurable threshold, a named policy (e.g.
+"WCAG 2.1 AA") with verification method, or an explicit "N/A because …" declaration per
+`CR-L09`. Policies without verification, or silent omissions, are not requirements.
 
-- Criterion: `CR-L13` (nfr-testable).
+- Criterion: `CR-L09` (nfr-applicability-coverage).
 
 **4. Missing Edge-Case Touchpoints**
 
@@ -199,32 +208,36 @@ Journeys must cover happy path, error recovery, and first-use / onboarding. Atta
 - A touchpoint list with no Pain Point column or every Pain Point entry is `N/A`. Real user
   journeys contain friction; universal `N/A` means the author did not explore the journey.
 - Missing interaction mode on ANY touchpoint (stage, screen, action, interaction mode, system
-  response, pain point are all required fields).
+  response, pain point are all required fields per `CR-L04`).
 - Error & Recovery Paths section absent or bulleted with `TBD` / `TODO`.
 
 A journey that does not exercise at least one non-happy path cannot validate features against
-real-user stress.
+real-user stress. Incomplete touchpoint rows (missing any required field, or vacuous pain
+points) fail the touchpoint-completeness definition.
 
-- Criterion: `CR-L14` (journey-edge-case-coverage).
+- Criterion: `CR-L04` (touchpoint-completeness).
 
 **5. Under-Specified Personas**
 
-Personas must be concrete enough that a reader can predict which features serve them.
-Attack vectors:
+Personas must be concrete enough that a reader can predict which features serve them, AND
+the persona description, goals, and traits must remain consistent across every journey and
+feature that cites them. Attack vectors:
 
 - Persona entries limited to a role label ("Admin", "User", "Viewer") with no context, goals,
-  or constraints. Role labels are permission axes, not personas.
-- Missing persona fields: primary goal, key constraint (skill / time / device / environment),
-  success signal. All three are required for a persona to drive feature priority.
+  or constraints. Role labels are permission axes, not personas — they cannot be kept
+  consistent because there is nothing specific to agree on.
+- Divergent persona descriptions across leaves: "Sarah the PM" in J-001 vs "Sarah — product
+  lead for mid-market" in F-003 — ghost-persona proliferation.
 - Persona referenced by journey or feature but not defined in the README Personas section —
-  orphan persona names break traceability.
+  orphan persona names break the consistency check.
 - Multiple journeys collapsing into a single persona when journey content clearly describes
   different user motivations (e.g. "Admin onboarding" and "Admin troubleshooting" both tagged
-  as `Admin` despite different goal hierarchies).
+  as `Admin` despite different goal hierarchies) — the label is consistent but the semantic
+  is not.
 
-Under-specified personas collapse feature prioritization into guesswork.
+Under-specified or divergent personas collapse feature prioritization into guesswork.
 
-- Criterion: `CR-L15` (persona-specification-complete).
+- Criterion: `CR-L08` (persona-consistency).
 
 **6. Priority Rationale Gaps**
 
@@ -241,25 +254,29 @@ touchpoint, a user goal, or a compliance obligation. Attack vectors:
 
 A roadmap without traceable priority rationale is indistinguishable from a feature list.
 
-- Criterion: `CR-L16` (priority-rationale-present).
+- Criterion: `CR-L07` (priority-rationale-present).
 
 **7. Overlapping Features**
 
-Features must carve product scope at disjoint seams. Attack vectors:
+Features must carve product scope at disjoint seams so that every journey touchpoint maps to
+one clearly-responsible feature, not a tangle of duplicates. Attack vectors:
 
 - Two features whose Acceptance Criteria overlap by >50% on observable behavior — they are
-  the same feature split across two files for no reason, or one is a subset of the other.
+  the same feature split across two files for no reason, or one is a subset of the other; the
+  shared touchpoint is double-mapped.
 - Two features claiming ownership of the same screen, the same primary user goal, or the
   same data entity's primary write path. Shared reads are OK; shared writes are a merge
   candidate.
 - A feature whose description begins "similar to F-NNN but with X" — X is a variant, not a
   feature; if the difference is small, merge; if large, restate the distinct capability.
-- Two features with identical Dependencies and identical Component Contracts — the seam is
-  wrong.
+- Two features with identical `Mapped Journeys` lists and identical Dependencies — the seam
+  is wrong; the journey→feature mapping is degenerate.
 
-Overlapping features fragment implementation and confuse traceability.
+Overlapping features fragment implementation, duplicate journey→feature edges in the
+coverage matrix, and confuse traceability.
 
-- Criterion: `CR-L17` (feature-scope-disjoint).
+- Criterion: `CR-L03` (journey-to-feature-coverage) — overlapping features manifest as
+  duplicate / non-disjoint edges in the journey-to-feature coverage mapping.
 
 **8. Orphan Journeys**
 
@@ -269,7 +286,7 @@ addressed by at least one feature. Attack vectors:
 - A journey file exists in `journeys/` but no feature's `Mapped Journeys` field cites its
   J-NNN ID — the journey describes a user flow that no planned feature supports.
 - A cross-journey pattern listed in README is not cited in any feature's `Addresses Pattern`
-  field — the pattern is identified but unbudgeted.
+  field — the pattern is identified but unbudgeted (also covered by `CR-L10`).
 - A journey touchpoint with a non-`N/A` Pain Point is not resolved by any feature's
   Acceptance Criteria — the pain point is cataloged but unaddressed.
 - A feature that cites a journey ID whose file does not exist — reverse-orphan (dangling
@@ -278,7 +295,9 @@ addressed by at least one feature. Attack vectors:
 Orphan journeys and unbudgeted patterns mean the feature set does not cover the product
 surface.
 
-- Criterion: `CR-L18` (journey-feature-coverage).
+- Criterion: `CR-L03` (journey-to-feature-coverage). Use `CR-L10` (cross-journey-pattern-
+  addressed) instead when the finding is specifically about a README cross-journey-pattern
+  row with no feature in its "Addressed by Feature" column.
 
 ### Non-scope notes
 
@@ -293,19 +312,26 @@ surface.
 
 Path: `<target>/.review/round-<N>/issues/<issue-id>.md` — one file per issue found.
 
-Issue ID continues the same sequence started by cross-reviewer for this round. Before writing,
-list the existing `round-<N>/issues/` directory, find the highest existing `<seq>`, and
-increment from there. Format: `<target-slug>-round-<N>-<seq>` (e.g.
-`prd-analysis-round-1-014`).
+Issue ID format: `R<N>-<seq>` (zero-padded 3 digits; e.g. `R3-014`). Continue the same
+sequence started by the cross-reviewer this round — list the existing `round-<N>/issues/`
+directory, find the highest existing `<seq>`, and increment from there. The filename stem
+MUST match the frontmatter `id:` value (e.g. file `R3-014.md` contains `id: R3-014`). This
+schema is shared with `review/cross-reviewer-subagent.md` and
+`revise/per-issue-reviser-subagent.md` — all three write to the same
+`<target>/.review/round-<N>/issues/` directory, so the frontmatter schema MUST stay
+identical across roles; any future change here MUST be applied there in the same revision.
 
 Frontmatter is YAML; body is structured markdown.
 
 ```yaml
 ---
-issue_id: <target-slug>-round-<N>-<seq>
+id: R<N>-<seq>                        # zero-padded 3 digits; matches filename
 round: <N>
 file: <target-relative-path>          # the artifact leaf the issue is about
-criterion_id: CR-L11 | CR-L12 | ... | CR-L18
+criterion_id: <canonical-CR-id>       # MUST appear in common/review-criteria.md —
+                                      # the 8 adversarial attack angles map to:
+                                      # CR-L02 | CR-L03 | CR-L04 | CR-L06 |
+                                      # CR-L07 | CR-L08 | CR-L09 | CR-L10
 severity: critical | error | warning | info
 source: adversarial-reviewer
 reviewer_variant: adversarial
@@ -325,21 +351,23 @@ status: new
 ## Suggested Remediation
 
 <concrete action — what to add, remove, or rewrite; cite the authoritative rule
- (e.g. PRD-vs-system-design scope table, CR-L12 acceptance-criteria-testable definition)>
+ (e.g. PRD-vs-system-design scope table, `CR-L06` acceptance-criteria-testable definition
+ in common/review-criteria.md)>
 ```
 
-Severity guidance for the 8 attack angles:
+Severity guidance for the 8 attack angles (cited CR IDs are the canonical IDs from
+`common/review-criteria.md`):
 
-| Attack angle | Default severity |
-|--------------|-----------------|
-| Scope drift (CR-L11) | error |
-| Vague acceptance criteria (CR-L12) | critical if blocks test authoring, else error |
-| Untestable NFR (CR-L13) | error |
-| Missing edge-case touchpoint (CR-L14) | error if happy-only journey, else warning |
-| Under-specified persona (CR-L15) | error if persona is referenced but not defined, else warning |
-| Priority rationale gap (CR-L16) | warning; error if phase-priority contradiction |
-| Overlapping features (CR-L17) | error — scope seam wrong |
-| Orphan journey (CR-L18) | error — reverse-orphan or unbudgeted pattern is critical |
+| Attack angle | Canonical criterion | Default severity |
+|--------------|---------------------|-----------------|
+| Scope drift | `CR-L02` scope-discipline-prd-vs-design | error |
+| Vague acceptance criteria | `CR-L06` acceptance-criteria-testable | critical if blocks test authoring, else error |
+| Untestable NFR | `CR-L09` nfr-applicability-coverage | error |
+| Missing edge-case touchpoint | `CR-L04` touchpoint-completeness | error if happy-only journey, else warning |
+| Under-specified persona | `CR-L08` persona-consistency | error if persona is referenced but not defined, else warning |
+| Priority rationale gap | `CR-L07` priority-rationale-present | warning; error if phase-priority contradiction |
+| Overlapping features | `CR-L03` journey-to-feature-coverage | error — scope seam wrong, coverage edges duplicated |
+| Orphan journey | `CR-L03` journey-to-feature-coverage (or `CR-L10` for cross-journey patterns) | error — reverse-orphan or unbudgeted pattern is critical |
 
 ### ACK Format
 

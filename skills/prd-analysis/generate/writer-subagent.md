@@ -190,14 +190,14 @@ Content structure:
 
 See `generate/in-generate-review.md` for CR applicability table.
 
-- CR-L02 self-contained-file: PASS | FAIL — blocker_scope: <value> — note: <reason>
-- CR-L05 prd-scope-discipline: PASS | FAIL — ...
-- CR-S10 leaf-size-budget: PASS | FAIL — ...
-- CR-S11 id-format: PASS | FAIL — ...
-- CR-S12 slug-kebab-case: PASS | FAIL — ...
-- CR-L08 touchpoint-completeness (journey leaves only): PASS | FAIL — ...
-- CR-L09 ac-testable (feature leaves only): PASS | FAIL — ...
-- CR-L10 design-token-semantic: PASS | FAIL — ...
+- CR-L01 self-contained-file: PASS | FAIL — blocker_scope: <value> — note: <reason>
+- CR-L02 scope-discipline-prd-vs-design: PASS | FAIL — ...
+- CR-S02 leaf-size-budget-300: PASS | FAIL — ...
+- CR-S03 feature-id-format (feature leaves only) / CR-S04 journey-id-format (journey leaves only): PASS | FAIL — ...
+- CR-S06 kebab-slug-naming: PASS | FAIL — ...
+- CR-L04 touchpoint-completeness (journey leaves only): PASS | FAIL — ...
+- CR-L06 acceptance-criteria-testable (feature leaves only): PASS | FAIL — ...
+- CR-L05 design-token-semantic-naming: PASS | FAIL — ...
 # (include only CRs applicable to this leaf_kind — see in-generate-review.md table)
 
 ## Summary
@@ -357,7 +357,7 @@ Why this is well-formed: all 9 columns are filled; Interaction Mode is from the 
 (`form`); Mapped Feature is `—` during initial writing (summarizer backfills); Pain Point is
 specific (references previous-tool experience), not "UX is bad".
 
-### BAD — Feature leaf with orphan cross-refs (CR-L02 fires)
+### BAD — Feature leaf with orphan cross-refs (CR-L01 fires)
 
 ```markdown
 ## Context
@@ -373,14 +373,14 @@ specific (references previous-tool experience), not "UX is bad".
 ```
 
 Why this is BAD:
-- **CR-L02 self-contained-file** fires: "see architecture/data-model.md", "refer to shared
+- **CR-L01 self-contained-file** fires: "see architecture/data-model.md", "refer to shared
   conventions", "as per J-001" are orphan cross-refs. A coding agent reading only this file has
   zero policy text to implement from. Copy the data-model entries and conventions inline.
-- **CR-L09 ac-testable** fires: "works correctly" and "handles errors properly" are not
-  measurable — no threshold, no Given/When/Then, no observable state. A QA engineer cannot
-  derive a test from this.
+- **CR-L06 acceptance-criteria-testable** fires: "works correctly" and "handles errors properly"
+  are not measurable — no threshold, no Given/When/Then, no observable state. A QA engineer
+  cannot derive a test from this.
 
-### BAD — PRD leaf that drifts into system-design territory (CR-L05 fires)
+### BAD — PRD leaf that drifts into system-design territory (CR-L02 fires)
 
 ```markdown
 ## Implementation
@@ -392,13 +392,13 @@ HAProxy load balancer.
 ```
 
 Why this is BAD:
-- **CR-L05 prd-scope-discipline** fires: module decomposition (`M-004: auth-service`), concrete
-  library choice (`passport-local`), storage engine (`Redis`), deployment topology (`Docker` +
-  `HAProxy`) all belong to **system-design**, not PRD. PRD says "session cookie with 24h TTL";
-  system-design picks Redis vs. Postgres vs. in-memory. Strip implementation details and move
-  them to the corresponding system-design module spec.
+- **CR-L02 scope-discipline-prd-vs-design** fires: module decomposition (`M-004: auth-service`),
+  concrete library choice (`passport-local`), storage engine (`Redis`), deployment topology
+  (`Docker` + `HAProxy`) all belong to **system-design**, not PRD. PRD says "session cookie with
+  24h TTL"; system-design picks Redis vs. Postgres vs. in-memory. Strip implementation details
+  and move them to the corresponding system-design module spec.
 
-### BAD — Raw design-token values (CR-L10 fires)
+### BAD — Raw design-token values (CR-L05 fires)
 
 ```markdown
 ### Interaction Design
@@ -407,13 +407,13 @@ Primary button: background `#3B82F6`, padding `16px 24px`, font `Inter 14px/600`
 ```
 
 Why this is BAD:
-- **CR-L10 design-token-semantic** fires: raw hex (`#3B82F6`), raw px (`16px`, `24px`), raw
-  font (`Inter 14px/600`) are implementation values. Replace with semantic tokens:
+- **CR-L05 design-token-semantic-naming** fires: raw hex (`#3B82F6`), raw px (`16px`, `24px`),
+  raw font (`Inter 14px/600`) are implementation values. Replace with semantic tokens:
   `background: color.primary`, `padding: spacing.md spacing.lg`, `font: font.body.strong`.
   The token-to-value mechanism (CSS custom properties, Tailwind config) is defined in
   system-design, NOT PRD.
 
-### BAD — ID or slug format violation (CR-S11 / CR-S12 fire)
+### BAD — ID or slug format violation (CR-S03 / CR-S04 / CR-S06 fire)
 
 ```
 # F-3: Login                           WRONG: "F-3" — must be F-003 (zero-padded 3 digits)

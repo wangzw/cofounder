@@ -142,7 +142,7 @@ Before writing the revised leaf:
 3. If a regression is detected:
    - Do NOT proceed with this revision.
    - Emit a `CR-META-regression` meta-issue at
-     `<prd-root>/.review/round-<N>/issues/<next-seq>.md` (see §Meta-Issue Schema below).
+     `<prd-root>/.review/round-<N>/issues/R<N>-<next-seq>.md` (see §Meta-Issue Schema below).
    - Abort the revision write.
    - Return `FAIL` ACK with `reason=regression-detected-in-current-leaf`.
 4. After writing the revised leaf (in the normal path): mentally re-verify that none of the
@@ -168,7 +168,7 @@ Before writing ANY file, verify the target path is NOT skeleton-owned:
 If the target leaf is somehow routed to a skeleton-owned path:
 1. Do NOT write (the tool-permission sandbox will also deny this; this check is
    belt-and-suspenders).
-2. Write a meta-issue at `<prd-root>/.review/round-<N>/issues/<next-seq>.md` with
+2. Write a meta-issue at `<prd-root>/.review/round-<N>/issues/R<N>-<next-seq>.md` with
    `criterion_id: CR-META-skeleton-protected`.
 3. Return `FAIL` ACK with `reason=skeleton-path-write-denied`.
 
@@ -225,9 +225,17 @@ leaf per reviser invocation (§14). Cross-leaf coordination is the next round's 
 
 **Meta-Issue Schema** (when the reviser must abort or escalate):
 
+Issue ID format: `R<N>-<seq>` (zero-padded 3 digits). Continue the same sequence started by the
+cross-reviewer this round — list the existing `round-<N>/issues/` directory, find the highest
+existing `<seq>`, and increment from there. This schema MUST match the canonical schema in
+`review/cross-reviewer-subagent.md` verbatim — the cross-reviewer, adversarial-reviewer, and
+per-issue-reviser all write to the same `<prd-root>/.review/round-<N>/issues/` directory, so
+the frontmatter schema MUST be identical across roles. Any future change here MUST be applied
+to the sibling prompts in the same revision.
+
 ```yaml
 ---
-issue_id: <prd-slug>-round-<N>-<next-seq>
+id: R<N>-<seq>
 round: <N>
 file: <leaf-path>
 criterion_id: CR-META-regression | CR-META-skeleton-protected | CR-META-global-conflict

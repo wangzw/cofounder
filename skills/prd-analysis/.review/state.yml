@@ -1,5 +1,6 @@
-current_round: 2
-current_delivery: 1
-mode: generate-from-scratch
+current_round: 8
+current_delivery: 2
+mode: review
 phase: on-converge
-git_sha: e9488ce7db1e082213372a035999400cace93161
+forced_full_cross_review: false
+git_sha: 63dde4c6e21b44143edcfb872182653a6d7ffe28

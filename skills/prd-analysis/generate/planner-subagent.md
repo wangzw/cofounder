@@ -74,17 +74,20 @@ is the orchestrator's dispatch manifest for the writer fan-out.
   inferred from clarification `R-003` scope and `R-004` journey seeds). Product-slug and date
   come from clarification `R-001`/`R-003`; the concrete PRD directory path is
   `<target>/<YYYY-MM-DD>-<product-slug>/`.
-- PRD leaf categories (all belong in `add:` for FromScratch):
-  - `README.md` — product overview + journey index + feature index + roadmap (uses
-    `common/templates/prd-template.md`).
-  - `journeys/J-NNN-<slug>.md` — one per user journey; NNN is zero-padded sequential (uses
-    `common/templates/journey-template.md`).
-  - `features/F-NNN-<slug>.md` — one per feature; NNN is zero-padded sequential (uses
-    `common/templates/feature-template.md`).
-  - `architecture.md` — ~50–80-line index linking to topic files (uses
-    `common/templates/architecture-template.md` index variant).
-  - `architecture/<topic>.md` — one per applicable topic (uses
-    `common/templates/architecture-template.md` topic variant).
+- PRD leaf categories (all belong in `add:` for FromScratch). All leaves share the single
+  canonical template `common/templates/artifact-template.md`; the planner selects the
+  appropriate H2 section via the `template_section` field on each plan entry so the writer
+  knows which section body of `artifact-template.md` to instantiate:
+  - `README.md` — product overview + journey index + feature index + roadmap
+    (`template_section: "§ README Template"`).
+  - `journeys/J-NNN-<slug>.md` — one per user journey; NNN is zero-padded sequential
+    (`template_section: "§ Journey Template"`).
+  - `features/F-NNN-<slug>.md` — one per feature; NNN is zero-padded sequential
+    (`template_section: "§ Feature Template"`).
+  - `architecture.md` — ~50–80-line index linking to topic files
+    (`template_section: "§ Architecture Index Template"`).
+  - `architecture/<topic>.md` — one per applicable topic
+    (`template_section: "§ Architecture Topic Template"`).
 
 **NewVersion mode** (`mode: new-version` in plan.md) — evolve/revise against a prior PRD:
 
@@ -105,8 +108,8 @@ is the orchestrator's dispatch manifest for the writer fan-out.
   `keep` only if its latest flattened version is unchanged in this iteration.
 - **Tombstone handling**: deprecated leaves go in `delete` for filesystem purposes but the
   evolve-mode README still references them via tombstone files — the corresponding tombstone
-  file (if needed) goes in `add` with `template: common/templates/feature-template.md` (tombstone
-  variant) or equivalent.
+  file (if needed) goes in `add` with `template: common/templates/artifact-template.md` and
+  `template_section: "§ Tombstone Template"`.
 
 ### Output Contract
 
@@ -130,19 +133,24 @@ plan:
   modify: []           # new-version only; target-relative paths (leaves to update)
   add:                 # new leaves to author (both modes)
     - path: "<prd_dir>/README.md"
-      template: "common/templates/prd-template.md"
+      template: "common/templates/artifact-template.md"
+      template_section: "§ README Template"
       description: "PRD README index — product overview, journey index, feature index, roadmap"
     - path: "<prd_dir>/journeys/J-001-<slug>.md"
-      template: "common/templates/journey-template.md"
+      template: "common/templates/artifact-template.md"
+      template_section: "§ Journey Template"
       description: "<one-line journey description from clarification>"
     - path: "<prd_dir>/features/F-001-<slug>.md"
-      template: "common/templates/feature-template.md"
+      template: "common/templates/artifact-template.md"
+      template_section: "§ Feature Template"
       description: "<one-line feature description from clarification>"
     - path: "<prd_dir>/architecture.md"
-      template: "common/templates/architecture-template.md"
+      template: "common/templates/artifact-template.md"
+      template_section: "§ Architecture Index Template"
       description: "Architecture index — diagram + links to topic files"
     - path: "<prd_dir>/architecture/<topic>.md"
-      template: "common/templates/architecture-template.md"
+      template: "common/templates/artifact-template.md"
+      template_section: "§ Architecture Topic Template"
       description: "<topic> architecture decisions"
     # ... one entry per leaf
   keep: []             # new-version only; scaffold-verified unchanged baseline leaves
@@ -154,9 +162,16 @@ rationale: |
 
 Each entry in `add` and `modify` MUST include:
 - `path`: target-relative path of the PRD leaf to create or update (under `<prd_dir>/…`)
-- `template`: path to the template the writer should use (relative to prd-analysis root); use
-  `null` if no template applies (rare — only for hand-crafted one-off leaves explicitly called
-  out in `rationale`)
+- `template`: path to the template the writer should use (relative to prd-analysis root).
+  This MUST be `common/templates/artifact-template.md` — the single canonical template for
+  every PRD leaf kind. Use `null` only for hand-crafted one-off leaves explicitly called
+  out in `rationale` (rare).
+- `template_section`: the H2 section header inside `artifact-template.md` that the writer
+  should instantiate (e.g. `"§ README Template"`, `"§ Journey Template"`,
+  `"§ Feature Template"`, `"§ Architecture Index Template"`,
+  `"§ Architecture Topic Template"`, `"§ Tombstone Template"`). Required whenever
+  `template` is non-null so the writer can locate the correct section body without
+  guessing from the leaf kind.
 - `description`: one sentence describing the leaf's purpose in this PRD
 
 ### Reasoning Guidelines

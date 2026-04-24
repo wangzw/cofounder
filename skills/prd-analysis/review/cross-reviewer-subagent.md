@@ -145,7 +145,7 @@ Read these sources before writing any issues:
 | `<target>/common/domain-glossary.md` | Authoritative PRD vocabulary — check leaf terminology alignment (e.g. "touchpoint", "interaction mode", "self-contained leaf" are used with the glossary-defined meanings) |
 | `<target>/architecture.md` + focused `architecture/*.md` topic files | NFR/design-token context for feature review; read only topic files referenced by features in your focus |
 | `<target>/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression (new → persistent → resolved → regressed) per guide §9.3. If round 1, no previous issues. |
-| `common/review-criteria.md` | Authoritative definitions for CR-L01..CR-L10 plus PRD-domain LLM-type CRs (self-contained principle, scope discipline, journey-to-feature coverage, touchpoint completeness, persona consistency, design-token semantic naming, priority rationale, NFR coverage) |
+| `common/review-criteria.md` | Authoritative definitions for CR-L01..CR-L11 plus PRD-domain LLM-type CRs (self-contained principle, scope discipline, journey-to-feature coverage, touchpoint completeness, persona consistency, design-token semantic naming, priority rationale, NFR coverage, criteria-internally-consistent) |
 | `<target>/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews for this round — required for self-review FAIL-row handling (guide §11.1) |
 
 **Skip-set discipline**: ONLY read and evaluate leaves in `cross_reviewer_focus`. Do NOT open
@@ -193,26 +193,38 @@ MUST take exactly ONE of these three actions — NEVER silently ignore:
 For each issue found, write ONE file at:
 `<target>/.review/round-<N>/issues/<issue-id>.md`
 
-Issue ID format: `prd-analysis-round-<N>-<seq>` where `<seq>` is zero-padded 3 digits.
+Issue ID format: `R<N>-<seq>` where `<N>` is the round number and `<seq>` is zero-padded 3
+digits (e.g. `R3-007`). This matches the on-disk convention used by round-1/round-2 issue
+files and is shared with the adversarial-reviewer and per-issue-reviser sub-agents — all three
+write to the same `<target>/.review/round-<N>/issues/` directory, so the frontmatter schema
+MUST be identical across roles. (The sibling sub-agent prompts
+`review/adversarial-reviewer-subagent.md` and `revise/per-issue-reviser-subagent.md` are
+aligned to the same schema; any future change here MUST be applied there in the same revision.)
 
-Frontmatter schema:
+Frontmatter schema (canonical):
 
 ```yaml
 ---
-issue_id: prd-analysis-round-<N>-<seq>
+id: R<N>-<seq>                     # zero-padded 3 digits; matches filename
 round: <N>
 file: <target-relative-path>
-criterion_id: CR-L03
+criterion_id: <CR-Lxx | CR-Sxx | CR-META-xxx>
 severity: critical | error | warning | info
-source: cross-reviewer | self-review-escalation
-reviewer_variant: cross
+source: cross-reviewer | adversarial-reviewer | per-issue-reviser | self-review-escalation
+reviewer_variant: cross | adversarial | meta | null
 status: new | persistent | resolved | regressed
 ---
 ```
 
+For the cross-reviewer specifically: `source: cross-reviewer` (or `self-review-escalation` when
+escalating a writer FAIL row) and `reviewer_variant: cross`.
+
 Body: description of the issue + reasoning. Be specific: quote the offending text from the
 focus leaf, name the neighbor leaf that creates the inconsistency (with its relative path), cite
-the criterion definition from `common/review-criteria.md`, and explain why it fails.
+the criterion definition from `common/review-criteria.md` by its canonical `CR-L##` / `CR-S##`
+/ `CR-META-*` ID and canonical name, and explain why it fails. FORBIDDEN to invent CR IDs — if
+no canonical CR matches the intent, either use `CR-META-*` for skip-set/regression/skeleton
+concerns or omit the citation (do not fabricate `CR-PRD-*` or other ad-hoc prefixes).
 
 **Issue ID for self-review escalations**: use `source: self-review-escalation` with
 `reviewer_variant: cross`. The issue is still a real issue; the source just indicates origin.
@@ -226,7 +238,9 @@ a leaf that has a detectable problem, write an issue with `criterion_id: CR-META
 For the prd-analysis skill, the cross-reviewer MUST prioritize the following intra-artifact
 coherence checks. Every check below is a hard requirement — use MUST / MUST NOT / FORBIDDEN
 language when flagging. "Prefer", "try to", "ideally" are FORBIDDEN in issue bodies for these
-checks (that would violate CR-L07 language discipline).
+checks. This is a house style rule for reviewer-written issue prose (no corresponding CR in
+`common/review-criteria.md`); violations will be surfaced by meta-review, not by citing a
+review criterion.
 
 1. **Journey-to-feature coverage (bidirectional)**: every `features/F-*.md` MUST back-reference
    at least one journey via its `Mapped Journeys` / `Journey Context` field; every
@@ -315,8 +329,9 @@ OK trace_id=<trace_id> role=reviewer linked_issues=<comma-separated issue IDs or
   explicit escalate, dismiss, or cascade record under `.review/round-<N>/` (issues/ or
   dismissed-fails/).
 - **FORBIDDEN** to use soft language (`try to`, `prefer`, `ideally`, `should consider`) for
-  hard checks in issue bodies — use MUST / MUST NOT / FORBIDDEN only. Soft language violates
-  CR-L07 language discipline and will be flagged on the reviewer itself in meta-review.
+  hard checks in issue bodies — use MUST / MUST NOT / FORBIDDEN only. This is a house style
+  rule (no corresponding CR in `common/review-criteria.md`); the meta-review pass flags
+  reviewer-authored soft language directly rather than via a criterion citation.
 - **FORBIDDEN** to rewrite or "suggest edits into" leaves — you emit findings plus a one-line
   `suggested_fix` in the issue body; the reviser performs the edit in a separate dispatch.
 
@@ -359,10 +374,10 @@ and move on — the Task return stays ACK-only regardless.
 
 ```yaml
 ---
-issue_id: prd-analysis-round-2-007
+id: R2-007
 round: 2
 file: features/F-012-session-timeout.md
-criterion_id: CR-PRD-journey-feature-coverage
+criterion_id: CR-L03
 severity: error
 source: cross-reviewer
 reviewer_variant: cross
@@ -372,13 +387,13 @@ status: new
 
 `features/F-012-session-timeout.md` lists `Mapped Journeys: J-004` in its Journey Context
 section (line 14). However, `journeys/J-004-first-login.md §Mapped Features` column (line 47)
-does not list `F-012`; the column contains only `F-001, F-003, F-008`. Per the
-journey-to-feature coverage criterion, mapping MUST be bidirectional — a feature that claims to
-support a journey MUST be listed in that journey's Mapped Features column. Either F-012 does
-not in fact address a J-004 touchpoint (remove the Journey Context line in F-012) or J-004 is
-missing a touchpoint that F-012 addresses (add F-012 to the Mapped Features column and add the
-missing touchpoint row). Reviser MUST decide which direction is correct based on the feature's
-acceptance criteria vs. J-004's touchpoint list.
+does not list `F-012`; the column contains only `F-001, F-003, F-008`. Per CR-L03
+(journey-to-feature-coverage in `common/review-criteria.md`), mapping MUST be bidirectional — a
+feature that claims to support a journey MUST be listed in that journey's Mapped Features
+column. Either F-012 does not in fact address a J-004 touchpoint (remove the Journey Context
+line in F-012) or J-004 is missing a touchpoint that F-012 addresses (add F-012 to the Mapped
+Features column and add the missing touchpoint row). Reviser MUST decide which direction is
+correct based on the feature's acceptance criteria vs. J-004's touchpoint list.
 
 Suggested fix: reviser reads J-004's touchpoint list; if a session-timeout touchpoint exists
 but is unmapped, add `F-012` to Mapped Features; otherwise delete `J-004` from F-012's Journey
@@ -386,7 +401,8 @@ Context.
 
 ## Negative Example — Common Mistakes (with CR annotations)
 
-**Anti-pattern A — soft language in a hard check** (CR-L07 fires):
+**Anti-pattern A — soft language in a hard check** (house style rule; no CR cite — the
+meta-review pass flags soft language directly):
 
 ```markdown
 ### Issue body
