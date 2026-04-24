@@ -1,6 +1,0 @@
-{"event":"launched","trace_id":"R4-V-001","role":"reviewer","reviewer_variant":"cross","tier":"heavy","model":"claude-opus-4-7","delivery_id":1,"dispatched_at":"2026-04-24T11:50:00Z","prompt_hash":"sha256:fabr1"}
-{"event":"completed","trace_id":"R4-V-001","role":"reviewer","ack_status":"OK","linked_issues":["R4-001"],"returned_at":"2026-04-24T11:58:00Z"}
-{"event":"launched","trace_id":"R4-J-001","role":"judge","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":1,"dispatched_at":"2026-04-24T12:00:00Z","prompt_hash":"sha256:fabr2"}
-{"event":"completed","trace_id":"R4-J-001","role":"judge","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-24T12:01:05Z"}
-{"event":"launched","trace_id":"R4-S-001","role":"summarizer","reviewer_variant":null,"tier":"balanced","model":"claude-sonnet-4-6","delivery_id":1,"dispatched_at":"2026-04-24T12:02:00Z","prompt_hash":"sha256:fabr3"}
-{"event":"completed","trace_id":"R4-S-001","role":"summarizer","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-24T12:02:55Z"}
