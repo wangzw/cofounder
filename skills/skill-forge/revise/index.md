@@ -88,3 +88,9 @@ constraints, so they do not conflict).
   reviser task.
 - Reference `common/snippets.md` Snippet C (orchestrator dispatch contract) for `trace_id`
   format and `launched`/`completed` event schema.
+
+---
+
+## Files in This Directory
+
+- [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) — Per-issue reviser sub-agent prompt (one dispatch per target leaf)

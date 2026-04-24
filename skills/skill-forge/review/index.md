@@ -93,3 +93,10 @@ severity (default: `critical`).
 - **Skip-set semantics**: guide §8.5 — `cross_reviewer_focus` = leaves reviewer MUST read;
   `cross_reviewer_skip` = leaves reviewer MUST NOT read (unchanged and not implicated by open
   issues). Forced-full override clears the skip list for one dispatch (guide §8.6).
+
+---
+
+## Files in This Directory
+
+- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L10)
+- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)
