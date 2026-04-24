@@ -1,16 +1,39 @@
 #!/usr/bin/env bash
 # prepare-input.sh — Round 0 input preparation per guide §6.1
-# Usage: prepare-input.sh <user-prompt> <review-dir>
-#   <user-prompt>: raw prompt string, or '-' to read from stdin
-#   <review-dir>:  the .review/ root of the target skill
+# Usage: prepare-input.sh [--bootstrap-subdir <subdir>] <user-prompt> <review-dir>
+#   <user-prompt>:              raw prompt string, or '-' to read from stdin
+#   <review-dir>:               the .review/ root of the target skill
+#   --bootstrap-subdir <name>:  subdir under <review-dir> to write input.md +
+#                               input-meta.yml into (default: "round-0"). For
+#                               new-version delivery-N bootstrap, orchestrator
+#                               should pass the starting round of that delivery
+#                               (e.g. "round-5") so delivery-1's round-0 archive
+#                               is preserved. Guide §10.5 round continuity + §6.1
+#                               Round-0 semantics bridged by this flag. (F8 fix)
 # Produces:
-#   <review-dir>/round-0/input.md
-#   <review-dir>/round-0/input-meta.yml
+#   <review-dir>/<bootstrap-subdir>/input.md
+#   <review-dir>/<bootstrap-subdir>/input-meta.yml
 # No external packages — stdlib only (re, urllib, pathlib, datetime).
 set -euo pipefail
 
+BOOTSTRAP_SUBDIR="round-0"
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bootstrap-subdir) BOOTSTRAP_SUBDIR="$2"; shift 2 ;;
+    --) shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
+    -h|--help)
+      sed -n '/^# Usage:/,/^# No external/p' "$0" | sed 's/^# //'
+      exit 0
+      ;;
+    -*) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
 if [ $# -lt 2 ]; then
-  echo "Usage: prepare-input.sh <user-prompt|--> <review-dir>" >&2
+  echo "Usage: prepare-input.sh [--bootstrap-subdir <subdir>] <user-prompt|--> <review-dir>" >&2
   exit 1
 fi
 
@@ -25,7 +48,7 @@ fi
 # CWD at time of invocation — used for @path resolution
 INVOKE_CWD="$(pwd)"
 
-python3 - "$USER_PROMPT" "$REVIEW_DIR" "$INVOKE_CWD" <<'PYEOF'
+python3 - "$USER_PROMPT" "$REVIEW_DIR" "$INVOKE_CWD" "$BOOTSTRAP_SUBDIR" <<'PYEOF'
 import sys
 import os
 import re
@@ -33,15 +56,16 @@ import subprocess
 import datetime
 import pathlib
 
-prompt_text = sys.argv[1]
-review_dir  = sys.argv[2]
-invoke_cwd  = sys.argv[3]
+prompt_text     = sys.argv[1]
+review_dir      = sys.argv[2]
+invoke_cwd      = sys.argv[3]
+bootstrap_subdir = sys.argv[4]
 
-round0_dir = pathlib.Path(review_dir) / "round-0"
-round0_dir.mkdir(parents=True, exist_ok=True)
+bootstrap_dir = pathlib.Path(review_dir) / bootstrap_subdir
+bootstrap_dir.mkdir(parents=True, exist_ok=True)
 
-input_md_path   = round0_dir / "input.md"
-meta_yml_path   = round0_dir / "input-meta.yml"
+input_md_path   = bootstrap_dir / "input.md"
+meta_yml_path   = bootstrap_dir / "input-meta.yml"
 
 # ── 1. Find @path refs and http(s):// URLs ──────────────────────────────────
 # @path: must start with alnum/_, then legal filesystem chars. Stops at punctuation
@@ -121,5 +145,5 @@ meta_yml = (
 )
 meta_yml_path.write_text(meta_yml, encoding="utf-8")
 
-print(f"OK input written to {round0_dir}")
+print(f"OK input written to {bootstrap_dir}")
 PYEOF

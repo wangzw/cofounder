@@ -1,34 +1,51 @@
 #!/usr/bin/env bash
 # glossary-probe.sh — Round 0 glossary probe per guide §6.2
-# Usage: glossary-probe.sh <review-dir> <glossary-path>
-#   <review-dir>:    the .review/ root (must already have round-0/input.md + input-meta.yml)
-#   <glossary-path>: path to common/domain-glossary.md
+# Usage: glossary-probe.sh [--bootstrap-subdir <subdir>] <review-dir> <glossary-path>
+#   <review-dir>:               the .review/ root (must already have bootstrap-subdir/input.md)
+#   <glossary-path>:            path to common/domain-glossary.md
+#   --bootstrap-subdir <name>:  subdir under <review-dir> holding input.md (default: "round-0").
+#                               Must match the flag passed to prepare-input.sh for the same
+#                               bootstrap. For new-version delivery-N, pass the starting round
+#                               (e.g. "round-5"). (F8 fix)
 # Produces:
-#   <review-dir>/round-0/trigger-flags.yml
+#   <review-dir>/<bootstrap-subdir>/trigger-flags.yml
 # No external packages — stdlib only.
 set -euo pipefail
 
+BOOTSTRAP_SUBDIR="round-0"
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --bootstrap-subdir) BOOTSTRAP_SUBDIR="$2"; shift 2 ;;
+    --) shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
+    -*) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
+    *) POSITIONAL+=("$1"); shift ;;
+  esac
+done
+set -- "${POSITIONAL[@]}"
+
 if [ $# -lt 2 ]; then
-  echo "Usage: glossary-probe.sh <review-dir> <glossary-path>" >&2
+  echo "Usage: glossary-probe.sh [--bootstrap-subdir <subdir>] <review-dir> <glossary-path>" >&2
   exit 1
 fi
 
 REVIEW_DIR="$1"
 GLOSSARY_PATH="$2"
 
-python3 - "$REVIEW_DIR" "$GLOSSARY_PATH" <<'PYEOF'
+python3 - "$REVIEW_DIR" "$GLOSSARY_PATH" "$BOOTSTRAP_SUBDIR" <<'PYEOF'
 import sys
 import re
 import pathlib
 import datetime
 
-review_dir    = pathlib.Path(sys.argv[1])
-glossary_path = pathlib.Path(sys.argv[2])
+review_dir       = pathlib.Path(sys.argv[1])
+glossary_path    = pathlib.Path(sys.argv[2])
+bootstrap_subdir = sys.argv[3]
 
-round0_dir        = review_dir / "round-0"
-input_md_path     = round0_dir / "input.md"
-meta_yml_path     = round0_dir / "input-meta.yml"
-trigger_yml_path  = round0_dir / "trigger-flags.yml"
+bootstrap_dir     = review_dir / bootstrap_subdir
+input_md_path     = bootstrap_dir / "input.md"
+meta_yml_path     = bootstrap_dir / "input-meta.yml"
+trigger_yml_path  = bootstrap_dir / "trigger-flags.yml"
 
 # ── 1. Extract User Prompt section from input.md ────────────────────────────
 input_md = input_md_path.read_text(encoding="utf-8")

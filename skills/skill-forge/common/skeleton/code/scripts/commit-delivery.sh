@@ -28,11 +28,26 @@ fi
 TARGET="${TARGET%/}"
 
 # Compute slug from change-summary (§8.3)
-SLUG=$(python3 - "$CHANGE_SUMMARY" <<'PYEOF'
+# Since the final tag is always `delivery-<N>-<slug>`, strip a leading redundant
+# `delivery <N>:` / `delivery-<N>:` / `Delivery <N>:` prefix from the summary
+# before slug computation. Prevents tags like `delivery-2-delivery-2-...`
+# when summarizer's change_summary repeats the delivery prefix. (F9 fix)
+SLUG=$(python3 - "$CHANGE_SUMMARY" "$DELIVERY_ID" <<'PYEOF'
 import sys, re
 from datetime import datetime, timezone
 
-summary = sys.argv[1]
+summary      = sys.argv[1]
+delivery_id  = sys.argv[2]
+
+# Strip leading redundant "delivery-N" / "delivery N" / "Delivery N:" forms.
+# Matches (case-insensitive): optional "Delivery", separator, the delivery id,
+# optional trailing punct, whitespace. Only strips if it matches THIS delivery_id
+# (not some other number — that might be meaningful).
+pattern = rf'^\s*delivery[\s\-_:]+{re.escape(delivery_id)}\b[:\s\-–—]*'
+# Always use the stripped result. If strip yields empty (i.e. the summary was
+# ONLY the delivery prefix), let slugify produce empty → fall through to the
+# YYYYMMDD date fallback rather than re-introducing the prefix we just removed.
+summary = re.sub(pattern, '', summary, count=1, flags=re.IGNORECASE).strip()
 
 # First 40 chars, lowercase, non-[a-z0-9] -> '-', collapse adjacent '-', strip leading/trailing '-'
 truncated = summary[:40].lower()
@@ -60,7 +75,7 @@ fi
 git -C "$TARGET" add --all
 
 # Commit
-git -C "$TARGET" commit -m "feat({{SKILL_NAME}}): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
+git -C "$TARGET" commit -m "feat(skill-forge): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
 
 # Annotated tag
 git -C "$TARGET" tag -a "$TAG" -m "${CHANGE_SUMMARY}"
