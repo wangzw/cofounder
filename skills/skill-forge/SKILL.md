@@ -180,7 +180,15 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 
 Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml` (`model_tier_defaults` + `model_mapping`).
 
-CLI override: `--tier <role>=<tier>` (e.g., `--tier writer=heavy`).
+## CLI Flags (modifiers to base modes per guide §4.1)
+
+| Flag | Applies to | Semantics |
+|------|-----------|-----------|
+| `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus` (guide §8.6). Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
+| `--interactive` | Generate | Force-dispatch `domain-consultant` regardless of §6.2 triggers; used when user wants explicit clarification dialogue even on dense input. |
+| `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round. Requires HITL `force_continue` approval gate; records the override in `.review/hitl/<ts>-force-continue.yml`. |
+| `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g., `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
+| `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled verdict threshold; default 5). For cheap iteration budgets during testing. |
 
 ## Configuration & Subagent Files
 

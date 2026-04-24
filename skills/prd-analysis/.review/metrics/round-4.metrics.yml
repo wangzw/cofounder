@@ -1,0 +1,53 @@
+generated_at: 2026-04-24T12:39:30Z
+scope:
+  key: round
+  value: 4
+  rounds:
+    - 4
+delivery_id: 1
+pricing_source: skills/skill-forge/common/config.yml
+cost:
+  total_usd: 11.847645
+  by_role:
+    judge:
+      input_tokens: 9
+      output_tokens: 6239
+      cache_read_tokens: 1963278
+      cache_creation_tokens: 77875
+      usd: 3.539455
+      calls: 1
+    reviewer:
+      input_tokens: 19
+      output_tokens: 2309
+      cache_read_tokens: 5222586
+      cache_creation_tokens: 11718
+      usd: 8.227051
+      calls: 1
+    summarizer:
+      input_tokens: 6
+      output_tokens: 6
+      cache_read_tokens: 0
+      cache_creation_tokens: 21608
+      usd: 0.081138
+      calls: 1
+  by_criterion: {}
+latency_seconds:
+  total: 600
+  by_role:
+    judge: 65
+    reviewer: 480
+    summarizer: 55
+join_stats:
+  dispatched_traces: 3
+  unmatched_dispatches: 0
+  unmatched_events: 65815
+  unmatched_ratio: 0
+traces:
+  - trace_id: R4-J-001
+    usd: 3.539455
+  - trace_id: R4-S-001
+    usd: 0.081138
+  - trace_id: R4-V-001
+    usd: 8.227051
+    reviewer_variant: cross
+warnings: []

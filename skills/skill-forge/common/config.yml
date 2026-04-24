@@ -24,11 +24,25 @@ model_mapping:
   balanced: claude-sonnet-4-5
   light:    claude-haiku-4-5
 
+# Block-style required — scripts/lib/aggregate.py's mini-YAML parser
+# does not handle flow-style `{key: val}` dicts. Keep block-style here.
 pricing:
   models:
-    claude-opus-4:    {input_per_1m: 15.0, output_per_1m: 75.0, cache_read_per_1m: 1.50, cache_creation_per_1m: 18.75}
-    claude-sonnet-4:  {input_per_1m: 3.0,  output_per_1m: 15.0, cache_read_per_1m: 0.30, cache_creation_per_1m: 3.75}
-    claude-haiku-4:   {input_per_1m: 0.8,  output_per_1m: 4.0,  cache_read_per_1m: 0.08, cache_creation_per_1m: 1.0}
+    claude-opus-4:
+      input_per_1m: 15.0
+      output_per_1m: 75.0
+      cache_read_per_1m: 1.50
+      cache_creation_per_1m: 18.75
+    claude-sonnet-4:
+      input_per_1m: 3.0
+      output_per_1m: 15.0
+      cache_read_per_1m: 0.30
+      cache_creation_per_1m: 3.75
+    claude-haiku-4:
+      input_per_1m: 0.8
+      output_per_1m: 4.0
+      cache_read_per_1m: 0.08
+      cache_creation_per_1m: 1.0
 
 priority_order: [quality, cost, performance]
 

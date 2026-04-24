@@ -218,18 +218,57 @@ class UsageEvent:
 TRACE_ID_RE = re.compile(r"\btrace_id:\s*(R\d+-[A-Za-z]-\d+)")
 
 def load_dispatch_log(review_dir: str, round_n: int) -> List[DispatchRecord]:
+    """Parse dispatch-log.jsonl supporting both formats per guide §3.8:
+      (a) Combined format: one JSON line per dispatch with both dispatched_at + returned_at
+      (b) Event-pair format: two lines per dispatch — {"event":"launched",...} and
+          {"event":"completed",...} — joined by trace_id.
+    If both formats coexist in the same file (mixed fixtures), the event-pair version wins.
+    """
     p = os.path.join(review_dir, "traces", f"round-{round_n}", "dispatch-log.jsonl")
     if not os.path.isfile(p):
         return []
-    out: List[DispatchRecord] = []
+
+    combined: Dict[str, Dict[str, Any]] = {}
+    launched: Dict[str, Dict[str, Any]] = {}
+    completed: Dict[str, Dict[str, Any]] = {}
+
     with open(p, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
-            e = json.loads(line)
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            evt = e.get("event")
+            tid = e.get("trace_id")
+            if not tid:
+                continue
+            if evt == "launched":
+                launched[tid] = e
+            elif evt == "completed":
+                completed[tid] = e
+            else:
+                # Combined format (no explicit event field, has both timestamps)
+                combined[tid] = e
+
+    # Merge event-pair into combined shape
+    for tid, l in launched.items():
+        c = completed.get(tid, {})
+        merged = dict(l)  # start with launched fields
+        merged.update({k: v for k, v in c.items() if k not in {"event"}})
+        if "returned_at" not in merged:
+            # launched-only trace (subagent didn't complete yet or log lost).
+            # Skip — aggregate requires both timestamps.
+            continue
+        combined[tid] = merged
+
+    out: List[DispatchRecord] = []
+    for tid, e in combined.items():
+        try:
             out.append(DispatchRecord(
-                trace_id=e["trace_id"],
+                trace_id=tid,
                 role=e["role"],
                 tier=e.get("tier"),
                 model=e.get("model"),
@@ -241,6 +280,9 @@ def load_dispatch_log(review_dir: str, round_n: int) -> List[DispatchRecord]:
                 reviewer_variant=e.get("reviewer_variant"),
                 session_file=e.get("session_file"),
             ))
+        except (KeyError, ValueError):
+            # Malformed record — skip silently; malformed_count surfaced via warnings elsewhere
+            continue
     return out
 
 
