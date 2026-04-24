@@ -28,18 +28,19 @@ scripts/prepare-input.sh "<user-prompt>" <target>/.review
 ```
 
 - **Inputs**: raw user prompt string, optional `@refs` / URLs
-- **Outputs**: `<target>/.review/round-0/input.md` (normalized text), `<target>/.review/round-0/input-meta.yml` (sparse_input flag, source list)
+- **Outputs**: `<target>/.review/round-0/input.md` (normalized text), `<target>/.review/round-0/input-meta.yml` (sparse_input flag, source list). Also drops `<target>/.review/README.md` from `common/templates/review-readme-template.md` on first bootstrap (idempotent — skipped if the file already exists so user edits survive delivery-N re-bootstrap).
 - **Orchestrator**: read exit code only; do not read the written files.
 
 ### Step 3 — Glossary Probe (script)
 
 ```bash
-scripts/glossary-probe.sh <target>/.review/round-0 <skill-forge>/common/domain-glossary.md
+scripts/glossary-probe.sh <target>/.review <skill-forge>/common/domain-glossary.md
 ```
 
 - **Inputs**: `input.md`, `input-meta.yml`, `domain-glossary.md`
 - **Outputs**: `<target>/.review/round-0/trigger-flags.yml` (boolean flags: `glossary_hit`, `sparse_input`, `ambiguous_artifact_type`)
 - **Orchestrator**: read exit code only; do not read the written file.
+- **Note**: first arg is the `.review/` root, not `.review/round-0/` — the script appends `round-0/` itself (or `--bootstrap-subdir` override).
 
 ### Step 4 — Domain Consultant (conditional sub-agent dispatch)
 

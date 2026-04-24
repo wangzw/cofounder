@@ -68,6 +68,27 @@ else
   fail "round-checker-output.json is not valid JSON"
 fi
 
+# --- Confirm each issue in JSON has a matching <id>.md file with frontmatter ---
+python3 - "$ISSUES_JSON" "${ROUND_DIR}/issues" <<'PYEOF' && pass "each issue expanded to <id>.md with frontmatter" || fail "issue MD expansion missing or malformed"
+import sys, json, os, re
+issues_json = sys.argv[1]
+issues_dir  = sys.argv[2]
+with open(issues_json) as f:
+    issues = json.load(f)
+if not issues:
+    sys.exit(0)  # nothing to verify; empty array is acceptable
+mds = [f for f in os.listdir(issues_dir) if re.match(r'^R\d+-\d{3}\.md$', f)]
+assert len(mds) >= len(issues), f"expected at least {len(issues)} issue MDs, got {len(mds)}"
+sample = os.path.join(issues_dir, sorted(mds)[0])
+content = open(sample).read()
+assert content.startswith('---\n'), "issue MD missing frontmatter opener"
+for key in ('id:', 'status:', 'severity:', 'criterion_id:', 'file:', 'round:', 'source:'):
+    assert key in content.split('---',2)[1], f"frontmatter missing {key}"
+fm = content.split('---',2)[1]
+assert re.search(r'^status: (new|persistent|regressed|resolved)$', fm, re.MULTILINE), \
+    f"status must be one of new|persistent|regressed|resolved, got: {fm}"
+PYEOF
+
 # --- Confirm manifest.yml has generated_at and leaves section ---
 if grep -q '^generated_at:' "${ROUND_DIR}/manifest.yml" && grep -q '^leaves:' "${ROUND_DIR}/manifest.yml"; then
   pass "manifest.yml has generated_at and leaves fields"

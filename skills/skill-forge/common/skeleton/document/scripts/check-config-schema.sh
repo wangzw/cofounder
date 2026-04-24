@@ -45,7 +45,7 @@ except OSError as e:
     print(json.dumps(issues, indent=2))
     sys.exit(1)
 
-# CR-S06: check all required top-level keys (§21.2 — derived from skill-forge reference config)
+# CR-S06: check all required top-level keys (§21.2 — derived from this skill reference config)
 REQUIRED_KEYS = [
     "skill_version", "review_criteria_version", "artifact_template_version",
     "convergence", "model_tier_defaults", "model_mapping", "pricing",

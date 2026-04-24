@@ -22,6 +22,36 @@ cd "$TMP" && "$SCRIPT" "Build @requirements.md" "$TMP/.review2" >/dev/null 2>&1
 grep -q 'dummy requirements' "$TMP/.review2/round-0/input.md" \
   || { echo "FAIL: @ref content not expanded"; exit 1; }
 
+# Test 2b: @ref pointing to a directory expands into tree + inlined text files
+mkdir -p "$TMP/refdir/sub"
+echo "top-level content" > "$TMP/refdir/top.md"
+echo "nested content"    > "$TMP/refdir/sub/nested.md"
+mkdir -p "$TMP/refdir/.review" && echo "should-be-skipped" > "$TMP/refdir/.review/skip.md"
+cd "$TMP" && "$SCRIPT" "Reference @refdir" "$TMP/.review2b" >/dev/null 2>&1
+grep -q '^## @refdir' "$TMP/.review2b/round-0/input.md" \
+  || { echo "FAIL: dir @ref heading missing"; exit 1; }
+grep -q 'top.md' "$TMP/.review2b/round-0/input.md" \
+  || { echo "FAIL: dir tree listing missing top.md"; exit 1; }
+grep -q 'sub/nested.md' "$TMP/.review2b/round-0/input.md" \
+  || { echo "FAIL: dir tree listing missing sub/nested.md"; exit 1; }
+grep -q 'top-level content' "$TMP/.review2b/round-0/input.md" \
+  || { echo "FAIL: dir inlined top.md content missing"; exit 1; }
+grep -q 'nested content' "$TMP/.review2b/round-0/input.md" \
+  || { echo "FAIL: dir inlined sub/nested.md content missing"; exit 1; }
+grep -q 'should-be-skipped' "$TMP/.review2b/round-0/input.md" \
+  && { echo "FAIL: dir should have skipped .review/ but inlined it"; exit 1; }
+
+# Test 2c: prepare-input drops .review/README.md from the review-readme template (idempotent)
+"$SCRIPT" "seed" "$TMP/.review2c" >/dev/null 2>&1
+[ -f "$TMP/.review2c/README.md" ] || { echo "FAIL: .review/README.md not written on first bootstrap"; exit 1; }
+grep -q "Generation, Review & Delivery Archive" "$TMP/.review2c/README.md" \
+  || { echo "FAIL: .review/README.md content missing expected heading"; exit 1; }
+# user-edit preservation: modify README, re-run prepare-input — content must not revert
+echo "USER_EDIT_MARKER" >> "$TMP/.review2c/README.md"
+"$SCRIPT" "seed again" "$TMP/.review2c" >/dev/null 2>&1
+grep -q "USER_EDIT_MARKER" "$TMP/.review2c/README.md" \
+  || { echo "FAIL: .review/README.md was overwritten — must be idempotent"; exit 1; }
+
 # Test 3: idempotent (running twice produces same output)
 "$SCRIPT" "idempotent test prompt" "$TMP/.review3" >/dev/null 2>&1
 HASH1=$(sha256sum "$TMP/.review3/round-0/input.md" | awk '{print $1}')

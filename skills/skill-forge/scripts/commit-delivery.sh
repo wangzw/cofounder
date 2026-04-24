@@ -74,8 +74,11 @@ fi
 # Stage target dir (including .review/)
 git -C "$TARGET" add --all
 
-# Commit
-git -C "$TARGET" commit -m "feat(skill-forge): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
+# Scope is the target skill's own dir basename (Conventional Commits) so generated
+# skills get their own-name scope (e.g., feat(prd-analysis): ...) and skill-forge's
+# own deliveries get feat(skill-forge): ... automatically.
+SKILL_SCOPE="$(basename "$(cd "$TARGET" && pwd)")"
+git -C "$TARGET" commit -m "feat(${SKILL_SCOPE}): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
 
 # Annotated tag
 git -C "$TARGET" tag -a "$TAG" -m "${CHANGE_SUMMARY}"

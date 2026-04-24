@@ -106,8 +106,8 @@ which phase applies.
 | `<target>/.review/versions/<N-1>.md` | Previous version summary (if it exists; omit if first delivery) |
 | `<target>/.review/traces/round-<N>/dispatch-log.jsonl` | Dispatch events for latency metrics, tier distribution, and coverage completeness |
 
-The orchestrator path to the skill-forge directory is injected as `skill_forge_dir: <path>` in
-`state.yml`. Use this when referencing script paths below.
+The skill root (containing SKILL.md and scripts/) is the parent of the `.review/` directory — resolvable as `..` from
+`.review/`. Use this to resolve script paths like `../scripts/commit-delivery.sh` below.
 
 ---
 
@@ -127,9 +127,13 @@ delivery_id: <D>
 open_issues: <count of new+persistent+regressed>
 resolved_this_round: <count of resolved>
 regressed_count: <count of regressed>
-critical_count: <count where severity=critical>
-error_count: <count where severity=error>
-warning_count: <count where severity=warning>
+# Severity counts are scoped to OPEN issues only (status ∈ {new, persistent, regressed}).
+# Resolved issues are excluded — else a converged verdict would be impossible once any
+# resolved error/critical exists (judge-subagent §Verdict Definitions requires
+# critical_count == 0 AND error_count == 0 for convergence).
+critical_count: <open count where severity=critical>
+error_count: <open count where severity=error>
+warning_count: <open count where severity=warning>
 coverage_percent: <int 0-100>
 skip_set_utilization: <focused_leaves / total_leaves * 100>%
 writer_fail_count_sum: <sum of fail_count across all writer self-reviews this round>
@@ -222,11 +226,10 @@ exist):
 **Step — Commit-delivery script call**: after all Writes complete, call:
 
 ```bash
-<skill_forge_dir>/scripts/commit-delivery.sh <target> <delivery-id> <change-summary-slug>
+../scripts/commit-delivery.sh <target> <delivery-id> <change-summary-slug>
 ```
 
-Where `<skill_forge_dir>` is the absolute path to the skill-forge plugin directory (from
-`state.yml skill_forge_dir`). This script creates an annotated git tag and commits the
+Paths are resolved relative to `.review/` — `../scripts/` targets the skill\'s own scripts directory. This script creates an annotated git tag and commits the
 delivery state.
 
 ### ACK Format
@@ -237,3 +240,36 @@ OK trace_id=<trace_id> role=summarizer linked_issues=[]
 
 - `linked_issues` is always empty for the summarizer (it does not file issues).
 - Return this ACK as the **single and final line** of the Task return. Nothing after it.
+
+### Task Return Hygiene (MUST enforce before returning)
+
+Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
+Task return MUST be EXACTLY ONE LINE of the form:
+
+```
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+```
+
+or
+
+```
+FAIL trace_id=<id> reason=<one-line-reason>
+```
+
+**Any of the following pollutes orchestrator context and violates the IPC contract:**
+
+- A summary paragraph of what you did — FORBIDDEN
+- A bulleted list of changes — FORBIDDEN
+- Markdown headers / code fences wrapping the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
+- An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
+- A closing remark / sign-off of any kind — FORBIDDEN
+
+Your deliverables are the files you wrote via the Write tool. Those files are the proof of
+completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
+bookkeeping — nothing more.
+
+**Self-check**: before you send your final message, ask yourself "if I stripped every line
+except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
+If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
+and move on — the Task return stays ACK-only regardless.

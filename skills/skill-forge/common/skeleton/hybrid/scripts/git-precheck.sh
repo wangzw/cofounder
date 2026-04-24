@@ -20,13 +20,13 @@ python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' 2>/dev
   || { echo "FATAL: python3 ≥ 3.8 required" >&2; exit 1; }
 
 # §8.3: ensure a git repo exists. Use --allow-empty so we do NOT stage cwd contents
-# (if the user runs skill-forge in a non-repo dir like $HOME, we must not accidentally
+# (if the user runs this skill in a non-repo dir like $HOME, we must not accidentally
 # track their files). The user can commit real content later.
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "INFO: not a git repo; auto-running 'git init' + empty bootstrap commit" >&2
   git init >&2 || { echo "FATAL: git init failed" >&2; exit 1; }
-  git -c user.name=skill-forge -c user.email=skill-forge@local \
-    commit --allow-empty -m "init: skill-forge bootstrap" >&2 \
+  git -c user.name=this skill -c user.email=this skill@local \
+    commit --allow-empty -m "init: this skill bootstrap" >&2 \
     || { echo "FATAL: initial commit failed" >&2; exit 1; }
 fi
 

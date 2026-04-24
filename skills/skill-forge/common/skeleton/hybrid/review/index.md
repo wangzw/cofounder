@@ -76,7 +76,7 @@ severity (default: `critical`).
 
 | Verdict | Next Action |
 |---------|------------|
-| `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, skill-forge exits cleanly |
+| `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, this skill exits cleanly |
 | `progressing` | Revise phase: load `revise/index.md`, increment round |
 | `oscillating` | HITL gate: surface to user with oscillating-issue list; wait for `/continue`, `/override`, or `/abort` |
 | `diverging` | HITL gate: surface to user with regression report; same options |
@@ -99,4 +99,4 @@ severity (default: `critical`).
 ## Files in This Directory
 
 - [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L10)
-- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)
+- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (this skill–specific attack angles)

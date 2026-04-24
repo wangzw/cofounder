@@ -111,7 +111,7 @@ rationale: |
 
 Each entry in `add` and `modify` MUST include:
 - `path`: target-relative path of the file to create or update
-- `template`: path to the template the writer should use (relative to skill-forge root); use `null` if no template applies
+- `template`: path to the template the writer should use (relative to this skill root); use `null` if no template applies
 - `description`: one sentence describing the file's purpose in the target skill
 
 ### Reasoning Guidelines

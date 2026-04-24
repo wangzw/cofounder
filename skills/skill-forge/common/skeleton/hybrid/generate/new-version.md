@@ -42,7 +42,7 @@ scripts/prepare-input.sh "<change-description>" <target>/.review
 ### Step 3 — Glossary Probe (script)
 
 ```bash
-scripts/glossary-probe.sh <target>/.review/round-<K+1> <skill-forge>/common/domain-glossary.md
+scripts/glossary-probe.sh <target>/.review/round-<K+1> common/domain-glossary.md
 ```
 
 - **Outputs**: `round-<K+1>/trigger-flags.yml`
@@ -50,7 +50,7 @@ scripts/glossary-probe.sh <target>/.review/round-<K+1> <skill-forge>/common/doma
 ### Step 4 — Scaffold Drift Check (script)
 
 ```bash
-scripts/check-scaffold-sha.sh <target>/ <skill-forge>/common/skeleton/<variant>/
+scripts/check-scaffold-sha.sh <target>/ (manifest-pinned scripts enforced via CR-S12 on this skill's own common/shared-scripts-manifest.yml)
 ```
 
 - Verifies that boilerplate files in `<target>/` have not drifted from the skeleton SHA pins.

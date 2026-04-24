@@ -7,9 +7,7 @@
 files:
   scripts/metrics-aggregate.sh:
     sha256: 70d2c3dad1d974ea2804002959465b29e1ca513d412acc59a04e5c812fc2a19f
-    upstream: ~/Documents/mind/raw/guide/attachments/metrics-aggregate/metrics-aggregate.sh
     snapshot_date: 2026-04-24
   scripts/lib/aggregate.py:
     sha256: dee1c434206a2c5471d2ca9bfc8bd3cf9e6610f70f13bdecb1690ba48fd9c9aa
-    upstream: ~/Documents/mind/raw/guide/attachments/metrics-aggregate/lib/aggregate.py
     snapshot_date: 2026-04-24

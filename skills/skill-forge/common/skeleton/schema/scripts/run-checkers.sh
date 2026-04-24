@@ -10,6 +10,7 @@
 # Writes: manifest.yml, depgraph.yml, skip-set.yml, issues/round-checker-output.json
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
+
 # ====================================================================
 # VARIANT: schema
 # Phase B SHOULD additionally invoke (when target is schema-type):
@@ -17,7 +18,6 @@ set -euo pipefail
 #   - breaking-change detection vs prev delivery
 # These are not wired for v1 — writer sub-agent adds them during generate.
 # ====================================================================
-
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -334,9 +334,9 @@ scripts_dir = os.path.join(os.path.dirname(__file__) if '__file__' in dir() else
 
 # Resolve scripts dir from the script itself
 scripts_dir = os.path.join(target, '..', '..', 'scripts')
-# Actually use the skill-forge scripts dir
+# Actually use the this skill scripts dir
 # We need to find the scripts dir relative to run-checkers.sh
-# run-checkers.sh is in skills/skill-forge/scripts/ — same dir as the checkers
+# run-checkers.sh is in skills/this skill/scripts/ — same dir as the checkers
 # Pass it as an env var
 scripts_dir = os.environ.get('SKILL_FORGE_SCRIPTS_DIR', '')
 if not scripts_dir or not os.path.isdir(scripts_dir):
@@ -359,7 +359,7 @@ for c in criteria:
     # Resolve script path relative to target
     full_script = os.path.join(target, script_path)
     if not os.path.isfile(full_script):
-        # Also try relative to scripts_dir (skill-forge's scripts)
+        # Also try relative to scripts_dir (this skill's scripts)
         full_script = os.path.join(scripts_dir, os.path.basename(script_path))
     if not os.path.isfile(full_script):
         # Missing checker => structured meta-issue so it surfaces in review loop
@@ -368,17 +368,22 @@ for c in criteria:
         # that was silently skipped — allowing converged verdicts despite unchecked CRs.)
         all_issues.append({
             "criterion_id": "CR-META-missing-checker",
-            "file": script_path,
+            # The revisable artifact is the criteria file where the CR is declared,
+            # NOT the missing script path (scripts/ is skeleton-protected — reviser
+            # cannot author new scripts). Carry the missing script path as a separate
+            # field so the reviser can surface it in the rewrite rationale.
+            "file": "common/review-criteria.md",
+            "missing_script_path": script_path,
             "severity": "error",
             "description": (
                 f"{cid} declares script_path {script_path!r} but no such script exists "
-                f"in the target or skill-forge scripts/ directory; criterion was not evaluated"
+                f"in the target or this skill scripts/ directory; criterion was not evaluated"
             ),
             "suggested_fix": (
-                f"author scripts/{os.path.basename(script_path)} following §12.4 output contract, "
-                f"OR change {cid}.checker_type to 'llm' in common/review-criteria.md if the check "
-                f"genuinely requires LLM judgment, OR add deprecated: true to {cid} if the rule "
-                f"is no longer applicable"
+                f"Edit common/review-criteria.md: change {cid}.checker_type to 'llm' if the "
+                f"check genuinely requires LLM judgment, OR add deprecated: true to {cid} if the "
+                f"rule is no longer applicable. Authoring new scripts under scripts/ is NOT the "
+                f"reviser's job (skeleton-protected); escalate via HITL if a new script is required."
             ),
         })
         continue
@@ -441,6 +446,57 @@ for c in criteria:
 out_path = os.path.join(round_dir, 'issues', 'round-checker-output.json')
 with open(out_path, 'w', encoding='utf-8') as f:
     json.dump(all_issues, f, indent=2)
+
+# Expand each issue into an individual <issue-id>.md file so downstream
+# summarizer/judge/reviser (which all read `issues/*.md` frontmatter) can
+# pick them up. Number monotonically within the round starting at 001;
+# cross-reviewer picks up from max+1 when it dispatches later.
+issues_dir = os.path.join(round_dir, 'issues')
+existing_ids = set()
+for fname in os.listdir(issues_dir):
+    m = re.match(r'^R(\d+)-(\d{3})\.md$', fname)
+    if m:
+        existing_ids.add(int(m.group(2)))
+next_seq = max(existing_ids) + 1 if existing_ids else 1
+
+def _yaml_escape(s):
+    if s is None:
+        return '""'
+    s = str(s).replace('\\', '\\\\').replace('"', '\\"')
+    # collapse newlines for frontmatter scalars
+    s = s.replace('\n', ' ').replace('\r', ' ')
+    return '"' + s + '"'
+
+for issue in all_issues:
+    issue_id = f"R{round_num}-{next_seq:03d}"
+    next_seq += 1
+    md_path = os.path.join(issues_dir, issue_id + '.md')
+    criterion_id = issue.get('criterion_id', 'UNKNOWN')
+    severity     = issue.get('severity', 'error')
+    file_field   = issue.get('file', '')
+    description  = issue.get('description', '')
+    suggested    = issue.get('suggested_fix', '')
+    extra_fm_lines = []
+    if 'missing_script_path' in issue:
+        extra_fm_lines.append(f'missing_script_path: {_yaml_escape(issue["missing_script_path"])}')
+    extra_fm = ('\n' + '\n'.join(extra_fm_lines)) if extra_fm_lines else ''
+    frontmatter = (
+        '---\n'
+        f'id: {issue_id}\n'
+        f'status: new\n'
+        f'severity: {severity}\n'
+        f'criterion_id: {criterion_id}\n'
+        f'file: {_yaml_escape(file_field)}\n'
+        f'round: {round_num}\n'
+        f'source: script'
+        f'{extra_fm}\n'
+        '---\n\n'
+    )
+    body = f'# {criterion_id}\n\n{description}\n'
+    if suggested:
+        body += f'\n## Suggested Fix\n\n{suggested}\n'
+    with open(md_path, 'w', encoding='utf-8') as f:
+        f.write(frontmatter + body)
 
 print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
 

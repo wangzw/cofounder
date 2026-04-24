@@ -18,7 +18,7 @@ scripts/git-precheck.sh
 ```
 
 - **Inputs**: cwd
-- **Outputs**: exits 0 (repo ready) or non-zero (exits skill-forge)
+- **Outputs**: exits 0 (repo ready) or non-zero (exits the skill)
 - **Orchestrator**: if exit non-zero → stop, report error to user. Do not enter generate mode.
 
 ### Step 2 — Prepare Input (script)
@@ -28,18 +28,19 @@ scripts/prepare-input.sh "<user-prompt>" <target>/.review
 ```
 
 - **Inputs**: raw user prompt string, optional `@refs` / URLs
-- **Outputs**: `<target>/.review/round-0/input.md` (normalized text), `<target>/.review/round-0/input-meta.yml` (sparse_input flag, source list)
+- **Outputs**: `<target>/.review/round-0/input.md` (normalized text), `<target>/.review/round-0/input-meta.yml` (sparse_input flag, source list). Also drops `<target>/.review/README.md` from `common/templates/review-readme-template.md` on first bootstrap (idempotent — skipped if the file already exists so user edits survive delivery-N re-bootstrap).
 - **Orchestrator**: read exit code only; do not read the written files.
 
 ### Step 3 — Glossary Probe (script)
 
 ```bash
-scripts/glossary-probe.sh <target>/.review/round-0 <skill-forge>/common/domain-glossary.md
+scripts/glossary-probe.sh <target>/.review common/domain-glossary.md
 ```
 
 - **Inputs**: `input.md`, `input-meta.yml`, `domain-glossary.md`
 - **Outputs**: `<target>/.review/round-0/trigger-flags.yml` (boolean flags: `glossary_hit`, `sparse_input`, `ambiguous_artifact_type`)
 - **Orchestrator**: read exit code only; do not read the written file.
+- **Note**: first arg is the `.review/` root, not `.review/round-0/` — the script appends `round-0/` itself (or `--bootstrap-subdir` override).
 
 ### Step 4 — Domain Consultant (conditional sub-agent dispatch)
 
@@ -49,7 +50,7 @@ OR user passed `--interactive`. Skip otherwise.
 - **Dispatches**: `generate/domain-consultant-subagent.md`
 - **Inputs consumed by sub-agent**: `round-0/input.md`, `round-0/input-meta.yml`, `round-0/trigger-flags.yml`, `common/domain-glossary.md`
 - **Outputs written by sub-agent**: `<target>/.review/round-0/clarification/<ISO-timestamp>.yml`
-- **Orchestrator action on ACK**: record `trace_id` in `state.yml`; if ACK is `FAIL` → apply §16 retry policy; if user wrote `/abort` during dialogue → exit skill-forge.
+- **Orchestrator action on ACK**: record `trace_id` in `state.yml`; if ACK is `FAIL` → apply §16 retry policy; if user wrote `/abort` during dialogue → exit this skill.
 
 ### Step 5 — Planner (sub-agent dispatch)
 
@@ -69,7 +70,7 @@ artifact leaf).
 Wait for user response:
 - **approve** (or `/approve`) → continue to Step 7
 - **revise** (or `/revise <feedback>`) → re-dispatch planner with feedback appended; loop Step 5–6
-- **abort** (or `/abort`) → exit skill-forge
+- **abort** (or `/abort`) → exit this skill
 
 ### Step 7 — Scaffold (script)
 

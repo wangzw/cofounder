@@ -127,9 +127,13 @@ delivery_id: <D>
 open_issues: <count of new+persistent+regressed>
 resolved_this_round: <count of resolved>
 regressed_count: <count of regressed>
-critical_count: <count where severity=critical>
-error_count: <count where severity=error>
-warning_count: <count where severity=warning>
+# Severity counts are scoped to OPEN issues only (status ∈ {new, persistent, regressed}).
+# Resolved issues are excluded — else a converged verdict would be impossible once any
+# resolved error/critical exists (judge-subagent §Verdict Definitions requires
+# critical_count == 0 AND error_count == 0 for convergence).
+critical_count: <open count where severity=critical>
+error_count: <open count where severity=error>
+warning_count: <open count where severity=warning>
 coverage_percent: <int 0-100>
 skip_set_utilization: <focused_leaves / total_leaves * 100>%
 writer_fail_count_sum: <sum of fail_count across all writer self-reviews this round>

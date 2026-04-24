@@ -28,7 +28,7 @@ Supported placeholders in skeleton files:
   {{SKILL_DESCRIPTION}} The skill description (must start with "Use when")
 
 Notes:
-  - Skeletons live at skills/skill-forge/common/skeleton/<variant>/
+  - Skeletons live at skills/this skill/common/skeleton/<variant>/
   - scaffold.sh exits 2 if the skeleton for the requested variant is not yet implemented
   - scaffold.sh exits 2 if target-path exists and any file drifts from the skeleton
   - scripts/metrics-aggregate.sh and scripts/lib/aggregate.py are never substituted

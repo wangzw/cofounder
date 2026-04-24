@@ -74,8 +74,9 @@ fi
 # Stage target dir (including .review/)
 git -C "$TARGET" add --all
 
-# Commit
-git -C "$TARGET" commit -m "feat(skill-forge): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
+# Commit — scope is the skill's own dir basename (Conventional Commits)
+SKILL_SCOPE="$(basename "$(cd "$TARGET" && pwd)")"
+git -C "$TARGET" commit -m "feat(${SKILL_SCOPE}): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
 
 # Annotated tag
 git -C "$TARGET" tag -a "$TAG" -m "${CHANGE_SUMMARY}"

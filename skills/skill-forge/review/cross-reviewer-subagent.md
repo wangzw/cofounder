@@ -170,13 +170,15 @@ MUST take exactly ONE of these three actions — NEVER silently ignore:
 For each issue found, write ONE file at:
 `<target>/.review/round-<N>/issues/<issue-id>.md`
 
-Issue ID format: `<target-slug>-round-<N>-<seq>` where `<seq>` is zero-padded 3 digits.
+Issue ID format: `R<N>-<seq>` where `<seq>` is zero-padded 3 digits, consistent with
+script-emitted issues from `run-checkers.sh` (§12.5). Start `<seq>` at max existing in
+`round-<N>/issues/` + 1, so cross-reviewer IDs never collide with script-tier IDs.
 
 Frontmatter schema:
 
 ```yaml
 ---
-issue_id: <target-slug>-round-<N>-<seq>
+id: R<N>-<seq>
 round: <N>
 file: <target-relative-path>
 criterion_id: CR-L03
