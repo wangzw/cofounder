@@ -23,6 +23,18 @@ Idea → /cofounder:prd-analysis → /cofounder:system-design → /cofounder:aut
 
 Skills are chainable: `/cofounder:system-design` reads PRD output, `/cofounder:autoforge` reads system design output, `/cofounder:go-to-market` can chain from PRD. `/cofounder:dev-conventions` is standalone — run it at any point to generate repo scaffolding (issue/PR templates, CI lint workflows, git hooks, CONTRIBUTING.md). It is independent of the main pipeline and can be used before or after `/cofounder:autoforge`.
 
+## Meta-Skill
+
+`/cofounder:skill-forge` is a generative skill that generates new generative skills per the generative-skill design guide (`~/Documents/mind/raw/guide/生成式 Skill 设计指南.md`). It is orthogonal to the main pipeline — use it when you want to add a new skill to cofounder (or anywhere else) that produces artifacts from sparse input.
+
+Triggers:
+- `/cofounder:skill-forge "I want a skill that ..."` — from-scratch generation
+- `/cofounder:skill-forge --target skills/<name> "<change>"` — new-version evolution
+- `/cofounder:skill-forge --review --target skills/<name>` — review an existing skill
+- `/cofounder:skill-forge --diagnose [--round N | --delivery N]` — pure-script metrics aggregation
+
+See `skills/skill-forge/SKILL.md` for the full mode routing and the generative-skill design guide for methodology.
+
 ## Skill Architecture
 
 Each skill follows the same structure:
