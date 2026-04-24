@@ -119,7 +119,8 @@ state = {
     'leaves': leaves,
     'unchanged': unchanged,
     'manifest_path': manifest_path,
-    'round_dir': round_dir
+    'round_dir': round_dir,
+    'now_iso': now_iso,
 }
 state_path = os.path.join(round_dir, '_phase_a_state.json')
 with open(state_path, 'w') as f:
@@ -159,18 +160,129 @@ with open(state_path, 'r') as f:
     state = json.load(f)
 leaves = state['leaves']
 unchanged = state['unchanged']
+now_iso = state.get('now_iso', '')
 
 # Build skip-set
-per_file_skips = {}  # criterion_id -> list of files to skip
+# Per guide §8.5 / §12.5.1, skip-set has two granularities:
+#   (a) single_file_focus/skip: per-file hash unchanged → safe for single-file checkers
+#   (b) cross_reviewer_focus/skip: hash AND transitive dependencies unchanged → safe for
+#       cross-reviewer LLM (else a dependency change leaves stale cross-refs unchecked)
+
+all_leaves = set(leaves.keys())
+unchanged_set = set(unchanged)
+changed_set = all_leaves - unchanged_set
+
+# Load depgraph if available (built by build-depgraph.sh between Phase A and Phase B)
+depgraph_path = os.path.join(round_dir, 'depgraph.yml')
+depgraph = {}
+depgraph_available = False
+if os.path.isfile(depgraph_path):
+    try:
+        with open(depgraph_path, 'r', encoding='utf-8') as f:
+            dep_txt = f.read()
+        in_graph = False
+        current_file = None
+        current_deps = []
+        for line in dep_txt.split('\n'):
+            if line.strip() == 'graph:':
+                in_graph = True
+                continue
+            if not in_graph:
+                continue
+            m_file = re.match(r'^\s{2}"([^"]+)":\s*\[\]', line)
+            if m_file:
+                # Inline empty list
+                depgraph[m_file.group(1)] = []
+                continue
+            m_file_open = re.match(r'^\s{2}"([^"]+)":\s*$', line)
+            if m_file_open:
+                current_file = m_file_open.group(1)
+                depgraph[current_file] = []
+                continue
+            m_dep = re.match(r'^\s+-\s+"([^"]+)"', line)
+            if m_dep and current_file:
+                depgraph[current_file].append(m_dep.group(1))
+        depgraph_available = True
+    except Exception:
+        depgraph_available = False
+
+# Build reverse deps: for each file, who references it
+reverse_deps = {f: set() for f in all_leaves}
+for src, deps in depgraph.items():
+    for dep in deps:
+        if dep in reverse_deps:
+            reverse_deps[dep].add(src)
+
+# Compute transitive closure of "tainted" files for cross-reviewer:
+# A file is tainted if it changed, OR any file it references changed, OR any file
+# that references it changed. Tainted files go to cross_reviewer_focus; untainted to skip.
+tainted = set(changed_set)
+# Propagate both directions via BFS
+frontier = set(changed_set)
+while frontier:
+    next_frontier = set()
+    for f in frontier:
+        # Files this file depends on (if they're our problem we already know)
+        for dep in depgraph.get(f, []):
+            if dep in all_leaves and dep not in tainted:
+                tainted.add(dep)
+                next_frontier.add(dep)
+        # Files that depend on this file (changes here could invalidate them)
+        for rev in reverse_deps.get(f, set()):
+            if rev not in tainted:
+                tainted.add(rev)
+                next_frontier.add(rev)
+    frontier = next_frontier
+
+cross_reviewer_focus = sorted(tainted)
+cross_reviewer_skip  = sorted(all_leaves - tainted)
+
+single_file_focus = sorted(changed_set)
+single_file_skip  = sorted(unchanged_set)
+
+# Back-compat per_file_skips: per-CR list (same as before). Script checkers
+# still consume this rather than single_file_*. Identical semantics for per_file CRs.
+per_file_skips = {}
 for c in criteria:
     cid = c.get('id', '')
     skip = c.get('incremental_skip', 'full_scan')
     if skip == 'per_file':
-        per_file_skips[cid] = unchanged
+        per_file_skips[cid] = single_file_skip
 
-# Write skip-set.yml
+# Helper: write a YAML list field, inline `[]` when empty
+def write_list(f, key, values):
+    if not values:
+        f.write(f"{key}: []\n")
+    else:
+        f.write(f"{key}:\n")
+        for v in values:
+            f.write(f'  - "{v}"\n')
+
+# Write skip-set.yml per guide §12.5.1 schema
 skip_set_path = os.path.join(round_dir, 'skip-set.yml')
+round_num = int(round_dir.rstrip('/').split('round-')[-1])
+total_leaves = len(all_leaves)
+
 with open(skip_set_path, 'w', encoding='utf-8') as f:
+    f.write(f"round: {round_num}\n")
+    f.write(f"generated_at: {now_iso}\n")
+    f.write(f"depgraph_available: {'true' if depgraph_available else 'false'}\n")
+    write_list(f, "single_file_focus", single_file_focus)
+    write_list(f, "single_file_skip",  single_file_skip)
+    write_list(f, "cross_reviewer_focus", cross_reviewer_focus)
+    write_list(f, "cross_reviewer_skip",  cross_reviewer_skip)
+    # coverage check sums — union must equal total_leaves for each granularity
+    f.write("coverage_check:\n")
+    f.write(f"  total_leaves: {total_leaves}\n")
+    f.write(f"  single_file_focus_count: {len(single_file_focus)}\n")
+    f.write(f"  single_file_skip_count: {len(single_file_skip)}\n")
+    f.write(f"  single_file_union_complete: {str(len(single_file_focus) + len(single_file_skip) == total_leaves).lower()}\n")
+    f.write(f"  cross_reviewer_focus_count: {len(cross_reviewer_focus)}\n")
+    f.write(f"  cross_reviewer_skip_count: {len(cross_reviewer_skip)}\n")
+    f.write(f"  cross_reviewer_union_complete: {str(len(cross_reviewer_focus) + len(cross_reviewer_skip) == total_leaves).lower()}\n")
+    # Per-criterion skip lists (back-compat for script checkers).
+    # Script checkers that care about per_file granularity consume this; LLM reviewers
+    # should consume cross_reviewer_focus instead.
     f.write("per_file_skips:\n")
     for cid in sorted(per_file_skips.keys()):
         skipped = per_file_skips[cid]
