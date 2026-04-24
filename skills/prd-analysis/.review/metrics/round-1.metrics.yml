@@ -1,0 +1,89 @@
+generated_at: 2026-04-24T15:39:54Z
+scope:
+  key: round
+  value: 1
+  rounds:
+    - 1
+delivery_id: 1
+pricing_source: /Users/wangzw/workspace/cofounder/skills/skill-forge/common/config.yml
+cost:
+  total_usd: 6.077682
+  by_role:
+    judge:
+      input_tokens: 13
+      output_tokens: 199
+      cache_read_tokens: 362397
+      cache_creation_tokens: 13237
+      usd: 0.806909
+      calls: 1
+    planner:
+      input_tokens: 24
+      output_tokens: 317
+      cache_read_tokens: 21632
+      cache_creation_tokens: 39704
+      usd: 0.801033
+      calls: 1
+    reviser:
+      input_tokens: 12
+      output_tokens: 181
+      cache_read_tokens: 0
+      cache_creation_tokens: 30292
+      usd: 0.58173
+      calls: 1
+    summarizer:
+      input_tokens: 12
+      output_tokens: 2
+      cache_read_tokens: 19706
+      cache_creation_tokens: 10346
+      usd: 0.223877
+      calls: 1
+    writer:
+      input_tokens: 206
+      output_tokens: 899
+      cache_read_tokens: 392403
+      cache_creation_tokens: 240261
+      usd: 3.664133
+      calls: 10
+  by_criterion: {}
+latency_seconds:
+  total: 23499
+  by_role:
+    judge: 33
+    planner: 118
+    reviser: 146
+    summarizer: 82
+    writer: 23120
+join_stats:
+  dispatched_traces: 14
+  unmatched_dispatches: 0
+  unmatched_ratio: 0
+traces:
+  - trace_id: R1-J-001
+    usd: 0.806909
+  - trace_id: R1-P-001
+    usd: 0.801033
+  - trace_id: R1-R-001
+    usd: 0.58173
+  - trace_id: R1-S-001
+    usd: 0.223877
+  - trace_id: R1-W-001
+    usd: 0.592839
+  - trace_id: R1-W-002
+    usd: 0.538296
+  - trace_id: R1-W-003
+    usd: 0.356917
+  - trace_id: R1-W-004
+    usd: 0.275586
+  - trace_id: R1-W-005
+    usd: 0.255734
+  - trace_id: R1-W-006
+    usd: 0.253221
+  - trace_id: R1-W-007
+    usd: 0.671783
+  - trace_id: R1-W-008
+    usd: 0.255808
+  - trace_id: R1-W-009
+    usd: 0.247499
+  - trace_id: R1-W-010
+    usd: 0.216451
+warnings: []

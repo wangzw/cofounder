@@ -139,14 +139,37 @@ def yaml_load(path: str) -> dict:
             if body.startswith("- "):
                 val = _parse_scalar(body[2:].strip())
                 if not isinstance(parent, list):
-                    # We hit a `- value` line but the current parent is a dict,
-                    # not a list. The mini-reader only supports scalar-under-list
-                    # when the parent is already a list (pre-created elsewhere).
-                    # Top-level-list-under-key is not supported — warn loudly so
-                    # the skill author knows to swap in pyyaml if they need it.
-                    warn(f"yaml_load: dropped list item {val!r} (top-level-list "
-                         f"under dict key is unsupported; use pyyaml if needed)")
-                    continue
+                    # Parent is a dict — most likely the empty dict we created
+                    # from a prior `key:` line (rest == ""). If it's empty and
+                    # the current indent deepens into it, promote it to a list
+                    # in-place (standard YAML: `key:\n  - item` means list value).
+                    if (isinstance(parent, dict)
+                            and len(parent) == 0
+                            and len(stack) >= 2):
+                        _, grandparent = stack[-2]
+                        parent_indent = stack[-1][0]
+                        if isinstance(grandparent, dict):
+                            swapped = False
+                            for k, v in list(grandparent.items()):
+                                if v is parent:
+                                    new_list: List = []
+                                    grandparent[k] = new_list
+                                    stack[-1] = (parent_indent, new_list)
+                                    parent = new_list
+                                    swapped = True
+                                    break
+                            if not swapped:
+                                warn(f"yaml_load: dropped list item {val!r} "
+                                     f"(could not locate parent key for promotion)")
+                                continue
+                        else:
+                            warn(f"yaml_load: dropped list item {val!r} "
+                                 f"(grandparent is not a dict)")
+                            continue
+                    else:
+                        warn(f"yaml_load: dropped list item {val!r} "
+                             f"(parent is non-empty dict; ambiguous)")
+                        continue
                 parent.append(val)
                 continue
             if ":" in body:
@@ -633,7 +656,9 @@ def main() -> int:
         "generated_at": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "scope": {"key": scope_key, "value": scope_val, "rounds": rounds},
         "delivery_id": all_dispatches[0].delivery_id if all_dispatches else 0,
-        "pricing_source": args.config or "none",
+        # Record absolute path so the metrics YAML is reproducible regardless of
+        # which cwd `metrics-aggregate.sh --diagnose` was invoked from.
+        "pricing_source": (os.path.abspath(args.config) if args.config else "none"),
         "cost": {
             "total_usd": agg["total_usd"],
             "by_role": agg["by_role"],
@@ -644,10 +669,20 @@ def main() -> int:
             "by_role": agg["latency_by_role"],
         },
         "join_stats": {
+            # Dispatches scanned (from orchestrator's dispatch-log.jsonl).
             "dispatched_traces": len(all_dispatches),
+            # Dispatches for which NO harness event could be attributed.
+            # This is the JOIN-health signal — a growing number here means
+            # prompt_hash / time-window matching is degrading.
             "unmatched_dispatches": len(unmatched_ds),
-            "unmatched_events": len(unmatched_evs),
+            # unmatched_dispatches / dispatched_traces. Script exits 3 when >0.5.
             "unmatched_ratio": round(unmatched_ratio, 4),
+            # NOTE: harness-side events that don't match any dispatch are NOT
+            # reported here. They are dominated by the orchestrator's own
+            # session activity, which grows monotonically over time and makes
+            # the output non-idempotent across `--diagnose` runs. If you need
+            # that count for debugging, re-run with `--dry-run` and inspect
+            # stderr (future enhancement — currently not logged).
         },
         "traces": _build_traces(agg["trace_cost"], all_dispatches),
         "warnings": [],
