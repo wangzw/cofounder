@@ -413,12 +413,21 @@ def join_events(
         else:
             remaining.append(ev)
 
-    # Pass 2: fallback timestamp-window JOIN (only for remaining events)
+    # Pass 2: fallback timestamp-window JOIN (only for remaining events).
+    # Require STRICT model equality — a previous `(not ev.model or not d.model)`
+    # permissive rule silently attributed opus-tier events from overlapping
+    # parent-session activity to haiku-tier dispatches, inflating per-trace cost
+    # by up to 14× when windows coincided. Strict equality keeps the fallback
+    # honest: events with no model field or with a different model than the
+    # dispatch are left unattributed.
     for ev in remaining:
+        if not ev.model:
+            unmatched_events.append(ev)
+            continue
         candidates = [
             d for d in dispatches
             if d.dispatched_at <= ev.timestamp <= d.returned_at
-            and (not d.model or not ev.model or d.model == ev.model)
+            and d.model == ev.model
         ]
         if len(candidates) == 1:
             attributed.append(AttributedEvent(candidates[0].trace_id, ev))
