@@ -95,6 +95,31 @@ Evaluate all 10 LLM-type criteria (CR-L01..CR-L10) from `common/review-criteria.
 leaves listed in `cross_reviewer_focus`. One issue file per issue found. Handle writer self-review
 FAIL rows explicitly (escalate, dismiss with record, or cascade — never silently ignore).
 
+### Class-Based Scan (MANDATORY before emitting issues)
+
+When you identify ONE instance of an issue class (e.g., "file references stale criterion ID X"),
+you MUST scan ALL leaves in `cross_reviewer_focus` for the SAME class before finalizing your
+issue list. Rationale: skill-forge's review-revise loop amortizes its per-round cost across all
+parallel issues found in that round; if you catch 1 of 3 same-class instances in round N, the
+remaining 2 surface one-at-a-time in rounds N+1 and N+2, inflating `rounds_to_convergence` by
+2 rounds. Exhaustive class-based scan catches all instances in one round.
+
+**Workflow (enforce in this order):**
+
+1. For each criterion, evaluate one leaf at a time and note any issue instances.
+2. **Before writing any issue file**, re-scan: for each distinct issue class you found, grep/search
+   every leaf in `cross_reviewer_focus` for the same pattern. Add all newly-found instances.
+3. Only then write issue files. Each issue file covers ONE leaf; multi-leaf issues become N separate
+   files (one per affected leaf), all citing the same `criterion_id`.
+
+**Example**: if you find `generate/writer-subagent.md` references a stale CR-ID that no longer
+exists in `common/review-criteria.md`, you MUST then grep every `.md` file under the target for
+the same stale CR-ID before writing issues. Typical find: the same stale reference appears in 2-4
+files that were produced by parallel writers at the same round.
+
+**Self-check** before emitting ACK: "did I do the class-based scan for each issue I found?"
+If no, re-scan now.
+
 ### Input Contract
 
 Read these sources before writing any issues:
@@ -190,3 +215,36 @@ OK trace_id=<trace_id> role=reviewer linked_issues=<comma-separated issue IDs or
 - **FORBIDDEN** to include issue content in the Task return — the ACK is one line only.
 - **FORBIDDEN** to silently ignore writer self-review FAIL rows — each FAIL row requires an
   explicit escalate, dismiss, or cascade record.
+
+### Task Return Hygiene (MUST enforce before returning)
+
+Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
+Task return MUST be EXACTLY ONE LINE of the form:
+
+```
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+```
+
+or
+
+```
+FAIL trace_id=<id> reason=<one-line-reason>
+```
+
+**Any of the following pollutes orchestrator context and violates the IPC contract:**
+
+- A summary paragraph of what you did — FORBIDDEN
+- A bulleted list of changes — FORBIDDEN
+- Markdown headers / code fences wrapping the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
+- An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
+- A closing remark / sign-off of any kind — FORBIDDEN
+
+Your deliverables are the files you wrote via the Write tool. Those files are the proof of
+completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
+bookkeeping — nothing more.
+
+**Self-check**: before you send your final message, ask yourself "if I stripped every line
+except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
+If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
+and move on — the Task return stays ACK-only regardless.

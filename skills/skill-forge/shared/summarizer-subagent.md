@@ -237,3 +237,36 @@ OK trace_id=<trace_id> role=summarizer linked_issues=[]
 
 - `linked_issues` is always empty for the summarizer (it does not file issues).
 - Return this ACK as the **single and final line** of the Task return. Nothing after it.
+
+### Task Return Hygiene (MUST enforce before returning)
+
+Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
+Task return MUST be EXACTLY ONE LINE of the form:
+
+```
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+```
+
+or
+
+```
+FAIL trace_id=<id> reason=<one-line-reason>
+```
+
+**Any of the following pollutes orchestrator context and violates the IPC contract:**
+
+- A summary paragraph of what you did — FORBIDDEN
+- A bulleted list of changes — FORBIDDEN
+- Markdown headers / code fences wrapping the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
+- An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
+- A closing remark / sign-off of any kind — FORBIDDEN
+
+Your deliverables are the files you wrote via the Write tool. Those files are the proof of
+completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
+bookkeeping — nothing more.
+
+**Self-check**: before you send your final message, ask yourself "if I stripped every line
+except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
+If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
+and move on — the Task return stays ACK-only regardless.

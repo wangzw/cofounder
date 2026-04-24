@@ -4,7 +4,6 @@
 # Writes: manifest.yml, depgraph.yml, skip-set.yml, issues/round-checker-output.json
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
-
 # ====================================================================
 # VARIANT: hybrid
 # Phase B SHOULD route checkers by file type:
@@ -14,6 +13,7 @@ set -euo pipefail
 #   - cross-type consistency: `documented API matches implementation`
 # These dispatch rules are not wired for v1 — writer sub-agent adds them.
 # ====================================================================
+
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -225,7 +225,25 @@ for c in criteria:
         # Also try relative to scripts_dir (skill-forge's scripts)
         full_script = os.path.join(scripts_dir, os.path.basename(script_path))
     if not os.path.isfile(full_script):
-        sys.stderr.write(f"WARNING: {cid} script not found: {script_path}\n")
+        # Missing checker => structured meta-issue so it surfaces in review loop
+        # and the judge sees a real 'error' until the script is authored or the CR is
+        # re-classified / deprecated. (Previously this only emitted a stderr WARNING
+        # that was silently skipped — allowing converged verdicts despite unchecked CRs.)
+        all_issues.append({
+            "criterion_id": "CR-META-missing-checker",
+            "file": script_path,
+            "severity": "error",
+            "description": (
+                f"{cid} declares script_path {script_path!r} but no such script exists "
+                f"in the target or skill-forge scripts/ directory; criterion was not evaluated"
+            ),
+            "suggested_fix": (
+                f"author scripts/{os.path.basename(script_path)} following §12.4 output contract, "
+                f"OR change {cid}.checker_type to 'llm' in common/review-criteria.md if the check "
+                f"genuinely requires LLM judgment, OR add deprecated: true to {cid} if the rule "
+                f"is no longer applicable"
+            ),
+        })
         continue
 
     try:
@@ -250,11 +268,37 @@ for c in criteria:
                 if isinstance(checker_issues, list):
                     all_issues.extend(checker_issues)
             except json.JSONDecodeError:
-                sys.stderr.write(f"WARNING: {cid} produced non-JSON stdout: {stdout[:100]}\n")
+                # Non-JSON stdout is a contract violation — emit meta-issue
+                # instead of silent warning, so it's visible to judge + revise loop.
+                all_issues.append({
+                    "criterion_id": "CR-META-checker-contract-violation",
+                    "file": script_path,
+                    "severity": "error",
+                    "description": (
+                        f"{cid} checker stdout is not valid JSON (first 100 chars: "
+                        f"{stdout[:100]!r}); expected JSON array per §12.4"
+                    ),
+                    "suggested_fix": (
+                        f"fix {script_path} to emit JSON array on stdout (empty list [] on pass, "
+                        f"list of issue dicts on findings); all diagnostic output must go to stderr"
+                    ),
+                })
     except subprocess.TimeoutExpired:
-        sys.stderr.write(f"WARNING: {cid} timed out\n")
+        all_issues.append({
+            "criterion_id": "CR-META-checker-timeout",
+            "file": script_path,
+            "severity": "error",
+            "description": f"{cid} checker timed out after 60s; criterion not evaluated",
+            "suggested_fix": f"profile {script_path} and optimize, or split into per-file invocations",
+        })
     except Exception as e:
-        sys.stderr.write(f"WARNING: {cid} error: {e}\n")
+        all_issues.append({
+            "criterion_id": "CR-META-checker-error",
+            "file": script_path,
+            "severity": "error",
+            "description": f"{cid} checker raised unexpected exception: {type(e).__name__}: {e}",
+            "suggested_fix": f"inspect {script_path} for robustness; catch the underlying cause",
+        })
 
 # Write output
 out_path = os.path.join(round_dir, 'issues', 'round-checker-output.json')

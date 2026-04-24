@@ -184,3 +184,37 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
   use the blocker-scope taxonomy, record the FAIL row with `blocker_scope`, and return
   `OK ... self_review_status=PARTIAL`. The cross-reviewer and reviser handle global conflicts
   in the review/revise loop (§11.2).
+
+### Task Return Hygiene (MUST enforce before returning)
+
+Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
+Task return MUST be EXACTLY ONE LINE of the form:
+
+```
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+```
+
+or
+
+```
+FAIL trace_id=<id> reason=<one-line-reason>
+```
+
+**Any of the following pollutes orchestrator context and violates the IPC contract:**
+
+- A summary paragraph of what you did — FORBIDDEN
+- A bulleted list of changes — FORBIDDEN
+- Markdown headers / code fences wrapping the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
+- An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
+- A closing remark / sign-off of any kind — FORBIDDEN
+
+Your deliverables are the files you wrote via the Write tool. Those files are the proof of
+completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
+bookkeeping — nothing more.
+
+**Self-check**: before you send your final message, ask yourself "if I stripped every line
+except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK
+line. If you feel you need to explain something to the user, STOP — write it to a file in
+`.review/round-N/notes/<trace_id>.md` instead, and mention the note in the ACK's rationale is
+not allowed either — just write the note file and move on.
