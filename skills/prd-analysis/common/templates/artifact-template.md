@@ -24,7 +24,7 @@ docs/raw/prd/YYYY-MM-DD-<product-slug>/
 │   ├── tech-stack.md
 │   ├── data-model.md
 │   ├── coding-conventions.md
-│   └── nfr.md                        # perf + security + a11y (CR-PRD-L05)
+│   └── nfr.md                        # perf + security + a11y (CR-PRD-L05) + observability (advisory)
 ├── REVISIONS.md                       # Optional — only after first --revise cycle
 └── prototypes/                        # Optional
     ├── src/
@@ -197,6 +197,10 @@ interface ExampleEntity {
 - Self-containedness is mandatory (CR-PRD-L01): inline the data model AND conventions. A coding
   agent implementing this feature reads ONLY this file. It MUST NOT need to open any other file.
 - Leaf MUST be ≤ 300 lines (CR-PRD-S08).
+- **Feature files MUST NOT include observability constraints** (metric cardinality limits, SLO
+  definitions, span naming, log schemas). Observability is a cross-feature NFR and lives
+  exclusively in `architecture/nfr.md`. Placing observability content in feature files would
+  force cross-references to other features to resolve cardinality budgets, violating CR-PRD-L01.
 
 ---
 
@@ -215,7 +219,7 @@ interface ExampleEntity {
 | [tech-stack.md](architecture/tech-stack.md) | Languages, frameworks, infrastructure choices |
 | [data-model.md](architecture/data-model.md) | Entity definitions, relationships, storage schema |
 | [coding-conventions.md](architecture/coding-conventions.md) | Style, error handling, testing patterns |
-| [nfr.md](architecture/nfr.md) | Performance targets, security posture, accessibility requirements |
+| [nfr.md](architecture/nfr.md) | Performance targets, security posture, accessibility requirements, observability requirements |
 
 ## Navigation
 
@@ -223,7 +227,7 @@ interface ExampleEntity {
 - **tech-stack.md** — "What tools are we building with?"
 - **data-model.md** — "What does the data look like?"
 - **coding-conventions.md** — "How do we write code consistently?"
-- **nfr.md** — "What quality bar must the system meet?"
+- **nfr.md** — "What quality bar must the system meet, and how is it observed in production?"
 ```
 
 Rules:
@@ -242,11 +246,140 @@ Each topic file is self-contained and covers exactly one concern. Required topic
 | `tech-stack.md` | Runtime, language version, primary frameworks, cloud/infra decisions |
 | `data-model.md` | Entity definitions, field types, relationships, storage engine |
 | `coding-conventions.md` | Language style, naming, error handling, test patterns |
-| `nfr.md` | Performance targets (p95 latency, throughput), security posture (auth, encryption, OWASP coverage), accessibility requirements (WCAG level, a11y tooling) |
+| `nfr.md` | Performance targets (p95 latency, throughput), security posture (auth, encryption, OWASP coverage), accessibility requirements (WCAG level, a11y tooling), observability requirements (metrics cardinality, SLO templates, tracing-span naming, structured-log schemas) |
 
 `nfr.md` MUST cover all three non-functional dimensions — performance, security, and a11y — to
 satisfy CR-PRD-L05. An architecture section missing `nfr.md` or any of these three dimensions
 fails this criterion.
+
+### nfr.md — Observability Subsection (Prescriptive)
+
+In addition to the three CR-enforced dimensions, every `nfr.md` SHOULD include an **Observability**
+subsection. Writers MUST emit all four topics below when authoring a PRD's `architecture/nfr.md`.
+This subsection is currently advisory (not enforced by CR-PRD-L05). Future delivery may promote
+this to a formal CR (CR-PRD-L07 observability-coverage).
+
+**Scope boundaries for nfr.md:**
+
+- **Observability subsection** — covers the instrumentation contract: what to measure, how to
+  name it, cardinality limits, SLO definitions, trace span naming, and structured-log schemas.
+  SLO targets live here because SLOs are an observability concern (they define how the system
+  is observed and alerted on). Latency *targets* (the raw p95/p99 thresholds that drive SLOs)
+  are shared with the Performance section; cross-reference `performance.md` (or the Performance
+  subsection of `nfr.md`) for the authoritative latency budget.
+- **Security section** — covers log redaction policy, audit-trail requirements, and PII handling
+  in logs. Do NOT duplicate these concerns in the Observability subsection; reference the
+  Security section instead.
+- **Metric ownership rule** — metrics are owned by the feature that emits them; shared
+  infrastructure metrics (e.g., database connection-pool utilisation, message-queue depth) are
+  owned by the architecture and documented here at the architecture level.
+
+#### Metrics — Cardinality Limits
+
+Uncontrolled label cardinality causes metric storage explosions. The cardinality budget for every
+custom metric is declared here at the architecture level, not per feature file. Feature files stay
+self-contained (CR-PRD-L01); the observability contract is a cross-feature NFR.
+
+```markdown
+## Metrics Cardinality Limits
+
+| Feature | Metric Name | Max Dimensions | Allowed Label Values |
+|---------|-------------|---------------|---------------------|
+| F-001   | <metric>    | ≤ N           | <enumerated or bounded set> |
+
+Rules:
+- No user-id, session-id, or other unbounded identifiers as metric label values.
+- Cardinality per metric MUST NOT exceed <product-level cap, e.g., 1 000 series>.
+- High-cardinality data belongs in traces or logs, not metrics.
+- Metrics are owned by the feature that emits them; shared infrastructure metrics are owned
+  by architecture and appear in this table without a feature column.
+```
+
+#### SLO Templates — Latency P99 + Error-Budget Burn Rate
+
+Each user-facing feature MUST define at minimum one latency SLO and one availability SLO,
+expressed as P99 latency threshold and a 30-day error-budget burn rate. SLO definitions live
+here in the Observability subsection; see the Performance subsection of `nfr.md` for the
+underlying latency targets that these SLOs are derived from.
+
+```markdown
+## SLO Definitions
+
+| Feature | SLO Type      | Target                        | Error Budget (30 d) | Burn-Rate Alert |
+|---------|--------------|-------------------------------|---------------------|-----------------|
+| F-001   | Latency P99  | ≤ <N> ms at the 99th percentile | —                  | N/A             |
+| F-001   | Availability | ≥ <99.N>%                      | <M> min / 30 d     | > 5× budget/hr  |
+
+Notes:
+- P99 latency is measured at the service boundary (excludes client-side rendering time).
+- Error-budget burn rate threshold of 5× means: alert when the feature consumes its full 30-day
+  budget within 6 days at the current failure rate.
+- Adjust thresholds per feature criticality (P0 features warrant tighter budgets).
+```
+
+#### Tracing — Span Naming Convention
+
+All distributed traces MUST follow the `service.operation.phase` naming scheme to enable
+consistent cross-service query and dashboard construction.
+
+```markdown
+## Trace Span Naming Convention
+
+Pattern: `<service>.<operation>.<phase>`
+
+| Segment   | Definition                                      | Example values                       |
+|-----------|-------------------------------------------------|--------------------------------------|
+| service   | Logical service or bounded context (kebab-case) | `auth`, `order-svc`, `payment-svc`   |
+| operation | Business action being performed (verb-noun)     | `create-session`, `place-order`      |
+| phase     | Lifecycle phase of the operation                | `validate`, `execute`, `persist`, `notify` |
+
+Full example: `auth.create-session.validate`, `order-svc.place-order.persist`
+
+Rules:
+- Segment values are lowercase kebab-case; no dots within a segment.
+- The `phase` segment is OPTIONAL for atomic operations but REQUIRED for multi-step flows.
+- Span attributes MUST include: `feature_id` (e.g., `F-001`), `journey_id` (e.g., `J-001`),
+  `user_id` (hashed/anonymised), `env` (`prod | staging | dev`).
+```
+
+#### Logging — Structured Log Schemas
+
+All application logs MUST be emitted as structured JSON. Each event type requires a declared
+schema with mandatory fields to enable consistent indexing and alerting. Log redaction policy
+and audit-trail requirements are a Security concern — see the Security section of `nfr.md`.
+
+```markdown
+## Structured Log Schemas
+
+### Required Fields (all event types)
+
+| Field         | Type   | Description                                      |
+|---------------|--------|--------------------------------------------------|
+| `timestamp`   | string | ISO-8601 UTC, e.g. `2026-04-24T12:40:00.000Z`   |
+| `level`       | string | `debug | info | warn | error | fatal`            |
+| `service`     | string | Same value as trace `service` segment            |
+| `trace_id`    | string | W3C Trace-Context trace-id (hex-32)              |
+| `span_id`     | string | W3C Trace-Context span-id (hex-16)               |
+| `feature_id`  | string | e.g., `F-001`                                    |
+| `message`     | string | Human-readable summary; no PII                   |
+
+### Event-Type Extension Fields
+
+| Event Type    | Additional Required Fields                                              |
+|---------------|-------------------------------------------------------------------------|
+| `http_request`  | `method`, `path`, `status_code`, `duration_ms`                        |
+| `db_query`      | `db_system`, `db_name`, `operation` (`select|insert|update|delete`), `duration_ms` |
+| `auth_event`    | `event_kind` (`login|logout|token_refresh|mfa_challenge`), `outcome` (`success|failure`), `user_id_hash` |
+| `background_job` | `job_name`, `job_id`, `outcome` (`success|failure|retry`), `duration_ms` |
+| `external_call` | `target_service`, `method`, `status_code`, `duration_ms`              |
+
+Rules:
+- No raw PII in log payloads; hash or redact user identifiers before logging (see Security
+  section for the full redaction policy and audit-trail requirements).
+- `error` and `fatal` events MUST include an `error_code` field and a `stack_trace` field.
+- Log volume targets: `debug` level disabled in production by default; `info` events
+  SHOULD NOT exceed <product-level cap, e.g., 1 000 events/req> per request path.
+```
 
 ---
 
@@ -361,6 +494,7 @@ Why this example passes all applicable CRs:
 - CR-PRD-L01: data model (User, Session) and conventions copied inline — no cross-file deps ✓
 - CR-PRD-L02: journey back-reference to J-001, touchpoint 2 ✓
 - CR-PRD-S08: well under 300 lines ✓
+- No observability content in the feature file — observability belongs in `architecture/nfr.md` ✓
 
 ---
 

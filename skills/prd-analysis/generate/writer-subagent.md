@@ -255,7 +255,7 @@ contain implementation detail. It MUST contain:
 2. **Topic List** — table with columns `Topic`, `File`, `Summary` (one-line description). Every
    row MUST correspond to an existing `architecture/<topic>.md` file.
 3. **NFR Summary** — one-line reference to the NFR topic file with a short statement of the
-   top-3 NFR concerns (perf, security, a11y).
+   top-4 NFR concerns (perf, security, a11y, observability).
 
 Applicable CRs: CR-PRD-S05 (index table matches files on disk — no orphan rows, no missing
 files), CR-PRD-L05 (NFR coverage present).
@@ -268,7 +268,12 @@ Each topic file is a standalone document. It MUST:
 2. Cover its topic completely without referencing other topic files by path (cross-topic
    references by concept name are acceptable in prose).
 3. For the `nfr.md` topic specifically: MUST cover performance targets, security requirements,
-   and accessibility (a11y) requirements — each as a named subsection.
+   accessibility (a11y) requirements, and observability requirements — each as a named subsection.
+   The Observability subsection MUST address: (a) metrics cardinality limits per feature
+   (maximum number of dimensions per metric), (b) SLO templates expressed as P99 latency
+   targets plus error-budget burn rate thresholds, (c) tracing-span naming conventions
+   (format: `service.operation.phase`), and (d) structured log schemas specifying required
+   fields per log-event type.
 
 Applicable CRs: CR-PRD-S05 (topic file is listed in architecture.md index),
 CR-PRD-L05 (NFR topic contains perf + security + a11y subsections).

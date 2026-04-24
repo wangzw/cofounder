@@ -2,6 +2,23 @@
 
 All notable changes auto-logged by skill-forge on converge.
 
+## Delivery 2 — 2026-04-24
+
+Add observability requirements to PRD artifact template.
+
+**Files modified** (per narrow-change scope):
+- common/templates/artifact-template.md (Observability subsection)
+- generate/writer-subagent.md (NFR topic guidance)
+
+**Files added** (6 stub checker scripts for CR-PRD-S* full implementation deferred to delivery-3):
+- scripts/check-{feature-ids,journey-ids,architecture-index,wikilinks,revisions-log,leaf-size}.sh
+
+**Rounds to convergence**: 2 (rounds 5-6)
+**Open issues**: 0
+**Notable**: Adversarial reviewer found 2 legit design issues (metric ownership, subsection boundary overlap) that cross-reviewer alone missed. Writer PARTIAL self-review escalated → resolved.
+
+[Details](.review/versions/2.md)
+
 ## Delivery 1 — 2026-04-24
 
 Initial FromScratch generation.
