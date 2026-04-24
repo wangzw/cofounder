@@ -143,8 +143,9 @@ hit_records = deduped
 glossary_hit = len(hit_records) > 0
 
 # ── 5. Compute sparse_input ─────────────────────────────────────────────────
-sparse_input  = (word_count < 15) and (not has_code_block) and (not has_structured)
-sparse_reason = f"word_count={word_count} < 15" if sparse_input else None
+# threshold matches common/config.yml domain_consultant.trigger.min_words_without_consultant
+sparse_input  = (word_count < 50) and (not has_code_block) and (not has_structured)
+sparse_reason = f"word_count={word_count} < 50" if sparse_input else None
 
 # ── 6. Write trigger-flags.yml ──────────────────────────────────────────────
 generated_at = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")

@@ -24,7 +24,7 @@ grep -q 'glossary_hit: true' "$TMP/.review2/round-0/trigger-flags.yml" \
   || { echo "FAIL: 'delivery' not matched as glossary hit"; exit 1; }
 
 # Test 3: dense prompt with no hits
-"$PREPARE" "A straightforward prompt with enough words to avoid being flagged as sparse input needing domain consultation about absolutely nothing contentious in here whatsoever" "$TMP/.review3" >/dev/null 2>&1
+"$PREPARE" "A fully self-contained specification document describing the customer-facing workflow of an internal productivity tool designed for cross-functional teams that need to coordinate asynchronously across multiple time zones during rolling-hour operations involving several distinct organizational units reporting through a central dashboard system that consolidates status updates automatically on a recurring schedule." "$TMP/.review3" >/dev/null 2>&1
 "$PROBE" "$TMP/.review3" "$GLOSSARY" >/dev/null 2>&1
 grep -q 'sparse_input: false' "$TMP/.review3/round-0/trigger-flags.yml" \
   || { echo "FAIL: long prompt still flagged sparse"; exit 1; }
