@@ -33,7 +33,7 @@ The IPC model is **Direct Write + ACK**:
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
-| `domain_consultant` | 1 write | `.review/round-<N>/clarification.yml` (or scoped clarification path) |
+| `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
 > The orchestrator holds no Write permission to any of the above paths — only `state.yml` and
 > `dispatch-log.jsonl` (§19.1). This physically enforces §5.1 pure-dispatch.

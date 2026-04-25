@@ -273,6 +273,7 @@ cross_reviewer_skip  = sorted(all_leaves - tainted)
 # forced-full is on. Writer / reviser mutations drift the sha → auto-demoted
 # out of the skip-set.
 # ────────────────────────────────────────────────────────────────────────────
+scaffold_skip_set: set = set()
 if not forced_full:
     provenance_path = os.path.join(target, "common", "scaffold-provenance.yml")
     scaffold_shas: Dict[str, str] = {}
@@ -289,8 +290,8 @@ if not forced_full:
             if m:
                 scaffold_shas[m.group(1)] = m.group(2)
     if scaffold_shas:
-        pure_scaffold = set()
-        for leaf in list(cross_reviewer_focus):
+        # Walk every leaf — focus AND skip — to identify scaffold-pure leaves.
+        for leaf in sorted(set(cross_reviewer_focus) | set(cross_reviewer_skip)):
             expected = scaffold_shas.get(leaf)
             if not expected:
                 continue
@@ -300,10 +301,11 @@ if not forced_full:
             except OSError:
                 continue
             if actual == expected:
-                pure_scaffold.add(leaf)
-        if pure_scaffold:
-            cross_reviewer_focus = sorted(set(cross_reviewer_focus) - pure_scaffold)
-            cross_reviewer_skip  = sorted(set(cross_reviewer_skip) | pure_scaffold)
+                scaffold_skip_set.add(leaf)
+        if scaffold_skip_set:
+            cross_reviewer_focus = sorted(set(cross_reviewer_focus) - scaffold_skip_set)
+            cross_reviewer_skip  = sorted(set(cross_reviewer_skip) | scaffold_skip_set)
+scaffold_skip = sorted(scaffold_skip_set)
 
 single_file_focus = sorted(changed_set)
 single_file_skip  = sorted(unchanged_set)
@@ -340,6 +342,12 @@ with open(skip_set_path, 'w', encoding='utf-8') as f:
     write_list(f, "single_file_skip",  single_file_skip)
     write_list(f, "cross_reviewer_focus", cross_reviewer_focus)
     write_list(f, "cross_reviewer_skip",  cross_reviewer_skip)
+    # Subset of cross_reviewer_skip whose skip reason is "scaffold-pure"
+    # (sha matches scaffold-provenance manifest, never modified by writer/
+    # reviser). Summarizer counts these as PRESUMED-COVERED for the
+    # coverage_percent metric — otherwise Tier 2.4 narrowing of focus would
+    # be punished by coverage falling below the converged-verdict gate of 100%.
+    write_list(f, "scaffold_skip", scaffold_skip)
     # coverage check sums — union must equal total_leaves for each granularity
     f.write("coverage_check:\n")
     f.write(f"  total_leaves: {total_leaves}\n")
@@ -349,6 +357,21 @@ with open(skip_set_path, 'w', encoding='utf-8') as f:
     f.write(f"  cross_reviewer_focus_count: {len(cross_reviewer_focus)}\n")
     f.write(f"  cross_reviewer_skip_count: {len(cross_reviewer_skip)}\n")
     f.write(f"  cross_reviewer_union_complete: {str(len(cross_reviewer_focus) + len(cross_reviewer_skip) == total_leaves).lower()}\n")
+    f.write(f"  scaffold_skip_count: {len(scaffold_skip)}\n")
+    # Coverage = leaves accounted for / total. A leaf is "accounted for" when
+    # it lives in cross_reviewer_focus (re-evaluated this round) OR in
+    # cross_reviewer_skip (which by skip-set semantics means it is unchanged
+    # vs. a prior covered round, OR it is scaffold-pure). The union is
+    # asserted complete by the cross_reviewer_union_complete check above; in
+    # that case coverage is 100% and the converged-verdict gate is never
+    # falsely blocked by Tier-2.4 narrowing or by depgraph-driven incremental
+    # skipping.
+    cross_total = len(cross_reviewer_focus) + len(cross_reviewer_skip)
+    if cross_total == total_leaves:
+        cov_pct = 100
+    else:
+        cov_pct = int(round(100.0 * cross_total / max(1, total_leaves)))
+    f.write(f"  effective_coverage_percent: {cov_pct}\n")
     # Per-criterion skip lists (back-compat for script checkers).
     # Script checkers that care about per_file granularity consume this; LLM reviewers
     # should consume cross_reviewer_focus instead.

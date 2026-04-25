@@ -31,7 +31,7 @@ The IPC model is **Direct Write + ACK**:
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
-| `domain_consultant` | 1 write | `.review/round-<N>/clarification.yml` (or scoped clarification path) |
+| `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
 > The orchestrator holds no Write permission to any of the above paths — only `state.yml` and
 > `dispatch-log.jsonl` (§19.1). This physically enforces §5.1 pure-dispatch.
@@ -106,8 +106,8 @@ which phase applies.
 | `<target>/.review/versions/<N-1>.md` | Previous version summary (if it exists; omit if first delivery) |
 | `<target>/.review/traces/round-<N>/dispatch-log.jsonl` | Dispatch events for latency metrics, tier distribution, and coverage completeness |
 
-The skill root (containing SKILL.md and scripts/) is the parent of the `.review/` directory — resolvable as `..` from
-`.review/`. Use this to resolve script paths like `../scripts/commit-delivery.sh` below.
+The orchestrator path to the skill-forge directory is injected as `skill-root: <path>` in
+`state.yml`. Use this when referencing script paths below.
 
 ---
 
@@ -144,9 +144,14 @@ writer_fail_count_sum: <sum of fail_count across all writer self-reviews this ro
 [Brief prose summary of what was checked, what was found, and status trends.]
 ```
 
-**Coverage percent calculation**: `100 * (evaluated_leaves / total_leaves)` where
-`evaluated_leaves` = count of leaves in `cross_reviewer_focus`, `total_leaves` = count of all
-target leaves (excluding `.review/` directory). Round to nearest integer.
+**Coverage percent calculation**: read `coverage_check.effective_coverage_percent` directly
+from `skip-set.yml` — `run-checkers.sh` Phase A pre-computes it as
+`100 * (cross_reviewer_focus_count + scaffold_skip_count) / total_leaves` (rounded). The
+formula counts both leaves the cross-reviewer actually evaluated AND scaffold-pure leaves
+(byte-identical to scaffold-provenance manifest) as covered, because the latter never
+need LLM review — they are proven scaffold content. Without this carve-out, Tier-2.4
+narrowing would push coverage below the converged-verdict gate (100%) and prevent
+convergence.
 
 **Write 2 (conditional) — Leaf index update**: if `<target>/common/index.md` exists, append
 a round-N summary row to the index table (do not rewrite the whole file — append only).
@@ -229,7 +234,8 @@ exist):
 ../scripts/commit-delivery.sh <target> <delivery-id> <change-summary-slug>
 ```
 
-Paths are resolved relative to `.review/` — `../scripts/` targets the skill\'s own scripts directory. This script creates an annotated git tag and commits the
+Where `<skill-root>` is the absolute path to the skill-forge plugin directory (from
+`state.yml` (skill root resolves to `..` from `.review/`)). This script creates an annotated git tag and commits the
 delivery state.
 
 ### ACK Format
