@@ -1,5 +1,3 @@
-# Round 1 Plan — prd-analysis (FromScratch, delivery 1)
-
 ```yaml
 mode: from-scratch
 delivery_id: 1
@@ -9,43 +7,75 @@ plan:
   modify: []
   add:
     - path: "SKILL.md"
-      template: "common/templates/skill-md-template.md"
-      description: "Plugin entry point for /cofounder:prd-analysis. Frontmatter (name=prd-analysis, version=0.1.0, description per R-001) + mode-routing table dispatching to FromScratch / NewVersion / --review / --revise / --diagnose paths inherited from skeleton/document, with PRD-specific artifact root docs/raw/prd/YYYY-MM-DD-{product-slug}/."
+      template: "skills/skill-forge/common/templates/skill-md-template.md"
+      description: "Entry-point orchestrator for prd-analysis: frontmatter, Mode Routing (5 modes), Bootstrap Precheck, Core Contract, Orchestrator Dispatch Contract (Snippet C), --diagnose Mode, Model Tiers with per-dispatch override table, CLI Flags, and Configuration & Subagent Files index."
+
     - path: "common/review-criteria.md"
-      template: "common/templates/review-criteria-template.md"
-      description: "Authoritative checker registry: 5 script-type CRs (CR-S-001 artifact-pyramid-shape, CR-S-002 leaf-size-cap ≤300 lines, CR-S-003 id-format-and-uniqueness for F-/J-/M-NNN, CR-S-004 cross-link-integrity, CR-S-005 self-contained-discipline section-header presence) and 6 LLM-type CRs (CR-L-001 scope-discipline, CR-L-002 journey-feature-coverage, CR-L-003 cross-journey-pattern-resolution, CR-L-004 self-contained-readability, CR-L-005 mvp-discipline, CR-L-006 ambiguity-elimination) per R-005/R-006."
+      template: "skills/skill-forge/common/templates/review-criteria-template.md"
+      description: "PRD-domain review criteria: structural checks CR-S01..CR-S15 (inherited from skill-forge baseline, applied to generated PRD artifacts) plus semantic checks CR-L01..CR-L16 covering persona realism, journey causal flow, feature-journey traceability, MVP boundary discipline, success-criteria measurability, business-priority justification, terminology consistency, glossary coverage, scope discipline, self-containment audit, cross-journey pattern derivation, and design-token semantics."
+
     - path: "common/domain-glossary.md"
       template: null
-      description: "PRD-domain glossary: artifact (the dated PRD pyramid directory), leaf (single ≤300-line markdown file: feature/journey/architecture topic), feature (F-NNN), journey (J-NNN), module (M-NNN, referenced from system-design boundary), touchpoint, cross-journey pattern, self-contained leaf, design token, tombstone — aligned with R-002/R-003/R-004 and project CLAUDE.md Glossary so all subagents share vocabulary."
-    - path: "common/templates/artifact-template.md"
-      template: "common/templates/artifact-template.md"
-      description: "Skeleton of one PRD leaf (feature template): required section headers Data Models / Conventions / Journey Context / State Machine / Acceptance Criteria so writers produce CR-S-005-passing leaves and CR-L-004-readable content; ≤300-line cap reminder inline."
+      description: "PRD-domain glossary defining canonical terms used by the domain-consultant and writers: touchpoint, persona, user journey, feature, MVP boundary, design token, interaction mode, cross-journey pattern, feature-module mapping, tombstone, self-contained file — sourced from cofounder/CLAUDE.md Glossary and the backup SKILL.md domain vocabulary."
+
     - path: "generate/domain-consultant-subagent.md"
       template: null
-      description: "Round-0 clarifier subagent prompt: ingests sparse one-line product idea (plus optional @-expanded directory references like notes.md), asks targeted PRD-shaping questions (target users, primary journeys, must-have vs. nice-to-have, success metrics, constraints), and writes .review/round-0/clarification/<ISO>.yml with R-001..R-007 normalized requirements. Honors hitl_mode=delegated-proceed."
+      description: "Domain-consultant sub-agent prompt for prd-analysis: elicits R-001..R-007 (skill slug, artifact type, output layout, CLI surface, script criteria, LLM criteria, baseline) from sparse product descriptions or @-referenced brainstorm files, applying PRD-domain clarification heuristics before writing clarification.yml."
+
     - path: "generate/planner-subagent.md"
       template: null
-      description: "Decomposes the clarified PRD scope into a leaf-writing fan-out plan: enumerates one writer task per journey (J-NNN), per feature (F-NNN), per architecture topic, plus README.md + architecture.md + REVISIONS.md (if --revise). Emits .review/round-N/plan.md with add/modify/delete/keep lists and per-leaf template assignments; HITL approval gate before dispatch."
+      description: "Planner sub-agent prompt for prd-analysis: derives the per-round file plan from clarification.yml, emitting add/modify/delete/keep lists for the PRD artifact pyramid (README, journeys, features, architecture topic files) using PRD-domain naming conventions (F-NNN, J-NNN)."
+
     - path: "generate/writer-subagent.md"
-      template: "common/templates/writer-subagent-template.md"
-      description: "Authors one PRD leaf (one feature OR one journey OR one architecture topic OR README/architecture index) per dispatch, COPYING data models / conventions / journey context inline (self-contained discipline). Performs FULL_PASS self-review against the 5 script-CR + 6 LLM-CR checklist; writes leaf + .review/round-N/self-reviews/<trace_id>.md."
+      template: "skills/skill-forge/common/templates/writer-subagent-template.md"
+      description: "Writer sub-agent prompt for prd-analysis: authors PRD artifact leaves (journey specs, feature specs, architecture topic files, README index) following PRD templates, self-contained file principle, and PRD-specific quality bar (DO/DON'T examples); includes mandatory self-review pass against common/review-criteria.md before ACK."
+
     - path: "review/cross-reviewer-subagent.md"
-      template: "common/templates/cross-reviewer-template.md"
-      description: "Constructive LLM reviewer: evaluates the assembled PRD pyramid against CR-L-001..CR-L-006 (scope-discipline, journey-feature coverage, cross-journey-pattern resolution, self-contained-readability, mvp-discipline, ambiguity-elimination); emits one .review/round-N/issues/<id>.md per finding with severity, evidence, and suggested-fix."
+      template: "skills/skill-forge/common/templates/cross-reviewer-template.md"
+      description: "Cross-reviewer sub-agent prompt for prd-analysis: runs script-type checks (CR-S01..CR-S15) on generated PRD files and files structural issue reports under .review/round-N/issues/, focusing on pyramid index consistency, ID format validity, frontmatter completeness, and dispatch-log snippet presence."
+
     - path: "review/adversarial-reviewer-subagent.md"
-      template: null
-      description: "Adversarial LLM reviewer: stress-tests the same CR-L set from a hostile-coder-agent perspective — tries to find a feature leaf that cannot be implemented without opening another file (CR-L-004 break), an MVP feature secretly nice-to-have (CR-L-005), or a touchpoint with no addressing feature (CR-L-002). Same issue-file output shape as cross-reviewer; complementary, not redundant."
+      template: "skills/skill-forge/common/templates/cross-reviewer-template.md"
+      description: "Adversarial-reviewer sub-agent prompt for prd-analysis: applies LLM-type checks (CR-L01..CR-L16) to stress-test the PRD for persona realism, journey causal completeness, feature-journey traceability, MVP boundary discipline, measurable success criteria, and self-contained leaf compliance; files semantic issue reports."
+
     - path: "revise/per-issue-reviser-subagent.md"
       template: null
-      description: "Per-issue reviser subagent: consumes one .review/round-N/issues/<id>.md, mutates the affected PRD leaf (or README/architecture.md) to resolve the cited CR violation while preserving unaffected sections, and rewrites the leaf to its final path. One issue → one dispatch → one Write."
+      description: "Per-issue reviser sub-agent prompt for prd-analysis: receives a single open issue file and the linked artifact leaf, applies the minimal targeted fix to the leaf following PRD conventions (preserving ID stability, self-containment, and inline context copies), then writes the updated leaf and ACKs."
+
+    - path: "shared/summarizer-subagent.md"
+      template: null
+      description: "Summarizer sub-agent prompt for prd-analysis: aggregates a completed round's self-reviews, issues, and verdict into .review/versions/N.md (round summary) plus a CHANGELOG entry in the target PRD's CHANGELOG.md; produces the pyramid index README update if the round introduced new features or journeys."
+
+    - path: "shared/judge-subagent.md"
+      template: null
+      description: "Judge sub-agent prompt for prd-analysis: reads open-issue count, blocker count, and round history to emit a verdict.yml (converged | needs-revision | oscillating | diverging) with a PRD-domain convergence rationale; never reads artifact leaves directly."
+
+    - path: "common/templates/feature-template.md"
+      template: "skills/skill-forge/common/skeleton/document/common/templates/artifact-template.md"
+      description: "Self-contained PRD feature spec template (F-NNN-{slug}.md): sections for Overview, User Story, Acceptance Criteria, State Machine, Interaction Mode, Inline Data Model, Inline Journey Context, Inline Conventions, Dependencies, and MVP Boundary note — sourced from backup feature-template.md."
+
+    - path: "common/templates/journey-template.md"
+      template: null
+      description: "Self-contained PRD journey spec template (J-NNN-{slug}.md): sections for Persona, Goal, Pre-conditions, Touchpoint table (stage, screen, action, interaction mode, system response, pain point), Mapped Features, and Post-conditions — sourced from backup journey-template.md."
+
+    - path: "common/templates/architecture-template.md"
+      template: null
+      description: "PRD architecture index template (architecture.md) and topic-file shape reference: index lists all topic files with one-line summaries and Mermaid dependency diagram; each topic file (tech-stack, data-model, design-tokens, etc.) is standalone and self-contained — sourced from backup architecture-template.md."
+
+    - path: "common/templates/prd-readme-template.md"
+      template: "skills/skill-forge/common/skeleton/document/common/templates/review-readme-template.md"
+      description: "PRD pyramid README template: product overview, persona summary, journey index table (J-NNN links), feature index table (F-NNN, priority, MVP flag, journey refs), cross-journey patterns section, design-token reference, and roadmap — sourced from backup prd-template.md."
+
   keep: []
 rationale: |
-  Standard FromScratch 10-leaf set per planner-subagent.md §Output Contract for variant=document.
-  No variant-specific extensions needed (R-002 confirmed document-only; no code-execution / schema /
-  hybrid behaviors per variant_replay). Templates assigned per skeleton/document: SKILL.md, review-criteria,
-  writer, cross-reviewer, and artifact-template inherit skill-forge templates; domain-glossary, planner,
-  domain-consultant, adversarial-reviewer, and per-issue-reviser are template:null because they encode
-  PRD-domain specifics (F-/J-/M-NNN IDs, pyramid shape, journey-feature coverage, MVP discipline) that
-  no shared template captures cleanly. Shared summarizer/judge are intentionally omitted from the add list
-  — skeleton baselines suffice for delivery-1 (no PRD-specific aggregation overrides identified in R-001..R-007).
+  FromScratch mode with no consultant (clarification.yml no_consultant=true; all R-001..R-003
+  confirmed from backup, R-004..R-007 deferred to defaults). The document skeleton variant drives
+  the top-level directory shape (SKILL.md, common/, generate/, review/, revise/, shared/). All
+  8 sub-agent roles are listed because the backup review/ directory has a cross-reviewer but no
+  adversarial-reviewer or shared/ roles — those must be authored fresh. Four PRD artifact
+  templates (feature, journey, architecture, prd-readme) are added as domain-specific files
+  because they contain PRD-specific section shapes not covered by the generic artifact-template.md
+  in the document skeleton. summarizer-subagent.md and judge-subagent.md are included (not just
+  optional) because the PRD summarizer must also update the target PRD's CHANGELOG.md pyramid
+  entry, which requires PRD-domain awareness beyond the generic shared/ stubs.
 ```

@@ -2,9 +2,9 @@
 
 # per-issue-reviser-subagent — Reviser Role
 
-**Role**: `reviser` (`R` in trace_id). Scoped to ONE artifact leaf per dispatch. Reads all open
-issues for that leaf, applies fixes, and writes the revised leaf. Regression protection is
-mandatory — resolved-issues history is a hard negative-constraint set.
+**Role**: `reviser` (`R` in trace_id). Scoped to ONE issue per dispatch. Receives a single open
+issue file and the linked PRD leaf(es), applies the minimal targeted fix, and writes the updated
+leaf(es). Does not orchestrate — does not dispatch other agents.
 
 ---
 
@@ -27,7 +27,7 @@ The IPC model is **Direct Write + ACK**:
 |------|-------------|-------------|
 | `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
 | `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
+| `reviser` | 1 write per leaf | `<artifact-path>` (updated artifact leaf) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
@@ -69,8 +69,6 @@ Both the artifact leaf and the self-review archive are on disk. Downstream cross
 reviser handles the conflicts. This is the writer's normal success path when scope-external
 issues are found (§11.2).
 
-Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
-
 ### FORBIDDEN
 
 - **FORBIDDEN** to write `<!-- metrics-footer -->`, `<!-- self-review -->`, or any HTML-comment
@@ -91,125 +89,134 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 
 ### Purpose
 
-Fix all open issues for ONE artifact leaf. Write the revised leaf. Do not touch any other file.
-Regression protection is the primary discipline: the resolved-issues history injected by the
-orchestrator is a hard negative-constraint set — the revised leaf MUST NOT re-introduce any
-previously resolved issue.
+Receive ONE open issue file (e.g., `<target>/.review/round-<N>/issues/R3-007.md`), the linked PRD
+leaf(es), and apply the minimal targeted fix. Update only the leaves listed in the issue's
+`leaves_affected` frontmatter. Do not orchestrate — do not dispatch other agents.
 
-### Input Contract
+### Inputs
 
 | Source | Purpose |
 |--------|---------|
-| `<target>/.review/round-<N>/issues/<issue-id>.md` | One or more issue files for this leaf (all targeting the same `file` path). Read body + frontmatter of each — you MUST read the actual issue text to understand what to fix. |
-| `<target>/<leaf-path>` | Current artifact content — base for the revision |
-| Resolved-issues history (injected by orchestrator) | Up to `config.yml regression_gate.max_injected_resolved` (default: 20) previously resolved issue frontmatter entries, presented as negative constraints. Read these as a list of things the revised leaf MUST NOT revert to. |
+| One issue file path (passed in trace_id's role-specific context) | The open issue to address — read its frontmatter and body fully before writing anything |
+| The linked leaves (file paths in issue `leaves_affected` frontmatter) | PRD artifact leaves to update — read each in full before writing |
+| `common/review-criteria.md` | Canonical criterion definitions — consult to understand the criterion that was violated |
+| `common/domain-glossary.md` | Canonical PRD-domain terminology — consult to apply correct terminology in the fix |
+| Most recent self-review for the leaf (`.review/round-<N>/self-reviews/<writer-trace-id>.md`) | Context — what the writer initially marked PASS/FAIL for this leaf; do NOT re-run self-review |
 
 The `trace_id` (injected as the first line of this sub-session by the orchestrator) identifies
-the target leaf and the linked issue IDs for this dispatch.
+which issue this reviser instance is responsible for.
 
-Issue-id format: `R<N>-<NNN>` — e.g. `R1-001`, `R2-014`. This is consistent with the
-cross-reviewer and adversarial-reviewer output format. Do NOT invent alternative formats.
+### Output
 
-### Regression-Protection Protocol (guide §14)
+Write the updated leaf(es): **1 write per leaf in `leaves_affected`**. Each write is the FULL
+file content — not a patch, not a diff, not an append. The Write tool overwrites the existing
+leaf with the corrected version.
 
-Before writing the revised leaf:
+**PRESERVE across every write:**
 
-1. Read the injected resolved-issues history.
-2. For each previously resolved issue: confirm the fix is still present in the current leaf.
-   If a regression is detected (fix reverted), do NOT proceed — emit a `CR-META-regression`
-   meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` and abort the revision
-   write (return `FAIL` ACK with `reason=regression-detected-in-current-leaf`).
-3. After writing the revised leaf: mentally verify that none of the resolved-issues patterns
-   re-appear in the new content.
+- **F-NNN / J-NNN IDs** — stable identity; never renumber, never remove, never create a new ID
+  for an existing concept.
+- **Self-containment** — inline data models, conventions, and journey context must remain fully
+  inlined. Do not replace inline copies with cross-references.
+- **Frontmatter structure** — all frontmatter keys and their shapes (yaml block) must be
+  preserved. You may update values where the fix requires it, but do not remove or rename keys.
+- **Leaf shape** — do not turn a feature into a journey, a journey into a feature, or otherwise
+  change the artifact class of the leaf.
 
-This is belt-and-suspenders: the judge will also flag regressions, but the reviser catching
-them early prevents wasted dispatch cycles.
+### Escalation Protocol (cross-leaf dependencies)
 
-### Skeleton-Protection Protocol
+If applying the fix requires touching a leaf NOT listed in `leaves_affected`:
 
-Before writing ANY file, verify the target path is NOT skeleton-owned:
+1. **Do NOT silently fix the other leaf.**
+2. Add a one-line amendment block after the issue frontmatter (before the issue body):
+   ```
+   escalate: yes
+   escalate_reason: Fix requires touching <other-leaf-path> which is not in leaves_affected.
+   ```
+3. Fix only what you can within the listed leaves.
+4. ACK normally — the judge will see the escalation flag and decide whether to open a follow-up
+   issue for the other leaf.
 
-- Check against `common/scaffold-provenance.yml` (if it exists).
-- Path patterns that are always skeleton-owned:
-  - `scripts/metrics-aggregate.sh`
-  - `scripts/lib/aggregate.py`
-  - Any path explicitly listed in `shared-scripts-manifest.yml`
+### Failed Revision Protocol
 
-If the target leaf is skeleton-owned:
-1. Do NOT write to it (the tool-permission sandbox will also deny this; this check is
-   belt-and-suspenders).
-2. Write a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
-   `criterion_id: CR-META-skeleton-protected`.
-3. Return `FAIL` ACK with `reason=skeleton-path-write-denied`.
+If you cannot apply the fix (e.g., the anchor is missing, the criterion is no longer violated in
+the current leaf content, or the fix would break a hard invariant):
 
-### prd-analysis Artifact Context
-
-The artifact leaves produced by `prd-analysis` follow a specific structure. When revising, you
-MUST preserve:
-
-- **Self-contained-inline-copy invariants**: every leaf file is independently readable. All
-  referenced context (data models, conventions, journey context) is copied inline rather than
-  cross-referenced. Do NOT replace inline copies with file path references when applying fixes.
-- **ID stability**: feature IDs (`F-001`, `F-002`, ...), journey IDs (`J-001`, ...), and
-  module IDs (`M-001`, ...) are stable across iterations. NEVER renumber or reassign IDs
-  when applying fixes — only add new sequential IDs if a fix requires adding a new item.
-- **Neighbor cross-refs**: if a fix touches a section that is referenced by another leaf
-  (e.g. a Mapped Feature column in a journey, or a Dependencies list in a feature), preserve
-  the cross-ref anchor text exactly. Do NOT rewrite cross-refs beyond what the issue demands.
-
-Artifact leaf types and their self-containment rules:
-
-| Leaf type | Self-contained requirement |
-|-----------|--------------------------|
-| `features/F-NNN-*.md` | All journey context, data models, conventions, and dependencies copied inline; no path references to other feature or journey files |
-| `journeys/J-NNN.md` | All persona context, touchpoints, pain points, and mapped features copied inline |
-| `architecture/*.md` | Conventions and policies stated completely inline; no references to external convention documents |
-| `README.md` | Index only — summaries inline; full content lives in leaf files (pyramid invariant) |
+1. Do NOT write a partial or incorrect leaf.
+2. Add a one-line amendment block after the issue frontmatter:
+   ```
+   revise_attempt: failed
+   revise_failure_reason: <one-line explanation>
+   ```
+3. ACK with `linked_issues=<this-issue-id>` so the judge can see it stayed open.
+   The issue remains open — do not mark it resolved.
 
 ### Revision Discipline
 
 - Fix ONLY what the issue text describes. Do not make unrequested improvements.
-- Read every issue body — do not guess at fixes without understanding the criterion violation.
+- Read the issue body in full — do not guess at fixes without understanding the criterion violation.
+  Every fix must be traceable to a specific passage in the issue body.
 - Preserve unrelated content exactly (formatting, whitespace, other sections not touching the
   issue's target area).
-- Use `Edit` for single-anchor changes; use `MultiEdit` when a single issue requires changes
-  at multiple locations in the same leaf — NEVER make sequential `Edit` calls on the same file.
-- For issues with `blocker_scope: global-conflict` that have been escalated to the reviser
-  by the cross-reviewer: apply the fix as scoped to this leaf only. If fixing this leaf
-  creates a new conflict elsewhere, record that conflict in the self-review FAIL row with
-  `blocker_scope: global-conflict` — do NOT attempt to fix the other leaf in this dispatch.
+- For issues with `blocker_scope: global-conflict` escalated to the reviser by the cross-reviewer:
+  apply the fix as scoped to this leaf only. If fixing this leaf creates a new conflict elsewhere,
+  do not attempt to fix the other leaf — the orchestrator will open a follow-up issue.
+- Consult `common/review-criteria.md` for the canonical definition of the violated criterion so
+  the fix addresses the root cause, not just the surface symptom.
+- Consult `common/domain-glossary.md` to ensure any terminology added or changed by the fix
+  uses canonical PRD-domain terms (touchpoint, persona, user journey, feature, MVP boundary,
+  design token, interaction mode, cross-journey pattern, feature-module mapping, tombstone,
+  self-contained file).
+
+### PRD-Specific Preservation Rules
+
+These rules apply in addition to the general preservation rules above and are specific to the
+PRD artifact pyramid produced by prd-analysis:
+
+**Feature leaves (F-NNN-{slug}.md):**
+- Preserve all section headings: Overview, User Story, Acceptance Criteria, State Machine,
+  Interaction Mode, Inline Data Model, Inline Journey Context, Inline Conventions,
+  Dependencies, MVP Boundary note.
+- Do not remove inline data model or inline journey context blocks even if they seem redundant —
+  self-containment requires them.
+- Do not change the feature's priority (P0/P1/P2) or MVP flag unless the issue explicitly
+  targets those fields.
+
+**Journey leaves (J-NNN-{slug}.md):**
+- Preserve all section headings: Persona, Goal, Pre-conditions, Touchpoint table, Mapped Features,
+  Post-conditions.
+- Touchpoint table columns (stage, screen, action, interaction mode, system response, pain point)
+  must remain present; do not collapse or merge columns.
+- Mapped Features list must remain consistent with feature IDs in scope — do not add or remove
+  mappings unless the issue targets them.
+
+**Architecture topic leaves (architecture/{topic}.md):**
+- Preserve the topic's standalone shape: self-contained, no cross-references to other topic files.
+- Do not change the topic's canonical name or its position in the architecture index.
+
+**README (pyramid index):**
+- README is load-bearing for traversal but not for individual-agent tasks. If the issue targets
+  the README, preserve the index table structure (journey index, feature index, cross-journey
+  patterns section) and update only the cells the issue identifies.
 
 ### Output Contract
 
-Write ONE file: the revised artifact leaf at `<target>/<leaf-path>`.
+**1 write per leaf listed in `leaves_affected`.**
 
 - Pure artifact body — no HTML comments, no metadata headers, no IPC envelopes.
-- Self-contained content (same rules as writer): inline-copy invariants preserved, ID stability
-  maintained, neighbor cross-refs intact unless the issue explicitly requires changing them.
+- Full file content (not a patch).
+- Self-contained content: same rules as writer.
+- No self-review archive — reviser does NOT produce a self-review file. That is the writer's
+  role and has already been produced for this leaf in `.review/round-<N>/self-reviews/`.
 
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=reviser linked_issues=<comma-separated IDs of issues being resolved>
+OK trace_id=<trace_id> role=reviser linked_issues=<the issue ID being addressed>
 ```
 
-- `linked_issues`: the issue IDs this dispatch addressed (from the injected issue list), using
-  format `R<N>-<NNN>` (e.g. `R1-003,R1-007`).
+- `linked_issues`: the single issue ID this dispatch addressed (from the orchestrator's injection).
 - Return this ACK as the **single and final line** of the Task return. Nothing after it.
-
-### FORBIDDEN (reviser-specific)
-
-- **FORBIDDEN** to touch skeleton paths (tool-permission sandbox denies; this prompt reinforces).
-- **FORBIDDEN** to re-introduce regressions — treat resolved-issues history as hard negative
-  constraints, not suggestions.
-- **FORBIDDEN** to fabricate fixes without reading the actual issue text. Every fix must be
-  traceable to a specific issue body.
-- **FORBIDDEN** to touch any file other than the one target leaf assigned by the orchestrator.
-- **FORBIDDEN** to replace self-contained inline copies with cross-file references — this
-  violates the prd-analysis self-contained-file principle even if the reference would be shorter.
-- **FORBIDDEN** to renumber feature/journey/module IDs, even if gaps appear after deprecations.
-- **FORBIDDEN** to use sequential `Edit` calls on the same file — use `MultiEdit` for multi-anchor
-  changes within a single leaf.
 
 ### Task Return Hygiene (MUST enforce before returning)
 
@@ -217,7 +224,7 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
 ```
 
 or
@@ -231,7 +238,7 @@ FAIL trace_id=<id> reason=<one-line-reason>
 - A summary paragraph of what you did — FORBIDDEN
 - A bulleted list of changes — FORBIDDEN
 - Markdown headers / code fences wrapping the ACK — FORBIDDEN
-- A preface like "All deliverables complete." or "Revised leaf written." before the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
 - An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
 - A closing remark / sign-off of any kind — FORBIDDEN
 

@@ -1,11 +1,16 @@
-generated_at: 2026-04-25T00:59:47Z
+generated_at: 2026-04-25T05:48:27Z
 graph:
   "SKILL.md": []
   "common/domain-glossary.md": []
   "common/review-criteria.md": []
   "common/snippets.md": []
+  "common/templates/architecture-template.md": []
   "common/templates/artifact-template.md": []
+  "common/templates/feature-template.md": []
+  "common/templates/journey-template.md": []
+  "common/templates/prd-readme-template.md": []
   "common/templates/review-readme-template.md": []
+  "common/templates/skill-md-template.md": []
   "generate/domain-consultant-subagent.md": []
   "generate/from-scratch.md": []
   "generate/in-generate-review.md": []

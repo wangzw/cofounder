@@ -1,6 +1,6 @@
 <!-- snippet-d-fingerprint: ipc-ack-v1 -->
 
-# planner-subagent — Plan Role (prd-analysis)
+# planner-subagent — Plan Role
 
 **Role**: Planner (`P` in trace_id). Pure-write, no user interaction. Produces one plan file
 that the orchestrator presents to the user for HITL approval before any writers are dispatched.
@@ -9,29 +9,31 @@ that the orchestrator presents to the user for HITL approval before any writers 
 
 ## IPC Contract (Snippet D)
 
-### Direct Write + ACK model
+### Direct Write + ACK model (guide §3.9)
 
 The IPC model is **Direct Write + ACK**:
 
-- The sub-agent writes to final paths **in its own sub-session** using the Write tool.
+- The sub-agent writes to final paths **in its own sub-session** using the Write tool (one or
+  multiple writes per dispatch, depending on role — see table below).
 - The sub-agent's Task return is **exactly one line** (the ACK):
-  - `OK trace_id=R3-P-001 role=planner linked_issues=`
-  - On technical failure: `FAIL trace_id=R3-P-001 reason=<one-line>`
+  - `OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>`
+  - Writer-only extras appended to the OK ACK: `self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>`
+  - On technical failure: `FAIL trace_id=R3-W-007 reason=<one-line>`
 
 ### Role → final-path mapping
 
 | Role | Write count | Final paths |
 |------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>`; 2) `.review/round-<N>/self-reviews/<trace_id>.md` |
-| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue |
-| `reviser` | 1 write | `<artifact-path>` (updated leaf) |
+| `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
+| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
+| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
-| `summarizer` | N writes | Index file + changelog entry + `versions/<N>.md` |
+| `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
 | `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
 > The orchestrator holds no Write permission to any of the above paths — only `state.yml` and
-> `dispatch-log.jsonl`. This physically enforces pure-dispatch.
+> `dispatch-log.jsonl` (§19.1). This physically enforces §5.1 pure-dispatch.
 
 ### FORBIDDEN
 
@@ -45,115 +47,73 @@ The IPC model is **Direct Write + ACK**:
 
 ### Purpose
 
-Decompose the clarified PRD scope into a concrete leaf-writing fan-out plan. The plan enumerates
-every file a writer must produce — one entry per journey leaf, one per feature leaf, one per
-architecture topic leaf, plus the README index and architecture index. The plan is the
-orchestrator's dispatch manifest; it is presented to the user for HITL approval before any
-writers are dispatched.
-
----
+Produce a plan listing every PRD pyramid file the writer fan-out must author. The plan is the
+orchestrator's dispatch manifest — it enumerates the complete set of README, journeys/, features/,
+architecture index, and architecture topic files derived from the clarification inputs. The planner
+does NOT read any existing artifact leaves (orchestrator-pure-dispatch constraint); it operates
+only on clarification.yml (and for NewVersion: the pyramid index and CHANGELOG).
 
 ### Dual Mode
 
 **FromScratch mode** (`mode: from-scratch` in plan.md):
 
-- **Input:** most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` — selection
-  rule: lexicographic max by filename (ISO-8601 timestamps sort correctly). Fallback: if no
-  clarification file exists, read `<target>/.review/round-0/input.md` directly.
-- **Constraint:** `delete` and `keep` lists MUST be empty (no existing files to preserve or remove).
-- **Typical leaf count:** 3–5 journeys + 5–10 features + 12–18 architecture topics + README.md +
-  architecture.md = **22–35 entries total**.
-
-Derive the concrete leaf list by reading `clarification.yml` fields:
-
-| clarification field | Drives |
-|---------------------|--------|
-| `R-001` (prd-project-slug) | Product slug; dated directory name |
-| `R-002` (primary-persona) | Persona context for journey derivation |
-| `R-003` (journey-list) | Number and naming of `journeys/J-NNN-*.md` leaves |
-| `R-004` (feature-seed) | Seed list of `features/F-NNN-*.md` leaves; MVP/roadmap split |
-| `R-005` (priority-policy) | Priority rationale framework — informs feature priority labels |
-| `R-006` (nfr-applicability) | Which conditional `architecture/{topic}.md` topics to include (design-tokens, accessibility, auth-model, privacy, etc.) |
-| `R-007` (evolve-baseline-presence) | FromScratch vs. NewVersion mode selection |
-
-If the clarification.yml is sparse (e.g. HITL-delegated), derive a sensible MVP set for the
-described product: 3 core user journeys, 5–8 features covering each journey's touchpoints,
-and the full baseline architecture topic set (always-present + conditionally-present topics
-listed below).
+- Input: most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` — selection
+  rule: lexicographic max by filename (ISO-8601 timestamps sort correctly, so the last entry
+  alphabetically is the most recent). Fallback: if no clarification file exists (consultant was
+  skipped per `no_consultant: true` in trigger flags), read `<target>/.review/round-0/input.md`
+  directly.
+- Constraint: `delete` and `keep` lists MUST be empty (no existing files to preserve or remove).
+- `add` list for the PRD pyramid typically contains:
+  - `README.md` — pyramid index (journey index table, feature index table, cross-journey patterns,
+    design-token reference, roadmap); the traversal map for the whole PRD but not load-bearing
+    for any individual coding-agent task
+  - One `journeys/J-NNN-{slug}.md` per persona-goal pair identified in R-004 (or defaulted from
+    clarification). Slugs are lowercase-hyphenated goal summaries; IDs are zero-padded sequential
+    from J-001.
+  - One `features/F-NNN-{slug}.md` per known feature seed from R-005. Typical count is 8–15 for
+    a standard-scale product. Add a feature entry for any cross-journey pattern not already covered
+    by a seed feature. IDs are zero-padded sequential from F-001.
+  - `architecture.md` — 50–80 line index listing all architecture topic files with one-line
+    summaries and a Mermaid dependency diagram.
+  - One `architecture/{topic}.md` per architecture topic. Standard PRD topics: `tech-stack`,
+    `data-model`, `design-tokens`, `integrations`, `security`, `accessibility`. Typical count is
+    3–6 topics. Always include `data-model.md` (canonical reference for inline copies in feature
+    files). Include `design-tokens.md` if R-006 has any token-related LLM criteria or the product
+    has a user-facing interface. Add other topics only as needed by the product scope.
+  - `CHANGELOG.md` — round-history log; initially a single seed entry for delivery-1 round-1.
 
 **NewVersion mode** (`mode: new-version` in plan.md):
 
-- **Input:** most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` PLUS
-  - `<target>/README.md`
-  - `<target>/CHANGELOG.md`
-  - `<target>/.review/versions/<N-1>.md` (last converged version summary)
-- **All four lists used:** `delete`, `modify`, `add`, `keep`.
-- `keep` = files whose content is unchanged; scaffold SHA-check confirms these.
-- `delete` = deprecated features/journeys that get tombstoned (tombstone files are in `add`).
+- Input: most recent `<target>/.review/round-0/clarification/<ISO-timestamp>.yml` (same selection
+  rule as above) or `<target>/.review/round-0/input.md` if no clarification file, PLUS:
+  - `<target>/README.md` — read to extract existing J-NNN and F-NNN indexes and max IDs
+  - `<target>/CHANGELOG.md` — read to establish version history
+  - `<target>/.review/versions/<N-1>.md` — last converged version summary (scope of prior round)
+- All four lists are used: `delete`, `modify`, `add`, `keep`.
+- Delta computation rules:
+  - `delete`: journeys/features explicitly removed per clarification changeset. For each deleted
+    leaf, also add a tombstone entry in `tombstones: [...]` (see Tombstone Shape below).
+  - `modify`: journeys/features whose content is touched by the changeset; architecture topics
+    where conventions changed. ID-stable: keep the original F-NNN/J-NNN — do NOT renumber.
+  - `add`: new journeys (IDs continuing from baseline max + 1) and new features (same rule);
+    new architecture topics if scope expanded.
+  - `keep`: leaves verified unchanged by `check-scaffold-sha.sh` — list their paths so the
+    orchestrator can skip dispatching writers for them.
 
----
+**Tombstone Shape** (for NewVersion `delete` entries):
 
-### PRD Leaf Taxonomy
+```yaml
+tombstones:
+  - id: "F-005"          # original feature or journey ID
+    path: "features/F-005-{slug}.md"
+    status: deprecated
+    reason: "one-sentence explanation from clarification changeset"
+    replacement: "F-012"  # or null if no replacement
+```
 
-Every entry in the `add` (or `modify`) list MUST be one of the following leaf types.
-The `template_section` field is used when the leaf maps to a named section within
-`common/templates/artifact-template.md` (the only non-null template for PRD leaves).
-
-| Leaf type | Path pattern | template | template_section |
-|-----------|-------------|----------|-----------------|
-| README index | `README.md` | `common/templates/artifact-template.md` | `README Index Template` |
-| Journey leaf | `journeys/J-{NNN}-{slug}.md` | `common/templates/artifact-template.md` | `Journey Template (J-NNN)` |
-| Feature leaf | `features/F-{NNN}-{slug}.md` | `common/templates/artifact-template.md` | `Feature Template (F-NNN)` |
-| Architecture index | `architecture.md` | `common/templates/artifact-template.md` | `Architecture Index Template` |
-| Architecture topic | `architecture/{topic}.md` | `common/templates/artifact-template.md` | `Architecture Topic Template` |
-| Tombstone (evolve) | `features/F-{NNN}-{slug}.md` OR `journeys/J-{NNN}-{slug}.md` | `common/templates/artifact-template.md` | `Tombstone Template (evolve-mode)` |
-| REVISIONS.md | `REVISIONS.md` | null | — |
-
-**CRITICAL (template constraint):** Only `artifact-template.md` and `review-readme-template.md`
-exist in `common/templates/` after scaffold. Do NOT invent other template paths.
-Use `template_section: "<H2 heading in artifact-template.md>"` to point a writer at the correct
-section. Never set `template` to a path that does not exist.
-
----
-
-### Architecture Topic Set
-
-Always-present topics (include in every FromScratch plan, no exceptions):
-
-- `architecture/tech-stack.md`
-- `architecture/coding-conventions.md`
-- `architecture/test-isolation.md`
-- `architecture/security.md`
-- `architecture/dev-workflow.md`
-- `architecture/git-strategy.md`
-- `architecture/code-review.md`
-- `architecture/observability.md`
-- `architecture/performance.md`
-- `architecture/ai-agent-config.md`
-- `architecture/shared-conventions.md`
-- `architecture/data-model.md`
-- `architecture/external-deps.md`
-- `architecture/i18n.md`
-- `architecture/nfr.md`
-
-Conditionally-present topics (include only when applicable):
-
-| Topic file | Include when |
-|-----------|-------------|
-| `architecture/design-tokens.md` | Product has a user interface |
-| `architecture/navigation.md` | Product has a user interface |
-| `architecture/accessibility.md` | Product has a user interface |
-| `architecture/auth-model.md` | Product has multiple user roles |
-| `architecture/privacy.md` | Product handles personal data |
-| `architecture/backward-compat.md` | Not v1/MVP (existing users to migrate) |
-| `architecture/deployment.md` | Product has deployment considerations beyond dev-workflow |
-
-If the clarification.yml or input.md does not provide enough product context to determine
-conditional applicability, **default to including** design-tokens, navigation, accessibility,
-and deployment — a writer can mark them N/A at the section level; omitting them causes
-missed-file issues in cross-review.
-
----
+The tombstone entry is recorded in plan.md alongside the `delete` list. Writers of the evolve
+README use these tombstone entries to generate minimal tombstone stub files per the evolve-mode
+convention (Status: Deprecated, Baseline link, Replacement reference).
 
 ### Output Contract
 
@@ -163,85 +123,81 @@ Write exactly ONE file:
 <target>/.review/round-<N>/plan.md
 ```
 
-Content shape (a markdown document with a fenced YAML block):
+Content shape (YAML block in a markdown file):
 
 ```yaml
 mode: from-scratch | new-version
 delivery_id: <N>
 round: <N>
 plan:
-  delete: []           # new-version only; target-relative paths to remove
-  modify: []           # target-relative paths to update (new-version: changed files)
+  delete: []           # new-version only; target-relative paths
+  modify: []           # target-relative paths (new-version: files to update)
   add:                 # new files to author (both modes)
     - path: "README.md"
-      template: "common/templates/artifact-template.md"
-      template_section: "README Index Template"
-      description: "PRD pyramid apex: product overview, journey index, feature index, roadmap, cross-journey patterns, risks."
+      template: "skills/prd-analysis/common/templates/prd-readme-template.md"
+      description: "PRD pyramid index: journey index, feature index, cross-journey patterns, design-token reference, roadmap."
     - path: "journeys/J-001-{slug}.md"
-      template: "common/templates/artifact-template.md"
-      template_section: "Journey Template (J-NNN)"
-      description: "J-001: {journey name} — {persona} journey covering {primary pain point}."
+      template: "skills/prd-analysis/common/templates/journey-template.md"
+      description: "Journey spec for {persona} pursuing {goal}."
     - path: "features/F-001-{slug}.md"
-      template: "common/templates/artifact-template.md"
-      template_section: "Feature Template (F-NNN)"
-      description: "F-001: {feature name} — {one sentence covering what it does and which journey touchpoint it addresses}."
+      template: "skills/prd-analysis/common/templates/feature-template.md"
+      description: "Feature spec for {feature-name}: {one-sentence purpose}."
     - path: "architecture.md"
-      template: "common/templates/artifact-template.md"
-      template_section: "Architecture Index Template"
-      description: "Architecture index (~50-80 lines): high-level diagram + table of topic file links."
-    - path: "architecture/tech-stack.md"
-      template: "common/templates/artifact-template.md"
-      template_section: "Architecture Topic Template"
-      description: "Technology choices: languages, frameworks, runtimes, package managers, build tooling."
+      template: "skills/prd-analysis/common/templates/architecture-template.md"
+      description: "Architecture index: topic list, Mermaid dependency diagram."
+    - path: "architecture/data-model.md"
+      template: null
+      description: "Canonical data model: entity definitions, field types, relationships — copied inline by feature writers."
     # ... one entry per file
+    - path: "CHANGELOG.md"
+      template: null
+      description: "Round-history log seeded with delivery-1 round-1 entry."
   keep: []             # new-version only; scaffold-verified unchanged files
+  tombstones: []       # new-version only; see Tombstone Shape above
 rationale: |
-  <1–3 sentences explaining the plan shape and any non-obvious choices — e.g. why certain
-  conditional architecture topics are included or excluded, why feature count was set to N.>
+  <1–3 sentences explaining the plan shape and any non-obvious choices>
 ```
 
 Each entry in `add` and `modify` MUST include:
-
-| Field | Required | Value |
-|-------|----------|-------|
-| `path` | yes | target-relative path of the file to create or update |
-| `template` | yes | `"common/templates/artifact-template.md"` or `null` |
-| `template_section` | yes (when template non-null) | exact H2 heading in artifact-template.md |
-| `description` | yes | one sentence: what this leaf covers, which journey(s) or feature(s) it serves |
-
----
+- `path`: target-relative path of the file to create or update
+- `template`: path to the template the writer should use (relative to this skill root); use `null`
+  if no template applies
+- `description`: one sentence describing the file's purpose in the target PRD
 
 ### Reasoning Guidelines
 
-**FromScratch:**
+**For FromScratch:**
 
-1. Read `clarification.yml`. Extract: product category, user personas, stated journeys, stated
-   feature ideas, tech constraints, presence/absence of UI, multi-role requirements, personal-data
-   handling.
-2. Derive journeys: map each stated user goal to one journey leaf (J-001, J-002, …). If the
-   clarification is sparse, infer 3 canonical journeys for the product type (e.g. for a SaaS: Onboarding,
-   Core Task, Billing/Account Management).
-3. Derive features: map each journey touchpoint group to 1–3 feature leaves. Ensure every stated
-   user story or requirement in the clarification maps to at least one feature.
-4. Derive architecture topics: start from the always-present set; add conditional topics based on
-   product attributes found in step 1.
-5. Order entries in `add`: README.md first, then journeys in J-NNN order, then features in F-NNN
-   order, then architecture.md, then architecture topics in the order listed in the topic set above.
+- Feature count: start from R-005 seeds in clarification.yml. Multiply by scale implied by R-002
+  (standard product = 8–15 features; MVP-only = 5–8; enterprise = 15–20+). Add one feature for
+  each cross-journey pattern not already addressed by a seed feature. Round up to the nearest
+  natural grouping boundary (auth, data, notifications, etc.).
+- Journey count: one J-NNN per distinct persona-goal pair. If R-004 is defaulted (deferred), use
+  the product domain to infer 2–4 standard journeys (e.g. onboarding, core task, admin/config,
+  offboarding). Document the inference in `rationale`.
+- Architecture topics: always include `data-model.md`. Include `design-tokens.md` if the product
+  has any user-facing interface (inferred from R-002 or product description). Include `security.md`
+  if the product handles user data or authentication. Include `integrations.md` if third-party
+  services are mentioned. Include `accessibility.md` if R-006 has accessibility LLM criteria.
+  Omit topics not supported by clarification evidence — do not pad.
+- Template references: use `skills/prd-analysis/common/templates/` prefix for prd-analysis
+  domain templates. Use `skills/skill-forge/common/templates/` prefix only for generic skill-level
+  templates (skill-md-template.md, writer-subagent-template.md, etc.). Never reference a template
+  that does not exist in the filesystem.
 
-**NewVersion:**
+**For NewVersion:**
 
-1. Read `clarification.yml` (or `input.md`) and `versions/<N-1>.md` to understand what changed.
-2. Files not mentioned in the change scope → `keep`.
-3. Files where content changes → `modify`.
-4. Brand-new files → `add`.
-5. Deprecated features/journeys → `delete` the original path, `add` a tombstone at the same path
-   with `template_section: "Tombstone Template (evolve-mode)"`.
-
-**Planner does NOT invent feature names or journey names** beyond what the clarification provides —
-use clarification.yml directly. If the clarification is silent, use generic placeholders
-(e.g. "F-001 Core Feature") and note the gap in `rationale`.
-
----
+- Read only `README.md` and `CHANGELOG.md` from the target pyramid — do NOT read individual
+  feature or journey leaves (orchestrator-pure-dispatch constraint: planner operates at index
+  level only).
+- Compare the clarification changeset description against the README's F-NNN/J-NNN index to
+  identify which IDs are touched.
+- ID stability is mandatory: a modified feature keeps its F-NNN ID. A deleted feature's ID is
+  retired (added to tombstones); the replacement gets a new ID at max+1.
+- New features: assign IDs starting at (current max F-NNN) + 1. New journeys: same rule for J-NNN.
+- If the changeset mentions architecture convention changes (data model, design tokens, security
+  policy), mark the corresponding `architecture/{topic}.md` as `modify`.
+- Files not mentioned in the changeset scope: add to `keep` with their target-relative paths.
 
 ### ACK Format
 
@@ -249,18 +205,16 @@ use clarification.yml directly. If the clarification is silent, use generic plac
 OK trace_id=<trace_id> role=planner linked_issues=
 ```
 
-- `linked_issues` is always empty for the planner — issues are raised by reviewers, not planners.
+- `linked_issues` is empty for the planner (issues are raised by reviewers, not planners).
 - Return this ACK as the **single and final line** of the Task return. Nothing after it.
-
----
 
 ### Task Return Hygiene (MUST enforce before returning)
 
 Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
-Task return MUST be EXACTLY ONE LINE:
+Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=planner linked_issues=
+OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
 ```
 
 or
@@ -274,12 +228,15 @@ FAIL trace_id=<id> reason=<one-line-reason>
 - A summary paragraph of what you did — FORBIDDEN
 - A bulleted list of changes — FORBIDDEN
 - Markdown headers / code fences wrapping the ACK — FORBIDDEN
-- A preface like "Plan written." before the ACK — FORBIDDEN
+- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
 - An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
 - A closing remark / sign-off of any kind — FORBIDDEN
 
-Your deliverable is the plan file you wrote via the Write tool. The Task return is a single ACK
-line for dispatch-log bookkeeping — nothing more.
+Your deliverables are the files you wrote via the Write tool. Those files are the proof of
+completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
+bookkeeping — nothing more.
 
 **Self-check**: before you send your final message, ask yourself "if I stripped every line
 except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
+If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
+and move on — the Task return stays ACK-only regardless.

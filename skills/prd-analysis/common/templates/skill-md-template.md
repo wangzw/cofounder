@@ -1,7 +1,7 @@
 # Template: SKILL.md — Shape Reference for Writer
 
 This template is READ by the writer sub-agent when authoring the target skill's `SKILL.md`. It describes
-the fully-filled end-state the writer targets. The skeleton has placeholders (`{{SKILL_NAME}}` etc.);
+the fully-filled end-state the writer targets. The skeleton has placeholders (`prd-analysis` etc.);
 the writer replaces all of them using `clarification.yml` fields.
 
 ---
@@ -223,7 +223,7 @@ For every dispatch the orchestrator MUST assign a trace_id...
 ## How to Fill
 
 1. Open `clarification.yml` at `.review/round-0/clarification/<ts>.yml`.
-2. Map `skill_name` → every `{{SKILL_NAME}}` placeholder.
+2. Map `skill_name` → every `prd-analysis` placeholder.
 3. Map `trigger` → `description` value (prepend "Use when" if not already present).
 4. Copy Snippet C verbatim from `common/snippets.md`; do not paraphrase or shorten.
 5. Confirm all 5 Mode Routing rows are present before writing.

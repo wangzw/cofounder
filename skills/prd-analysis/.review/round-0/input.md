@@ -1,10 +1,10 @@
 # User Prompt
 
-I want a skill named `prd-analysis` that converts sparse product ideas into self-contained multi-file Product Requirements Documents (PRDs) optimized for AI coding agents. See @skills/prd-analysis.backup for the reference implementation.
+Create a generative skill named 'prd-analysis' that produces AI-coding-ready Product Requirements Documents (multi-file markdown pyramid: README, journeys/, features/, architecture/). The new skill should be a faithful re-implementation modernized to skill-forge's 8-role generative-skill pattern. Reference legacy implementation: @skills/prd-analysis.backup/
 
 # Expanded References
 
-## @skills/prd-analysis.backup
+## @skills/prd-analysis.backup/
 
 _(directory; dir-mode=selective — tree + orientation files inlined (SKILL.md, README.md, LICENSE, CHANGELOG, *-template.md); used 82003 B)_
 

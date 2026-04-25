@@ -25,7 +25,7 @@ Supported placeholders in skeleton files:
   prd-analysis        The name of the skill
   docs/raw/prd/     The artifact output root directory
   0.1.0     The skill version (e.g. 1.0.0)
-  Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert sparse product ideas or brainstorming notes into structured self-contained PRDs optimized for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis'. The skill description (must start with "Use when")
+  Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert sparse product ideas or brainstorming notes into structured self-contained PRDs optimized for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /cofounder:prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis'. The skill description (must start with "Use when")
 
 Notes:
   - Skeletons live at <generator-skill-root>/common/skeleton/<variant>/

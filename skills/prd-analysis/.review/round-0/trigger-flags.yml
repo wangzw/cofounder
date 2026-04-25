@@ -1,5 +1,9 @@
-generated_at: "2026-04-25T00:37:24Z"
-glossary_hit: false
-hit_terms: []
+generated_at: "2026-04-25T05:21:35Z"
+glossary_hit: true
+hit_terms:
+  - term: "generative skill"
+    line: 1
+  - term: "role"
+    line: 1
 sparse_input: true
-sparse_reason: "word_count=29 < 50"
+sparse_reason: "word_count=37 < 50"

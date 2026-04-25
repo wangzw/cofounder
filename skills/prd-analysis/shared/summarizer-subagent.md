@@ -1,6 +1,6 @@
 <!-- snippet-d-fingerprint: ipc-ack-v1 -->
 
-# summarizer-subagent — Summarizer Role
+# summarizer-subagent — Round Summarizer Role
 
 **Role**: `summarizer` (`S` in trace_id). LIGHT-tier. Aggregates round results and, on
 convergence, writes the delivery version summary and CHANGELOG. Multiple writes per dispatch.
@@ -91,20 +91,53 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 
 ### Purpose
 
-Aggregate per-round review results and, upon convergence, produce the delivery record. Two
-distinct phases based on orchestrator trigger — always check `state.yml phase` to determine
-which phase applies.
+Produce a round summary archive AND an updated CHANGELOG entry AND (when a round adds or removes
+journeys or features) refresh the PRD pyramid's `README.md` index tables.
+
+The summarizer has three distinct responsibilities in prd-analysis:
+
+1. **Per-round summary** (`<target>/.review/round-<N>/index.md`) — always written, aggregates
+   issue counts, coverage, and writer fail totals for the judge to read.
+2. **Delivery record** (`<target>/.review/versions/<N>.md` + `CHANGELOG.md`) — written ONLY on
+   convergence, captures the definitive state of the skill at delivery.
+3. **PRD pyramid README refresh** — written ONLY when the round's plan adds or removes journeys
+   or features (i.e., `plan.add` or `plan.delete` is non-empty for PRD pyramid leaves); skipped
+   otherwise to avoid index churn.
+
+**CRITICAL DISTINCTION — META-skill artifacts vs. PRD pyramid leaves:**
+
+- **META-skill artifacts** are files inside `skills/prd-analysis/` itself: `SKILL.md`,
+  `common/review-criteria.md`, `common/domain-glossary.md`, sub-agent prompts, config files,
+  scripts. These are the skill's own operational files. The summarizer ALWAYS targets the
+  META-skill's `.review/versions/N.md` and `CHANGELOG.md` for its delivery record writes.
+- **PRD pyramid leaves** are the generated artifacts the skill produces for a user's product:
+  `docs/raw/prd/YYYY-MM-DD-{slug}/README.md`, `journeys/J-NNN-*.md`, `features/F-NNN-*.md`,
+  `architecture/*.md`. These live under `ARTIFACT_ROOT` (from `clarification.yml`), not inside
+  `skills/prd-analysis/`.
+
+The summarizer ONLY updates the PRD pyramid's `README.md` when this skill is run in consumer
+mode against an actual PRD pyramid (i.e., `--target <prd-pyramid-path>` points outside
+`skills/prd-analysis/`). During self-hosted prd-analysis review (the skill reviewing its own
+META-skill files), there is no PRD pyramid to refresh — do NOT attempt to write to
+`docs/raw/prd/` during self-hosted review.
+
+Always check `state.yml` for the `target` path and `artifact_root` to determine which mode
+applies before deciding whether to write the pyramid README.
+
+---
 
 ### Input Contract
 
 | Source | Purpose |
 |--------|---------|
 | `<target>/.review/round-<N>/issues/*.md` frontmatter | Issue aggregation counts by severity and status |
-| `<target>/.review/round-<N>/verdict.yml` | Verdict for coverage calculation reference (if already written by judge for this round) |
+| `<target>/.review/round-<N>/verdict.yml` | Verdict (read AFTER judge runs — summarizer always runs after judge per from-scratch.md ordering convention) |
 | `<target>/.review/round-<N>/self-reviews/*.md` frontmatter | `fail_count` and `self_review_status` per writer dispatch |
 | `<target>/.review/round-<N>/skip-set.yml` | `cross_reviewer_focus` length for skip-set utilization metric |
-| `<target>/.review/versions/<N-1>.md` | Previous version summary (if it exists; omit if first delivery) |
-| `<target>/.review/traces/round-<N>/dispatch-log.jsonl` | Dispatch events for latency metrics, tier distribution, and coverage completeness |
+| `<target>/.review/round-<N>/plan.md` | Whether `plan.add` or `plan.delete` contains PRD pyramid leaves (triggers README refresh decision) |
+| `<target>/.review/versions/<N-1>.md` | Previous version summary (omit if first delivery) |
+| `<target>/.review/traces/round-<N>/dispatch-log.jsonl` | Dispatch events for latency metrics, tier distribution, coverage completeness |
+| PRD pyramid leaves (read-only) | Needed for README index refresh — read journeys/, features/ directory listings; do NOT modify leaves |
 
 The orchestrator path to the skill-forge directory is injected as `skill-root: <path>` in
 `state.yml`. Use this when referencing script paths below.
@@ -114,7 +147,8 @@ The orchestrator path to the skill-forge directory is injected as `skill-root: <
 ### Phase 1 — Per-Round Summary
 
 **Trigger**: dispatched by orchestrator after cross-reviewer (and optionally adversarial-reviewer)
-complete for round N, BEFORE the judge is dispatched.
+complete for round N, AFTER the judge is dispatched (summarizer runs after judge per
+from-scratch.md ordering convention, so `verdict.yml` is already available).
 
 **Outputs** (all Writes):
 
@@ -141,7 +175,8 @@ writer_fail_count_sum: <sum of fail_count across all writer self-reviews this ro
 
 # Round <N> Review Summary
 
-[Brief prose summary of what was checked, what was found, and status trends.]
+[Brief prose summary of what was checked, what was found, and status trends. For prd-analysis,
+note which sub-agent prompts and PRD template files were reviewed vs. skipped via skip-set.]
 ```
 
 **Coverage percent calculation**: read `coverage_check.effective_coverage_percent` directly
@@ -183,6 +218,9 @@ quality_at_delivery:
   coverage_percent: 100
   writer_fail_count_sum: 0
 justified_regressions: []
+leaves_touched:
+  - <relative path from target root>
+  - ...
 ---
 
 # Delivery <D> — Version Summary
@@ -191,11 +229,20 @@ justified_regressions: []
 
 ## Affected Leaves
 
-<bullet list of leaves modified in this delivery>
+<bullet list of leaves modified in this delivery, grouped by type:
+- Sub-agent prompts: generate/, review/, revise/, shared/
+- Common files: common/review-criteria.md, common/domain-glossary.md, common/templates/
+- Orchestrator: SKILL.md
+- PRD pyramid leaves (if consumer mode): journeys/, features/, architecture/>
 
 ## Control Signals
 
 <any config.yml flags or forced-full overrides active during this delivery>
+
+## PRD Pyramid Index Status
+
+<"N/A — self-hosted review: no PRD pyramid to refresh" OR "Refreshed: <dated-slug>/README.md
+updated to include <N> journeys and <M> features">
 ```
 
 **Write 4 — CHANGELOG.md**: `<target>/CHANGELOG.md`
@@ -206,12 +253,16 @@ prepend the new entry — do not overwrite older entries.
 ```markdown
 # CHANGELOG
 
-## Delivery <D> — <ISO-date>
+## Delivery <D> — <YYYY-MM-DD>
 
 - **Verdict**: converged after <rounds_to_convergence> rounds
 - **Git SHA**: `<sha>`
-- **Changes**: <change_summary>
-- **Leaves affected**: <comma-separated list>
+- **Changes**: <change_summary — for FromScratch: "Initial generation of all sub-agent prompts,
+  review criteria, domain glossary, and PRD templates"; for NewVersion: summary of plan.add,
+  plan.modify, plan.delete contents>
+- **Leaves affected**: <comma-separated list of relative paths>
+- **PRD pyramid**: <"N/A" for self-hosted review; OR "README.md refreshed: <N> journeys,
+  <M> features" for consumer mode>
 
 ## Delivery <D-1> — ...
 [existing entries preserved verbatim below]
@@ -228,6 +279,46 @@ exist):
 | <D>      | <N>    | 100       | 0    | 0        | 0     | 0         | 0           |
 ```
 
+**Write 6 (conditional) — PRD pyramid README refresh**: `<artifact-root>/<dated-slug>/README.md`
+
+**Condition**: write ONLY when ALL of the following are true:
+1. Consumer mode is active: `state.yml` `target` path points to a PRD pyramid directory
+   (outside `skills/prd-analysis/`)
+2. `plan.add` or `plan.delete` in the current round's `plan.md` contains at least one entry
+   with a `journeys/` or `features/` path
+3. The PRD pyramid root (`<artifact-root>/<dated-slug>/`) exists on disk
+
+**If condition is NOT met** (including all self-hosted review runs): skip this write entirely.
+Do not create or modify any file under `docs/raw/prd/`.
+
+**Index README structure** (PRD pyramid `<artifact-root>/<dated-slug>/README.md`):
+
+The README is a traversal index, NOT a load-bearing content file. It MUST contain:
+
+- **Title + 1-paragraph product summary** — product name, primary user problem, key value prop
+- **`## Personas` table** — columns: Name | Role | Motivation | Success Metric
+- **`## Journey Index` table** — columns: ID | Persona | Goal | Feature Count | Priority; one
+  row per `J-NNN` file in `journeys/`; link each ID to its file (`[J-001](journeys/J-001-*.md)`)
+- **`## Feature Index` table** — columns: ID | Name | Priority | MVP | Journey Refs | Status;
+  one row per `F-NNN` file in `features/`; link each ID to its file; Status is `active` or
+  `deprecated` (tombstoned features remain in the index with status `deprecated`)
+- **`## Cross-Journey Patterns` section** — one paragraph per pattern identified across
+  journeys, each paragraph ending with "Addressed by: F-NNN, F-NNN" references
+- **`## Architecture Topics` table** — columns: Topic | Summary; sourced from `architecture.md`
+  index entries
+- **`## Roadmap`** — timeline of deliveries with bullets covering what was added/changed per
+  delivery; updated to include current delivery
+- **`## Glossary`** — links to inline-defined terms across leaves (e.g., `[touchpoint](journeys/J-001-*.md#touchpoint-definition)`); this is a quick-reference index only — it does NOT replace `common/domain-glossary.md` in the META-skill (those are different glossaries serving different audiences: the META-skill glossary defines terms the consultant uses; this README glossary helps human readers navigate the product domain vocabulary within this specific PRD artifact)
+
+**Population rules** for the index tables:
+- Read `journeys/` directory listing to enumerate J-NNN files; do NOT invent journey IDs
+- Read `features/` directory listing to enumerate F-NNN files; do NOT invent feature IDs
+- For tombstoned features: check whether the file's frontmatter contains `status: deprecated`;
+  if so, mark the row Status as `deprecated` in the index
+- Feature count per journey row: count how many `F-NNN` files reference that journey's ID in
+  their frontmatter `source_journeys` field
+- Do NOT read full file content for index population — frontmatter fields are sufficient
+
 **Step — Commit-delivery script call**: after all Writes complete, call:
 
 ```bash
@@ -235,13 +326,15 @@ exist):
 ```
 
 Where `<skill-root>` is the absolute path to the skill-forge plugin directory (from
-`state.yml` (skill root resolves to `..` from `.review/`)). This script creates an annotated git tag and commits the
-delivery state.
+`state.yml` — skill root resolves to `..` from `.review/`). This script creates an annotated
+git tag and commits the delivery state.
+
+---
 
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=summarizer linked_issues=[]
+OK trace_id=<trace_id> role=summarizer linked_issues=
 ```
 
 - `linked_issues` is always empty for the summarizer (it does not file issues).
