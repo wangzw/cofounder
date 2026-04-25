@@ -1,0 +1,4 @@
+{"event": "launched", "trace_id": "R3-S-001", "role": "summarizer", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-25T06:51:09Z", "prompt_hash": "sha256:test-skill-forge", "linked_issues": []}
+{"event": "launched", "trace_id": "R3-J-001", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-25T06:51:09Z", "prompt_hash": "sha256:test-skill-forge", "linked_issues": []}
+{"event": "completed", "trace_id": "R3-S-001", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T06:52:49Z"}
+{"event": "completed", "trace_id": "R3-J-001", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T06:52:49Z"}

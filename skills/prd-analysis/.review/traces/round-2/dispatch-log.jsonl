@@ -1,0 +1,2 @@
+{"event": "launched", "trace_id": "R2-R-001", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 2, "dispatched_at": "2026-04-25T06:47:27Z", "prompt_hash": "sha256:test-skill-forge-revise", "linked_issues": ["R2-001"]}
+{"event": "completed", "trace_id": "R2-R-001", "role": "reviser", "ack_status": "OK", "linked_issues": ["R2-001"], "returned_at": "2026-04-25T06:50:19Z"}

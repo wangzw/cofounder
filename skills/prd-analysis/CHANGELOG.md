@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Delivery 2 — 2026-04-25
+
+- **Verdict**: pending (judge dispatch in progress)
+- **Mode**: --review (script-type) + --revise (R2-R-001 sonnet)
+- **Trigger**: defect-injection test — removed snippet-D fingerprint from generate/writer-subagent.md
+- **Resolution**: 1 reviser dispatch closed CR-S08; round-3 re-check passed (0 new issues)
+- **Carry-forward**: 26 stale CR-S10 false-positives from delivery-1 (underlying script bug fixed in skill-forge commit 8ee3497 — these no longer reproduce; tracked as known-stale).
+- **Dispatches**: 1 reviser, 1 summarizer, 1 judge — 0 reviewer dispatches (focused test)
+
 ## Delivery 1 — 2026-04-25
 
 - **Verdict**: pending (judge dispatch in progress)
