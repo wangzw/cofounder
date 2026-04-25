@@ -1,0 +1,14 @@
+round: 1
+delivery_id: 1
+verdict: progressing
+next_action: revise
+evidence:
+  open_issues: 8
+  critical_count: 1
+  error_count: 5
+  regressed_count: 0
+  coverage_percent: 100
+  writer_fail_count_sum: 1
+  rounds_elapsed: 1
+  oscillating_pairs: []
+notes: First round of generation with 8 new issues across architecture and schema consistency. Coverage is complete (100%), but critical and error severities preclude convergence. Issues require reviser attention in round 2.

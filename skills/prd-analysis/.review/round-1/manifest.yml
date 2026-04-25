@@ -1,0 +1,149 @@
+generated_at: 2026-04-25T00:59:47Z
+leaves:
+  "SKILL.md":
+    sha256: "54c760b6d4df9c9e394f12d99a54bdc80165d38aa405fbfd3ce2a435ebd86ff9"
+    line_count: 181
+  "common/config.yml":
+    sha256: "e8aca0eec27db5f34dcd4f6041e2fbaf69c1d778922d09489b2e88591ac2cd66"
+    line_count: 135
+  "common/domain-glossary.md":
+    sha256: "a332cd6c6e50602e71d0f6f2128297ad3262d67e52f5d451bc007ed544fdc44b"
+    line_count: 289
+  "common/review-criteria.md":
+    sha256: "681839e9e54dd0054e2fe20565b0ef2796cac178f3b91375564c637db770f47e"
+    line_count: 519
+  "common/scaffold-provenance.yml":
+    sha256: "1ccb4188b14f84299a2d8fbe073de436cb61dce4b4bc6619965bf2921433b136"
+    line_count: 55
+  "common/shared-scripts-manifest.yml":
+    sha256: "a54a858898beb1670ccebd3e785bdb8225f6f208f2a675d5fc77bb57e5902018"
+    line_count: 13
+  "common/snippets.md":
+    sha256: "6911efd19bbc3c797e8eb04f143195f998ed16b65fbdc05f66acee640277b76d"
+    line_count: 220
+  "common/templates/artifact-template.md":
+    sha256: "90de98d92e9b7c9ab0d86f2ab5a791153dece1a8de25a67c205fabaea8765756"
+    line_count: 507
+  "common/templates/review-readme-template.md":
+    sha256: "6f08740685eba2c5f79f09fb2308cf5bf497072a8429d5aa0b40e26854873f81"
+    line_count: 183
+  "generate/domain-consultant-subagent.md":
+    sha256: "f8d65a1f097400a09085a8be915762792e43fc5ec7c6a4869b110573e9d3bc45"
+    line_count: 417
+  "generate/from-scratch.md":
+    sha256: "c35ed5ba218afe7e8d0350e440ab48b2ba7887fdbfbd42aa2b875bae94e79b7f"
+    line_count: 155
+  "generate/in-generate-review.md":
+    sha256: "bc2c352eeb92e5755fb9c56033133c2f7b4b3cff9a3c4029f6e2ec43ee3d2cea"
+    line_count: 40
+  "generate/new-version.md":
+    sha256: "03c2fd0ec804e8f682faee7dcd1872b0eff391466b4e1f3abf043b4a14d0193c"
+    line_count: 136
+  "generate/planner-subagent.md":
+    sha256: "0cf423cb64aedd78b2d2ac984270abd6178946d40f76d4e8b62d275090f4b77f"
+    line_count: 282
+  "generate/writer-subagent.md":
+    sha256: "bd74fa1b03894e29b01e512cc137dacfe61ac49975340e4f1cf2b3dd5901160a"
+    line_count: 483
+  "review/adversarial-reviewer-subagent.md":
+    sha256: "77bbfe0fcd374fe5cf2c5b4b2bf6ce32436ef4bc947d784f59a46d3f679f4f96"
+    line_count: 309
+  "review/cross-reviewer-subagent.md":
+    sha256: "52a5334cd7f7ceb35d076d69b7e3870b01b29eae955e6fc49a8daf31b1104083"
+    line_count: 446
+  "review/index.md":
+    sha256: "1063bdb6d35e382a8f6b7e27867612ab248da2a494d65f16ab59207c87250737"
+    line_count: 128
+  "revise/index.md":
+    sha256: "d6c6cb5b78068680152577b4dc71e8aa9b08bbfccb1420de836b65150f9e219d"
+    line_count: 97
+  "revise/per-issue-reviser-subagent.md":
+    sha256: "c1d07e3e680b170a90c2b8df41c991dc74d1909b3f69845ce6a74d512119057b"
+    line_count: 245
+  "scripts/build-depgraph.sh":
+    sha256: "dc65e7d622e86d89c9dcc3426f6aa4e706e2893f9002f6ac0e4a53f04cb7c199"
+    line_count: 137
+  "scripts/check-artifact-pyramid.sh":
+    sha256: "e04a0fc0c6819aadcaff37efae4ec530101247bf018733971089b15ebfe555c4"
+    line_count: 64
+  "scripts/check-changelog-consistency.sh":
+    sha256: "0f71e95e1839bdc5c74b3cafb0e109a1c029190f91304251026387d9c8c8287c"
+    line_count: 121
+  "scripts/check-config-schema.sh":
+    sha256: "9ee4f8f5b1f1c14b01e1d9b3021a3343e88b23f64bb93685457f1a3bdca459b6"
+    line_count: 122
+  "scripts/check-criteria-consistency.sh":
+    sha256: "455bdacd27f1e68bd6ecb33a19d7b234d5a34a9ce37bf512815efb6924e4da7a"
+    line_count: 129
+  "scripts/check-criteria-yaml.sh":
+    sha256: "14852f8106add10e60e4cf85119a9221cca1af639f25e176cf6562a17a01d06f"
+    line_count: 99
+  "scripts/check-dependencies.sh":
+    sha256: "e065998283e836001bad3bb11890d8ed0210d3ae842447473cb06efb4b476903"
+    line_count: 66
+  "scripts/check-dispatch-log-snippet.sh":
+    sha256: "932d74d02051b897da5f52a574ca0296e541bf823de33e36ab9b1bb3a0853b67"
+    line_count: 56
+  "scripts/check-drift.sh":
+    sha256: "88ddcf33bee93d9a578fc3bcdf64924946cc904a364de71ba412b943b4732926"
+    line_count: 78
+  "scripts/check-frontmatter.sh":
+    sha256: "ab2b07bd6f5cd8b9be2f556fbda24d02d3bbf1fcf8defcf15b1677d5abe8c588"
+    line_count: 98
+  "scripts/check-index-consistency.sh":
+    sha256: "b5d4d306c00ce0fb1129b5c8b9509858b616e04673ef8ed81eb07b779d5949c9"
+    line_count: 127
+  "scripts/check-ipc-footer.sh":
+    sha256: "b46b1bcb088c37bc9685cf5793266cb5e997582b2cd535ed12a45c66bc28f8e6"
+    line_count: 68
+  "scripts/check-mode-routing.sh":
+    sha256: "b3efb9befd74c5b100b912bf341062cc145b464a5c6973d25183a30255787005"
+    line_count: 108
+  "scripts/check-scaffold-sha.sh":
+    sha256: "f48e49095678a861d83863784e4d29cfc6cb57d725e0fa174cbac3197b6aaaac"
+    line_count: 92
+  "scripts/check-scripts-inventory.sh":
+    sha256: "5372e3eaed41a25877deba69bfd6710b2e709002c23d2b2359c97fdbf1095a79"
+    line_count: 72
+  "scripts/check-skill-structure.sh":
+    sha256: "31852501259d142e0667b3675a4f45b2518f9f0f1ab18f1e4ec563c943fc3f61"
+    line_count: 57
+  "scripts/check-trace-id-format.sh":
+    sha256: "88996412eaa936be62a47d40d2393643f8470a7840c2594f61b0bc9e991a0398"
+    line_count: 64
+  "scripts/commit-delivery.sh":
+    sha256: "effe0b9dec043fab229619463dcc03ba611f634e5091d20ea088e968026bf26f"
+    line_count: 96
+  "scripts/extract-criteria.sh":
+    sha256: "433089398d6d5f7068e86f4fec7a9ed98ff2992244bb78104b14253e6c7f209b"
+    line_count: 111
+  "scripts/git-precheck.sh":
+    sha256: "9816255dc2a52b0dc9322e786c0d0240ff3437926c356947d9a3a69d11cf860b"
+    line_count: 34
+  "scripts/glossary-probe.sh":
+    sha256: "02306eb8c9d055f7d5a2bdc674017a3e0adba154f7b9bba62df0bcf0ae2de33a"
+    line_count: 202
+  "scripts/lib/aggregate.py":
+    sha256: "ef316d46da7c156b621966a6f8626ad9b2b8c0316c6eaa6a9d56bf8708b9c50b"
+    line_count: 768
+  "scripts/metrics-aggregate.sh":
+    sha256: "70d2c3dad1d974ea2804002959465b29e1ca513d412acc59a04e5c812fc2a19f"
+    line_count: 121
+  "scripts/prepare-input.sh":
+    sha256: "1ac736564c8266db1420186817f156b3c608f9a5effb3b426bdc5d8b81d80555"
+    line_count: 272
+  "scripts/prune-traces.sh":
+    sha256: "c9eaa8aea87a8e8b3919e253d47d4b840fe0b2b3d5cb156101f48321f018382d"
+    line_count: 80
+  "scripts/run-checkers.sh":
+    sha256: "321afdc4db4a124d0491b877d2bc25ee406b388f9fe1e9795c571434c945d26f"
+    line_count: 652
+  "scripts/scaffold.sh":
+    sha256: "9f4705d79c1c243f3bd752b89fe00658f92d5358cdb7d5e864f07b7110a94217"
+    line_count: 270
+  "shared/judge-subagent.md":
+    sha256: "e9af98646e041fab40f4e15eff532823c2b3c1405125c397795ce7329376af4b"
+    line_count: 189
+  "shared/summarizer-subagent.md":
+    sha256: "7fe385f8f59a9bae721ad56129fb16fdc8c4a7a482177cc0824a382e87a58207"
+    line_count: 281

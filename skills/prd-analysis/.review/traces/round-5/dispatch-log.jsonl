@@ -1,0 +1,2 @@
+{"event": "launched", "trace_id": "R5-V-001", "role": "reviewer", "reviewer_variant": "cross", "tier": "heavy", "model": "claude-opus-4-5", "delivery_id": 1, "dispatched_at": "2026-04-25T01:10:11Z", "prompt_hash": "sha256:f23e3f21368fcfc754f212c90c62920437d795abfd76f7d21fa1c12fb0ba2006", "linked_issues": ["R3-009", "R3-010", "R3-011", "R3-012"]}
+{"event": "completed", "trace_id": "R5-V-001", "role": "reviewer", "ack_status": "OK", "linked_issues": ["R5-001", "R5-002", "R5-003", "R5-004", "R5-005"], "returned_at": "2026-04-25T01:11:44Z"}
