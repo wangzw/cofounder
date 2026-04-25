@@ -83,4 +83,34 @@ HASH2=$(sha256sum "$TMP/.review3/round-0/input.md" | awk '{print $1}')
 # Allow input-meta.yml to differ in generated_at timestamp; check input.md body only
 [ "$HASH1" = "$HASH2" ] || { echo "FAIL: input.md not idempotent ($HASH1 vs $HASH2)"; exit 1; }
 
+# Test 4: @-ref regex stops at trailing punctuation (regression for 91e1472 #1).
+# Earlier `\S+` greedily captured `notes.md)` from "use @notes.md)", then tried
+# to read `notes.md)` from disk and recorded a fetch error. The narrowed
+# `[A-Za-z0-9_][A-Za-z0-9._/\-]*` class stops at `)`, `,`, `;` etc.
+echo "punctuation-test content" > "$TMP/notes.md"
+cd "$TMP" && "$SCRIPT" "(see @notes.md), and also @notes.md, plus @notes.md;" "$TMP/.review-punct" >/dev/null 2>&1
+grep -q 'punctuation-test content' "$TMP/.review-punct/round-0/input.md" \
+  || { echo "FAIL: @notes.md with trailing punctuation didn't expand (91e1472 #1 regression)"; exit 1; }
+# Should produce ZERO fetch errors — every reference must resolve cleanly.
+ferr=$(grep -E '^fetch_errors:' "$TMP/.review-punct/round-0/input-meta.yml" | head -1)
+echo "$ferr" | grep -q '\[\]' \
+  || { echo "FAIL: punctuation test produced fetch errors (was: $ferr) — 91e1472 #1 regression"; exit 1; }
+echo "PASS: @-ref regex stops at trailing ')', ',', ';' (91e1472 #1)"
+
+# Test 5: URL refs strip trailing prose punctuation (regression for 91e1472 #1).
+# A naive `\S+` URL match captures `https://example.com/foo).` including the
+# `).` punctuation. The fix .rstrips `).,;:!?'\"` from URL refs. We assert by
+# the URL appearing as a heading (`## https://example.com/foo`) WITHOUT the
+# trailing punctuation, regardless of whether the fetch itself succeeded.
+cd "$TMP" && "$SCRIPT" "See (https://example.com/foo). And https://example.com/bar." \
+  "$TMP/.review-url-punct" >/dev/null 2>&1
+INPUT_MD="$TMP/.review-url-punct/round-0/input.md"
+# Heading lines for URL refs use `## <url>` exactly; trailing `).` or `.`
+# would appear immediately after the URL on the same line.
+grep -E '^## https://example\.com/foo$' "$INPUT_MD" >/dev/null \
+  || { echo "FAIL: URL heading retained trailing ')' or '.' (91e1472 #1 regression)"; grep '^## https' "$INPUT_MD"; exit 1; }
+grep -E '^## https://example\.com/bar$' "$INPUT_MD" >/dev/null \
+  || { echo "FAIL: URL heading retained trailing '.' (91e1472 #1 regression)"; grep '^## https' "$INPUT_MD"; exit 1; }
+echo "PASS: URL refs strip trailing prose punctuation (91e1472 #1)"
+
 echo "PASS test-prepare-input.sh"

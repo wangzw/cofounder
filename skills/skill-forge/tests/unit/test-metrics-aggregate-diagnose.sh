@@ -158,4 +158,85 @@ python3 -c "import sys; sys.exit(0 if float('$usd') > 0.08 else 1)" \
   || { echo "FAIL: total_usd=$usd looks like only 1/3 turns attributed (Bug #14 regression?)"; exit 1; }
 echo "PASS: trace_id hint persists across tool_result user turns (Bug #14)"
 
-echo "=== PASS test-metrics-aggregate-diagnose.sh (11 sub-tests) ==="
+# --- Test 12: strict-model JOIN — fallback rejects mismatched model events
+# (regression for f6fd74b #13). A previous permissive `(not d.model or not
+# ev.model or d.model == ev.model)` rule attributed opus events to a haiku
+# dispatch when their time windows coincided, inflating per-trace cost up
+# to 14×. The fix requires strict equality.
+HARNESS3="$TMP/harness-mismatch-model"
+mkdir -p "$HARNESS3"
+# Harness session contains an OPUS event in the dispatch's time window.
+# The dispatch is for a SONNET-tier trace; the events should be left
+# unattributed by the fallback JOIN, NOT folded into the trace's cost.
+# Use a fixture WITHOUT the `trace_id:` first-line marker so primary JOIN
+# misses; only the fallback path is exercised.
+cat > "$HARNESS3/some-other-session.jsonl" <<'JSONL'
+{"type":"user","message":{"content":[{"type":"text","text":"unrelated parent activity"}]}}
+{"type":"assistant","timestamp":"2026-04-24T10:00:15Z","message":{"model":"claude-opus-4","usage":{"input_tokens":1000,"output_tokens":1000,"cache_read_input_tokens":0,"cache_creation_input_tokens":1000}}}
+JSONL
+REVIEW3="$TMP/.review-mismatch"
+mkdir -p "$REVIEW3/traces/round-1" "$REVIEW3/metrics"
+cat > "$REVIEW3/traces/round-1/dispatch-log.jsonl" <<'JSONL'
+{"event":"launched","trace_id":"R1-S-001","role":"summarizer","reviewer_variant":null,"tier":"light","model":"claude-haiku-4","delivery_id":1,"dispatched_at":"2026-04-24T10:00:00Z","prompt_hash":"sha256:abc","linked_issues":[]}
+{"event":"completed","trace_id":"R1-S-001","role":"summarizer","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-24T10:01:00Z"}
+JSONL
+set +e
+bash "$SCRIPT" --diagnose --round 1 --review-dir "$REVIEW3" --config "$CONFIG" --harness-dir "$HARNESS3" >/dev/null 2>&1
+ec=$?
+set -e
+# JOIN coverage of 0 (we WANT zero matches because the model differs) → exit 3.
+# Output YAML is still written.
+[ "$ec" = "0" ] || [ "$ec" = "3" ] || { echo "FAIL: mismatch-model fixture unexpected exit $ec"; exit 1; }
+usd=$(grep '^  total_usd:' "$REVIEW3/metrics/round-1.metrics.yml" | awk '{print $2}')
+# At haiku pricing for 0 attributed tokens: total_usd should be 0.
+# At opus pricing for the events (1000 input + 1000 output + 1000 cache): ~$0.10.
+# Anything above ~$0.001 indicates the cross-tier mis-attribution regression.
+python3 -c "import sys; sys.exit(0 if float('$usd') < 0.005 else 1)" \
+  || { echo "FAIL: total_usd=$usd indicates haiku dispatch absorbed cross-tier opus events (f6fd74b #13 regression)"; exit 1; }
+echo "PASS: strict-model JOIN drops cross-tier events (f6fd74b #13)"
+
+# --- Test 13: fallback JOIN drops events with empty model entirely
+# (regression guard for the `if not ev.model: continue` branch).
+HARNESS4="$TMP/harness-empty-model"
+mkdir -p "$HARNESS4"
+cat > "$HARNESS4/some-session.jsonl" <<'JSONL'
+{"type":"user","message":{"content":[{"type":"text","text":"no trace marker"}]}}
+{"type":"assistant","timestamp":"2026-04-24T10:00:15Z","message":{"usage":{"input_tokens":500,"output_tokens":500}}}
+JSONL
+REVIEW4="$TMP/.review-empty-model"
+mkdir -p "$REVIEW4/traces/round-1" "$REVIEW4/metrics"
+cp "$REVIEW3/traces/round-1/dispatch-log.jsonl" "$REVIEW4/traces/round-1/dispatch-log.jsonl"
+set +e
+bash "$SCRIPT" --diagnose --round 1 --review-dir "$REVIEW4" --config "$CONFIG" --harness-dir "$HARNESS4" >/dev/null 2>&1
+ec=$?
+set -e
+[ "$ec" = "0" ] || [ "$ec" = "3" ] || { echo "FAIL: empty-model fixture unexpected exit $ec"; exit 1; }
+usd=$(grep '^  total_usd:' "$REVIEW4/metrics/round-1.metrics.yml" | awk '{print $2}')
+python3 -c "import sys; sys.exit(0 if float('$usd') < 0.005 else 1)" \
+  || { echo "FAIL: total_usd=$usd indicates empty-model events were attributed (f6fd74b #13 regression)"; exit 1; }
+echo "PASS: empty-model harness events left unattributed in fallback JOIN (f6fd74b #13)"
+
+# --- Test 14: load_dispatch_log accepts the two-event launched+completed
+# format (9aa7ad8 F6). Earlier the loader only accepted the combined
+# single-line format, silently rejecting guide §3.8's event-pair encoding.
+# The fixture uses ONLY event-pair shape — no combined record present.
+REVIEW5="$TMP/.review-event-pair"
+mkdir -p "$REVIEW5/traces/round-1" "$REVIEW5/metrics"
+cat > "$REVIEW5/traces/round-1/dispatch-log.jsonl" <<'JSONL'
+{"event":"launched","trace_id":"R1-W-001","role":"writer","reviewer_variant":null,"tier":"balanced","model":"claude-sonnet-4-5","delivery_id":1,"dispatched_at":"2026-04-24T10:00:00Z","prompt_hash":"sha256:abc","linked_issues":[]}
+{"event":"completed","trace_id":"R1-W-001","role":"writer","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-24T10:01:00Z","self_review_status":"FULL_PASS","fail_count":0}
+JSONL
+mkdir -p "$TMP/empty-harness-2"
+set +e
+bash "$SCRIPT" --diagnose --round 1 --review-dir "$REVIEW5" --config "$CONFIG" --harness-dir "$TMP/empty-harness-2" >/dev/null 2>&1
+ec=$?
+set -e
+[ "$ec" = "0" ] || [ "$ec" = "3" ] || { echo "FAIL: event-pair fixture unexpected exit $ec"; exit 1; }
+# The dispatch must appear in `traces:` of the metrics output. If
+# load_dispatch_log silently dropped the event-pair record (regression),
+# `dispatched_traces` would be 0.
+dispatched=$(grep 'dispatched_traces:' "$REVIEW5/metrics/round-1.metrics.yml" | awk '{print $2}')
+[ "$dispatched" = "1" ] || { echo "FAIL: event-pair fixture got dispatched_traces=$dispatched (expected 1) — load_dispatch_log dropped the record (9aa7ad8 F6 regression)"; exit 1; }
+echo "PASS: load_dispatch_log accepts two-event launched+completed format (9aa7ad8 F6)"
+
+echo "=== PASS test-metrics-aggregate-diagnose.sh (14 sub-tests) ==="
