@@ -238,6 +238,46 @@ The target skill's `git-precheck.sh` MUST verify: `git ≥ 2.0`, `bash ≥ 4.0`,
 
 ---
 
+## CR-S15 skill-md-cost-control-sections
+
+The target's `SKILL.md` MUST include the cost-control sections that the
+`skill-md-template.md` template bakes in: a `## Model Tiers` heading, a
+`### Per-dispatch model override` subsection with the role→tier→Agent-tool-`model`
+mapping table, and a `## CLI Flags` table containing at minimum the rows
+`--full`, `--no-consultant`, `--tier <role>=<tier>`, and `--max-iterations N`.
+
+These sections are the orchestrator-facing contract for cost control. Without
+them, the orchestrator inherits the parent session's model (typically `opus`)
+across every sub-agent dispatch, and users have no documented way to skip the
+domain-consultant or override tiers per role. The writer-subagent is told to
+follow the SKILL.md template "exactly", but absent this script-tier check the
+writer can quietly omit these sections (as observed in the prd-analysis
+delivery-1 run that prompted this CR).
+
+The check is structural — regex anchors against H2/H3 headings, the role table
+header, and backtick-quoted flag literals. It does not validate the prose inside
+each section; that would require an LLM check.
+
+```yaml
+- id: CR-S15
+  name: "skill-md-cost-control-sections"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-skill-md-sections.sh
+  severity: error
+  applies_to: ["SKILL.md"]
+  conflicts_with: []
+  priority: 1
+  incremental_skip: per_file
+  rationale: |
+    Without this gate, Tier 1.1 (per-dispatch model override) and Tier 3.7
+    (--no-consultant flag) silently fail to propagate from skill-forge into
+    the generated skill's SKILL.md, regressing the cost optimizations on
+    every new generation.
+```
+
+---
+
 ## Semantic Criteria (LLM-Type)
 
 ---

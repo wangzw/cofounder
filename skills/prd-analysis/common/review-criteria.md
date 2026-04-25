@@ -182,6 +182,40 @@ review rounds.
 
 ---
 
+## CR-S09 skill-md-cost-control-sections (meta — applies to this skill's own SKILL.md)
+
+prd-analysis is itself a generative skill produced by skill-forge. Its `SKILL.md` is the
+orchestrator-facing contract for cost control when prd-analysis runs (to generate PRDs). This
+meta-CR mirrors skill-forge's CR-S15: SKILL.md MUST include `## Model Tiers` + `### Per-dispatch
+model override` (with role→tier→Agent-tool-`model` mapping table) + `## CLI Flags` (with at
+minimum `--full`, `--no-consultant`, `--tier`, `--max-iterations` rows). Without these
+sections, anyone running `/cofounder:prd-analysis` would default to opus inheritance across
+every sub-agent dispatch (5–25× the configured tier rate).
+
+Domain-irrelevant for the PRD content itself; this CR exists because prd-analysis is BOTH a
+generator (of PRDs) and a generated artifact (of skill-forge), and the cost-control contract
+must hold in both directions.
+
+```yaml
+- id: CR-S09
+  name: "skill-md-cost-control-sections"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-skill-md-sections.sh
+  severity: error
+  applies_to: ["SKILL.md"]
+  conflicts_with: []
+  priority: 1
+  incremental_skip: per_file
+  rationale: |
+    Applies to this skill's own SKILL.md (the orchestrator contract for running
+    /cofounder:prd-analysis), not to PRDs produced by it. Without this gate, a
+    re-generation of prd-analysis under skill-forge could quietly omit the
+    cost-control sections and regress Tier 1.1 + Tier 3.7 optimizations.
+```
+
+---
+
 ## Semantic Criteria (LLM-Type)
 
 ---

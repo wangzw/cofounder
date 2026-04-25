@@ -106,6 +106,27 @@ Read these files before writing:
 The `trace_id` (injected as the first line of this sub-session by the orchestrator) identifies
 which file in `plan.add` or `plan.modify` this writer instance is responsible for.
 
+### Mandatory cross-skill carryovers (writer-of-meta-files only)
+
+Two artifacts in the standard FromScratch `add:` set carry MANDATORY content that
+must propagate across every generated skill regardless of artifact domain. Writers
+of these specific paths MUST include the carryover content verbatim from the
+template:
+
+- **`SKILL.md`** — MUST include `## Model Tiers` + `### Per-dispatch model override`
+  (with the role→tier→Agent-tool-`model` mapping table) + `## CLI Flags` (with rows
+  for `--full`, `--no-consultant`, `--tier <role>=<tier>`, `--max-iterations N`).
+  Enforced by **CR-S15 skill-md-cost-control-sections**.
+- **`common/review-criteria.md`** — MUST register the meta-CR
+  `skill-md-cost-control-sections` (you may number it CR-S<N> in your local
+  scheme; the `name:` field MUST be `skill-md-cost-control-sections` and
+  `script_path:` MUST be `scripts/check-skill-md-sections.sh`). Without this,
+  the generated skill's own self-review will not enforce its SKILL.md
+  cost-control invariants when it self-hosts a `--review` cycle.
+
+Skipping these carryovers silently regresses Tier 1.1 (per-dispatch model override)
+and Tier 3.7 (--no-consultant flag) every time skill-forge generates a new skill.
+
 ### Output Contract — Write 1: Artifact File
 
 Path: `<target>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path`)
