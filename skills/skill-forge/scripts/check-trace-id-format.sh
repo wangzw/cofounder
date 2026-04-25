@@ -34,10 +34,28 @@ else:
             if fn.endswith(".md") or fn.endswith(".yml") or fn.endswith(".yaml"):
                 files.append(os.path.join(root, fn))
 
-# trace_id pattern: R<digits>-<role-letter>-<3 digits>
-VALID_PATTERN = re.compile(r'\btrace_id[=:\s]+R\d+-[CPWVRSJ]-\d{3}\b')
-# Detect any trace_id= value at all
-ANY_TRACE = re.compile(r'\btrace_id[=:\s]+(\S+)')
+# Real trace_id values match this strict pattern: R<digits>-<role-letter>-<3 digits>
+VALID_RE = re.compile(r'^R\d+-[CPWVRSJ]-\d{3}$')
+# Detect a trace_id assignment — `=` or `:` separator only (whitespace alone is prose,
+# e.g. "trace_id strings" or "in trace_id" sentences, NOT a literal value).
+ANY_TRACE = re.compile(r'\btrace_id\s*[=:]\s*(\S+)')
+# Marker chars that indicate the captured token is a placeholder / format-doc / markdown
+# fragment, not a real trace_id literal we should validate.
+PLACEHOLDER_CHARS = set('<>{}[]()')
+
+
+def is_placeholder(value: str) -> bool:
+    """Return True if `value` is doc syntax (placeholder, format hint, markdown fragment),
+    False if it looks like a real trace_id literal we should validate against VALID_RE."""
+    # Strip surrounding markdown/quote punctuation that isn't part of the value
+    stripped = value.strip('`"\',.;:)')
+    if not stripped:
+        return True
+    # Angle/curly/square/round-bracket placeholders: <id>, {trace_id}, [id], (id)
+    if any(c in stripped for c in PLACEHOLDER_CHARS):
+        return True
+    return False
+
 
 for fpath in sorted(files):
     rel = os.path.relpath(fpath, os.path.dirname(target) if os.path.isfile(target) else target)
@@ -46,11 +64,11 @@ for fpath in sorted(files):
     except OSError:
         continue
     for m in ANY_TRACE.finditer(content):
-        value = m.group(1).rstrip('.,;)')
-        # Check the full match in context using valid pattern
-        start = max(0, m.start() - 5)
-        snippet = content[start:m.end() + len(value)]
-        if not VALID_PATTERN.search(content[m.start():m.end() + 20]):
+        raw = m.group(1)
+        value = raw.strip('`"\',.;:)')
+        if is_placeholder(raw):
+            continue
+        if not VALID_RE.match(value):
             issues.append({
                 "criterion_id": "CR-S10",
                 "file": rel,
