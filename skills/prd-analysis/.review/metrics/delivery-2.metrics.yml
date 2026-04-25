@@ -1,0 +1,97 @@
+generated_at: 2026-04-25T14:59:11Z
+scope:
+  key: delivery
+  value: 2
+  rounds:
+    - 3
+    - 4
+    - 5
+delivery_id: 2
+pricing_source: /Users/wangzw/workspace/cofounder/skills/prd-analysis/common/config.yml
+cost:
+  total_usd: 101.623156
+  by_role:
+    judge:
+      input_tokens: 53
+      output_tokens: 908
+      cache_read_tokens: 304239
+      cache_creation_tokens: 40902
+      usd: 0.068916
+      calls: 1
+    reviewer:
+      input_tokens: 7928
+      output_tokens: 141758
+      cache_read_tokens: 47486267
+      cache_creation_tokens: 2855906
+      usd: 98.177557
+      calls: 6
+    reviser:
+      input_tokens: 168
+      output_tokens: 39518
+      cache_read_tokens: 1504131
+      cache_creation_tokens: 527130
+      usd: 3.021251
+      calls: 10
+    summarizer:
+      input_tokens: 137
+      output_tokens: 2657
+      cache_read_tokens: 671944
+      cache_creation_tokens: 290939
+      usd: 0.355432
+      calls: 1
+  by_criterion: {}
+latency_seconds:
+  total: 5700
+  by_role:
+    judge: 30
+    reviewer: 2610
+    reviser: 3000
+    summarizer: 60
+join_stats:
+  dispatched_traces: 18
+  unmatched_dispatches: 0
+  unmatched_ratio: 0
+traces:
+  - trace_id: R3-V-001
+    usd: 88.839844
+    reviewer_variant: cross
+  - trace_id: R3-V-002
+    usd: 2.188807
+    reviewer_variant: cross
+  - trace_id: R3-V-003
+    usd: 2.422127
+    reviewer_variant: cross
+  - trace_id: R3-V-004
+    usd: 1.047327
+    reviewer_variant: cross
+  - trace_id: R3-V-005
+    usd: 2.297942
+    reviewer_variant: cross
+  - trace_id: R3-V-006
+    usd: 1.38151
+    reviewer_variant: cross
+  - trace_id: R4-R-001
+    usd: 0.740309
+  - trace_id: R4-R-002
+    usd: 0.358534
+  - trace_id: R4-R-003
+    usd: 0.436175
+  - trace_id: R4-R-004
+    usd: 0.50131
+  - trace_id: R4-R-005
+    usd: 0.108659
+  - trace_id: R4-R-006
+    usd: 0.199511
+  - trace_id: R4-R-007
+    usd: 0.209204
+  - trace_id: R4-R-008
+    usd: 0.20042
+  - trace_id: R4-R-009
+    usd: 0.157051
+  - trace_id: R4-R-010
+    usd: 0.110077
+  - trace_id: R5-J-001
+    usd: 0.068916
+  - trace_id: R5-S-001
+    usd: 0.355432
+warnings: []
