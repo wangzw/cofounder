@@ -65,9 +65,22 @@ if [ -z "$LATEST_TAG" ]; then
 fi
 
 # Compute drift — any path under <target>/ (excluding .review/ meta-archive) that
-# differs between the latest delivery tag and HEAD.
-DRIFT="$(git -C "$REPO_ROOT" diff --name-only "$LATEST_TAG" HEAD -- "$REL_TARGET" \
+# differs between the latest delivery tag and the WORKING TREE. Comparing to HEAD
+# alone misses uncommitted edits and would falsely report no-drift on a target
+# that has been modified locally but not yet committed (review/revise cycles
+# routinely operate on uncommitted changes).
+#
+# `git diff <tag> -- <path>` (no second ref) diffs the tag against the working
+# tree, which catches both committed and unstaged changes.
+DRIFT="$(git -C "$REPO_ROOT" diff --name-only "$LATEST_TAG" -- "$REL_TARGET" \
           2>/dev/null | grep -v '^'"$REL_TARGET"'/\.review/' || true)"
+# Also include untracked files under the target (excluding .review/), since
+# `diff` does not see them.
+UNTRACKED="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$REL_TARGET" \
+          2>/dev/null | grep -v '^'"$REL_TARGET"'/\.review/' || true)"
+if [ -n "$UNTRACKED" ]; then
+  DRIFT="$(printf '%s\n%s' "$DRIFT" "$UNTRACKED" | grep -v '^$' || true)"
+fi
 
 if [ -z "$DRIFT" ]; then
   echo "no-drift since $LATEST_TAG — skipping LLM review"

@@ -1,0 +1,24 @@
+round: 4
+delivery_id: 3
+verdict: converged
+decided_at: 2026-04-25T07:34:47Z
+metrics:
+  open_critical: 0
+  open_error: 0
+  open_warning: 0
+  open_info: 0
+  writer_partial_count: 0
+  dispatch_count: 2
+rationale: |
+  Delivery 3 (fresh --review against post-delivery-2 working tree) converged
+  on script-type criteria. All 56 leaves pass single-file checks; 0 carry-
+  forwards (auto-resolve filter correctly dropped round-3's 26 stale CR-S10
+  phantoms when the fixed checker reported them clean). Cross-reviewer was
+  user-declined this session, so CR-L01..CR-L16 are not re-verified at
+  delivery-3 — flagged in versions/3.md as an outstanding risk for the
+  next cycle. The META-skill's structural invariants hold; deferring LLM
+  verification is acceptable for a delivery that ships only script-fix
+  changes (no sub-agent prompt edits, no contract changes).
+next_action: deliver
+caveats:
+  - "Cross-reviewer + adversarial-reviewer skipped this round; LLM-type criteria CR-L01..CR-L16 not re-verified for delivery-3."

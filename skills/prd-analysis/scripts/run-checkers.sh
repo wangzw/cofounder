@@ -563,6 +563,7 @@ print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
 # converged round just because the cross-reviewer wasn't re-dispatched.
 # ────────────────────────────────────────────────────────────────────────────
 carried_forward = 0
+auto_resolved = 0
 if round_num > 1:
     prev_round_dir = os.path.join(
         os.path.dirname(round_dir), f"round-{round_num - 1}")
@@ -583,6 +584,17 @@ if round_num > 1:
                     cross_skip.append(leaf)
                 elif s and not s.startswith("  "):
                     in_skip = False
+    # Build a fingerprint set of (criterion_id, file) pairs found by THIS round's
+    # script-type checks. Used to auto-clear stale script-type carry-forwards: if
+    # a prior CR-S* issue's (criterion_id, file) does not appear in this round's
+    # findings, the underlying script no longer reports it (e.g. the script bug
+    # was fixed, or the file was edited to satisfy the rule via a non-targeted
+    # change). Such issues MUST NOT be carried forward — that would propagate a
+    # phantom finding indefinitely.
+    current_script_pairs = {
+        (i.get("criterion_id", ""), i.get("file", ""))
+        for i in all_issues
+    }
     if os.path.isdir(prev_issues_dir) and cross_skip:
         cross_skip_set = set(cross_skip)
         for fname in sorted(os.listdir(prev_issues_dir)):
@@ -615,6 +627,16 @@ if round_num > 1:
                 # Leaf was re-evaluated this round; do NOT carry forward.
                 # Cross-reviewer will explicitly mark resolved/persistent.
                 continue
+            # Auto-clear stale script-type issues: if the prior issue's criterion
+            # is script-type (CR-S*) and (criterion_id, file) is NOT in this
+            # round's script findings, the originating script no longer reports
+            # it. Skip the carry-forward — the issue is resolved, even if the
+            # leaf is in the cross_reviewer_skip set (script checks ran on the
+            # whole tree regardless of skip-set).
+            crit = fm.get("criterion_id", "")
+            if crit.startswith("CR-S") and (crit, leaf) not in current_script_pairs:
+                auto_resolved += 1
+                continue
             new_id = f"R{round_num}-{next_seq:03d}"
             next_seq += 1
             out_md_path = os.path.join(issues_dir, new_id + ".md")
@@ -642,6 +664,8 @@ if round_num > 1:
             carried_forward += 1
 if carried_forward:
     print(f"OK carry-forward: {carried_forward} open issues inherited from round-{round_num-1}")
+if auto_resolved:
+    print(f"OK auto-resolved: {auto_resolved} stale script-type issues dropped (originating script no longer reports them)")
 
 # Clean up temp state
 try:

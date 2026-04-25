@@ -1,9 +1,0 @@
-[
-  {
-    "criterion_id": "CR-S08",
-    "file": "generate/writer-subagent.md",
-    "severity": "critical",
-    "description": "Snippet D fingerprint missing from 'generate/writer-subagent.md'",
-    "suggested_fix": "Add '<!-- snippet-d-fingerprint: ipc-ack-v1 -->' to the sub-agent prompt"
-  }
-]

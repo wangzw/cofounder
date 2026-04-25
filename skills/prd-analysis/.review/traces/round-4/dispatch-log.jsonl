@@ -1,0 +1,6 @@
+{"event": "launched", "trace_id": "R4-V-001", "role": "reviewer", "reviewer_variant": "cross", "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-25T07:16:48Z", "prompt_hash": "sha256:test-skill-forge-fresh-review", "linked_issues": []}
+{"event": "completed", "trace_id": "R4-V-001", "role": "reviewer", "ack_status": "SKIPPED", "linked_issues": [], "returned_at": "2026-04-25T07:33:43Z"}
+{"event": "launched", "trace_id": "R4-S-001", "role": "summarizer", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 3, "dispatched_at": "2026-04-25T07:33:43Z", "prompt_hash": "sha256:test-skill-forge-fresh-review", "linked_issues": []}
+{"event": "launched", "trace_id": "R4-J-001", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 3, "dispatched_at": "2026-04-25T07:33:43Z", "prompt_hash": "sha256:test-skill-forge-fresh-review", "linked_issues": []}
+{"event": "completed", "trace_id": "R4-S-001", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T07:35:03Z"}
+{"event": "completed", "trace_id": "R4-J-001", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T07:35:03Z"}

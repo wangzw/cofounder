@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Delivery 3 — 2026-04-25
+
+- **Verdict**: pending (judge dispatch in progress)
+- **Mode**: --review (fresh, .review/ history cleared)
+- **Drift detected**: scripts/check-drift.sh + scripts/run-checkers.sh (post-delivery-2 fixes synced from skill-forge)
+- **Script-type checks**: 0 issues after restoring versions/{1,2}.md from delivery-2 tag
+- **Cross-reviewer**: SKIPPED (user-declined dispatch this session)
+- **Carry-forward verified**: round-3's 26 stale CR-S10 phantoms correctly auto-resolved (0 carries in round-4)
+- **Dispatches**: 1 summarizer, 1 judge — 0 reviewer dispatches
+
 ## Delivery 2 — 2026-04-25
 
 - **Verdict**: pending (judge dispatch in progress)

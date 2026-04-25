@@ -1,6 +1,5 @@
 skill_forge_dir: /Users/wangzw/workspace/cofounder/skills/skill-forge
-delivery_id: 1
-current_round: 0
-mode: generate-from-scratch
+delivery_id: 3
+current_round: 4
+mode: review
 target: /Users/wangzw/workspace/cofounder/skills/prd-analysis
-input_source: /Users/wangzw/workspace/cofounder/skills/prd-analysis.backup
