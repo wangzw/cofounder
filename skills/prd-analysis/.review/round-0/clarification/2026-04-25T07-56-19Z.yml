@@ -1,0 +1,32 @@
+SKILL_NAME: "prd-analysis"
+SKILL_VERSION: "0.1.0"
+SKILL_DESCRIPTION: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'."
+ARTIFACT_ROOT: "docs/raw/prd/<YYYY-MM-DD>-<product-slug>/"
+
+generated_at: "2026-04-25T07:56:19Z"
+trace_id: "synthesized-no-consultant"
+synthesized_by: "orchestrator (--no-consultant override)"
+
+R-001:
+  status: deferred
+  note: "Deferred per --no-consultant. Inferred from baseline @skills/prd-analysis.backup/SKILL.md."
+R-002:
+  status: deferred
+  note: "Deferred per --no-consultant. Variant inferred as 'document' (PRD pipeline with questioning, generation, self-review, evolve modes — multi-stage document workflow)."
+R-003:
+  status: deferred
+R-004:
+  status: deferred
+R-005:
+  status: deferred
+R-006:
+  status: deferred
+R-007:
+  status: deferred
+
+variant: document
+
+baseline_reference:
+  source: "skills/prd-analysis.backup/"
+  size_bytes: 83465
+  files: 15

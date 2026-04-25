@@ -1,0 +1,106 @@
+generated_at: 2026-04-25T09:33:56Z
+scope:
+  key: delivery
+  value: 1
+  rounds:
+    - 1
+    - 2
+delivery_id: 1
+pricing_source: /Users/wangzw/workspace/cofounder/skills/prd-analysis/common/config.yml
+cost:
+  total_usd: 108.234987
+  by_role:
+    judge:
+      input_tokens: 143
+      output_tokens: 3017
+      cache_read_tokens: 762973
+      cache_creation_tokens: 114046
+      usd: 1.438385
+      calls: 1
+    planner:
+      input_tokens: 171
+      output_tokens: 28519
+      cache_read_tokens: 2270591
+      cache_creation_tokens: 400932
+      usd: 10.992826
+      calls: 1
+    reviser:
+      input_tokens: 58
+      output_tokens: 7813
+      cache_read_tokens: 1081961
+      cache_creation_tokens: 215921
+      usd: 4.334735
+      calls: 1
+    summarizer:
+      input_tokens: 1608
+      output_tokens: 3305
+      cache_read_tokens: 641791
+      cache_creation_tokens: 307616
+      usd: 1.982363
+      calls: 1
+    writer:
+      input_tokens: 67797
+      output_tokens: 492643
+      cache_read_tokens: 40001679
+      cache_creation_tokens: 6959537
+      usd: 89.486678
+      calls: 18
+  by_criterion: {}
+latency_seconds:
+  total: 24000
+  by_role:
+    judge: 30
+    planner: 90
+    reviser: 60
+    summarizer: 60
+    writer: 23760
+join_stats:
+  dispatched_traces: 22
+  unmatched_dispatches: 0
+  unmatched_ratio: 0
+traces:
+  - trace_id: R1-P-001
+    usd: 10.992826
+  - trace_id: R1-R-001
+    usd: 4.334735
+  - trace_id: R1-W-001
+    usd: 9.76325
+  - trace_id: R1-W-002
+    usd: 8.781825
+  - trace_id: R1-W-003
+    usd: 8.416091
+  - trace_id: R1-W-004
+    usd: 6.689741
+  - trace_id: R1-W-005
+    usd: 7.251092
+  - trace_id: R1-W-006
+    usd: 6.039637
+  - trace_id: R1-W-007
+    usd: 9.590237
+  - trace_id: R1-W-008
+    usd: 8.971993
+  - trace_id: R1-W-009
+    usd: 7.428961
+  - trace_id: R1-W-010
+    usd: 10.345773
+  - trace_id: R1-W-011
+    usd: 0.594117
+  - trace_id: R1-W-012
+    usd: 0.727503
+  - trace_id: R1-W-013
+    usd: 0.875976
+  - trace_id: R1-W-014
+    usd: 0.917744
+  - trace_id: R1-W-015
+    usd: 1.235078
+  - trace_id: R1-W-016
+    usd: 0.377856
+  - trace_id: R1-W-017
+    usd: 0.976116
+  - trace_id: R1-W-018
+    usd: 0.503687
+  - trace_id: R2-J-001
+    usd: 1.438385
+  - trace_id: R2-S-001
+    usd: 1.982363
+warnings: []

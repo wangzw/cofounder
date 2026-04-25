@@ -1,0 +1,42 @@
+[
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-prd-structure.sh",
+    "severity": "error",
+    "description": "CR-PP01 declares script_path 'scripts/check-prd-structure.sh' but no such script exists in the target or resolved scripts/ directory; criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-PP01.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-PP01 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-prd-ids.sh",
+    "severity": "error",
+    "description": "CR-PP02 declares script_path 'scripts/check-prd-ids.sh' but no such script exists in the target or resolved scripts/ directory; criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-PP02.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-PP02 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-prd-readme-index.sh",
+    "severity": "error",
+    "description": "CR-PP03 declares script_path 'scripts/check-prd-readme-index.sh' but no such script exists in the target or resolved scripts/ directory; criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-PP03.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-PP03 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-prd-tbd.sh",
+    "severity": "error",
+    "description": "CR-PP04 declares script_path 'scripts/check-prd-tbd.sh' but no such script exists in the target or resolved scripts/ directory; criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-PP04.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-PP04 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-prd-version-chain.sh",
+    "severity": "error",
+    "description": "CR-PP05 declares script_path 'scripts/check-prd-version-chain.sh' but no such script exists in the target or resolved scripts/ directory; criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-PP05.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-PP05 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  }
+]

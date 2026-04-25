@@ -1,0 +1,7 @@
+skill_forge_dir: /Users/wangzw/workspace/cofounder/skills/skill-forge
+delivery_id: 1
+current_round: 1
+mode: generate
+target: /Users/wangzw/workspace/cofounder/skills/prd-analysis
+no_consultant: true
+input_compression: selective
