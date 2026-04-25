@@ -1,4 +1,4 @@
-skill_version: {{SKILL_VERSION}}
+skill_version: 0.1.0
 review_criteria_version: 1.0.0
 artifact_template_version: 1.0.0
 
@@ -24,11 +24,25 @@ model_mapping:
   balanced: claude-sonnet-4-5
   light:    claude-haiku-4-5
 
+# Block-style required — scripts/lib/aggregate.py's mini-YAML parser
+# does not handle flow-style `{key: val}` dicts. Keep block-style here.
 pricing:
   models:
-    claude-opus-4:    {input_per_1m: 15.0, output_per_1m: 75.0, cache_read_per_1m: 1.50, cache_creation_per_1m: 18.75}
-    claude-sonnet-4:  {input_per_1m: 3.0,  output_per_1m: 15.0, cache_read_per_1m: 0.30, cache_creation_per_1m: 3.75}
-    claude-haiku-4:   {input_per_1m: 0.8,  output_per_1m: 4.0,  cache_read_per_1m: 0.08, cache_creation_per_1m: 1.0}
+    claude-opus-4:
+      input_per_1m: 15.0
+      output_per_1m: 75.0
+      cache_read_per_1m: 1.50
+      cache_creation_per_1m: 18.75
+    claude-sonnet-4:
+      input_per_1m: 3.0
+      output_per_1m: 15.0
+      cache_read_per_1m: 0.30
+      cache_creation_per_1m: 3.75
+    claude-haiku-4:
+      input_per_1m: 0.8
+      output_per_1m: 4.0
+      cache_read_per_1m: 0.08
+      cache_creation_per_1m: 1.0
 
 priority_order: [quality, cost, performance]
 
@@ -96,3 +110,26 @@ incremental_review:
   force_full_every_n_rounds: 5
   depgraph: on
   coverage_gap_verdict: stalled
+
+# Writer fan-out batching (Tier-2 cost optimization).
+# When `enabled: true`, the orchestrator bin-packs the planner's add/modify
+# entries into N dispatch groups (each with sum(estimated_output_tokens) <=
+# max_output_tokens_per_dispatch), fanning out one writer dispatch per group
+# instead of one per file. Trades parallel wall-time for shared cache_creation
+# amortization — a batched dispatch pays the sub-agent bootstrap cache cost
+# once, not per-file.
+#
+# Hard safety floor: `max_output_tokens_per_dispatch` leaves ~19k tokens of
+# headroom under the sonnet / opus 64k per-turn output cap (each Write tool
+# call is one turn). If a single file's estimate exceeds this cap, it dispatches
+# solo and the cap acts as a pure max-file guard.
+#
+# Planner spec side: each `add:` / `modify:` entry MUST include
+# `estimated_output_tokens: <int>` so the orchestrator can bin-pack without
+# opening every template.
+writer_batching:
+  enabled: false   # default off; flip per-skill once the planner + writer
+                   # prompts are upgraded to support the batched contract.
+  max_output_tokens_per_dispatch: 45000
+  min_files_per_batch: 2   # below this, solo dispatch is cheaper than the
+                           # multi-file prompt overhead.

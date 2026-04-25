@@ -83,4 +83,14 @@ git -C "$TARGET" commit -m "feat(${SKILL_SCOPE}): delivery-${DELIVERY_ID}: ${CHA
 # Annotated tag
 git -C "$TARGET" tag -a "$TAG" -m "${CHANGE_SUMMARY}"
 
+# Auto-prune old traces so .review/traces/ doesn't grow unbounded. Retention
+# policy lives in common/config.yml (convergence.traces_retention_rounds,
+# default 20). prune-traces.sh is a best-effort step — a failure here does
+# not invalidate the delivery commit.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -x "$SCRIPT_DIR/prune-traces.sh" ]; then
+  "$SCRIPT_DIR/prune-traces.sh" "$TARGET" >/dev/null 2>&1 || \
+    echo "warn: prune-traces.sh exited non-zero; traces not pruned" >&2
+fi
+
 echo "OK tag ${TAG}"

@@ -177,7 +177,8 @@ CRITERIA_JSON=$("${SCRIPT_DIR}/extract-criteria.sh" "$TARGET" 2>/dev/null) || {
 
 set +e
 CHECKER_SCRIPTS_DIR="$SCRIPT_DIR" python3 - "$TARGET" "$ROUND_DIR" "$CRITERIA_JSON" <<'PYEOF'
-import sys, os, json, subprocess, re
+import sys, os, json, subprocess, re, hashlib
+from typing import Dict
 
 target = sys.argv[1]
 round_dir = sys.argv[2]
@@ -272,6 +273,47 @@ while frontier:
 
 cross_reviewer_focus = sorted(tainted)
 cross_reviewer_skip  = sorted(all_leaves - tainted)
+
+# ────────────────────────────────────────────────────────────────────────────
+# Scaffold-provenance skip: leaves whose current sha matches the manifest at
+# common/scaffold-provenance.yml are "still pure scaffold content" — the writer
+# / reviser never touched them. LLM cross-reviewer auditing such leaves is
+# pure waste (the skeleton has been reviewed at the generator level; the
+# target's copy is byte-identical). Move them unconditionally to skip unless
+# forced-full is on. Writer / reviser mutations drift the sha → auto-demoted
+# out of the skip-set.
+# ────────────────────────────────────────────────────────────────────────────
+if not forced_full:
+    provenance_path = os.path.join(target, "common", "scaffold-provenance.yml")
+    scaffold_shas: Dict[str, str] = {}
+    if os.path.isfile(provenance_path):
+        in_files = False
+        for line in open(provenance_path, encoding="utf-8"):
+            s = line.rstrip("\n")
+            if s.startswith("files:"):
+                in_files = True
+                continue
+            if not in_files or not s.strip() or s.lstrip().startswith("#"):
+                continue
+            m = re.match(r'^  (.+?):\s+([0-9a-f]{64})$', s)
+            if m:
+                scaffold_shas[m.group(1)] = m.group(2)
+    if scaffold_shas:
+        pure_scaffold = set()
+        for leaf in list(cross_reviewer_focus):
+            expected = scaffold_shas.get(leaf)
+            if not expected:
+                continue
+            try:
+                actual = hashlib.sha256(
+                    open(os.path.join(target, leaf), "rb").read()).hexdigest()
+            except OSError:
+                continue
+            if actual == expected:
+                pure_scaffold.add(leaf)
+        if pure_scaffold:
+            cross_reviewer_focus = sorted(set(cross_reviewer_focus) - pure_scaffold)
+            cross_reviewer_skip  = sorted(set(cross_reviewer_skip) | pure_scaffold)
 
 single_file_focus = sorted(changed_set)
 single_file_skip  = sorted(unchanged_set)

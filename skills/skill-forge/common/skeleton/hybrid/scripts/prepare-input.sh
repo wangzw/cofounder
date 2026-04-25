@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # prepare-input.sh — Round 0 input preparation per guide §6.1
-# Usage: prepare-input.sh [--bootstrap-subdir <subdir>] <user-prompt> <review-dir>
+# Usage: prepare-input.sh [--bootstrap-subdir <subdir>] [--dir-mode <mode>]
+#                         <user-prompt> <review-dir>
 #   <user-prompt>:              raw prompt string, or '-' to read from stdin
 #   <review-dir>:               the .review/ root of the target skill
 #   --bootstrap-subdir <name>:  subdir under <review-dir> to write input.md +
@@ -10,6 +11,19 @@
 #                               (e.g. "round-5") so delivery-1's round-0 archive
 #                               is preserved. Guide §10.5 round continuity + §6.1
 #                               Round-0 semantics bridged by this flag. (F8 fix)
+#   --dir-mode <mode>:          How to expand `@dir` references. One of
+#                               listing   — file tree only, no content
+#                               selective — tree + inline SKILL.md / README.md /
+#                                           LICENSE / CHANGELOG / *-template.md
+#                                           only (default)
+#                               full      — tree + inline every text file under
+#                                           MAX_DIR_TOTAL_BYTES (legacy)
+#                               Cost note: `full` can easily balloon the
+#                               consultant/writer cache_creation footprint
+#                               (231 KB backup → ~$4+ per downstream dispatch at
+#                               opus rates). Default `selective` trims to the
+#                               orientation files; sub-agents Read the rest on
+#                               demand.
 # Produces:
 #   <review-dir>/<bootstrap-subdir>/input.md
 #   <review-dir>/<bootstrap-subdir>/input-meta.yml
@@ -17,10 +31,18 @@
 set -euo pipefail
 
 BOOTSTRAP_SUBDIR="round-0"
+DIR_MODE="selective"
 POSITIONAL=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --bootstrap-subdir) BOOTSTRAP_SUBDIR="$2"; shift 2 ;;
+    --dir-mode)
+      DIR_MODE="$2"
+      case "$DIR_MODE" in
+        listing|selective|full) ;;
+        *) echo "ERROR: --dir-mode must be listing|selective|full, got: $DIR_MODE" >&2; exit 1 ;;
+      esac
+      shift 2 ;;
     --) shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
     -h|--help)
       sed -n '/^# Usage:/,/^# No external/p' "$0" | sed 's/^# //'
@@ -49,12 +71,12 @@ fi
 INVOKE_CWD="$(pwd)"
 
 # Resolve template path — sibling to this script via `../common/templates/`.
-# Works both when run inside this skill (before scaffold) and inside a scaffolded
+# Works both when run inside skill-forge (before scaffold) and inside a scaffolded
 # target (after scaffold copies scripts/ + common/templates/ forward).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 README_TEMPLATE="${SCRIPT_DIR}/../common/templates/review-readme-template.md"
 
-python3 - "$USER_PROMPT" "$REVIEW_DIR" "$INVOKE_CWD" "$BOOTSTRAP_SUBDIR" "$README_TEMPLATE" <<'PYEOF'
+python3 - "$USER_PROMPT" "$REVIEW_DIR" "$INVOKE_CWD" "$BOOTSTRAP_SUBDIR" "$README_TEMPLATE" "$DIR_MODE" <<'PYEOF'
 import sys
 import os
 import re
@@ -67,6 +89,7 @@ review_dir      = sys.argv[2]
 invoke_cwd      = sys.argv[3]
 bootstrap_subdir = sys.argv[4]
 readme_template = sys.argv[5] if len(sys.argv) > 5 else ""
+dir_mode        = sys.argv[6] if len(sys.argv) > 6 else "selective"
 
 review_root = pathlib.Path(review_dir)
 review_root.mkdir(parents=True, exist_ok=True)
@@ -103,8 +126,24 @@ MAX_DIR_TOTAL_BYTES = 512 * 1024     # 512 KB aggregate per directory ref
 TEXT_EXTS = {".md", ".txt", ".yml", ".yaml", ".json", ".sh", ".py", ".toml",
              ".ini", ".cfg", ".rst", ".html", ".xml", ".css", ".js", ".ts"}
 
+# Orientation files — inlined in `selective` mode. They are the files a
+# consultant / planner needs first to understand the intent of a referenced
+# directory without paying the full-directory cache_creation cost.
+SELECTIVE_BASENAMES = {"SKILL.md", "README.md", "README", "LICENSE", "CHANGELOG",
+                       "CHANGELOG.md"}
+SELECTIVE_SUFFIXES  = ("-template.md",)
+
 def _is_text_file(p):
     return p.suffix.lower() in TEXT_EXTS or p.name in {"README", "LICENSE", "CHANGELOG"}
+
+def _is_orientation_file(p, rel):
+    # `rel` is a pathlib.Path relative to the referenced dir root.
+    # Orientation = top-level orientation files OR suffix match anywhere
+    if p.name in SELECTIVE_BASENAMES and len(rel.parts) == 1:
+        return True
+    if any(p.name.endswith(s) for s in SELECTIVE_SUFFIXES):
+        return True
+    return False
 
 def _should_skip(rel_parts):
     # Skip dotdirs (.git, .review, .venv, ...) and common build/cache dirs
@@ -122,7 +161,7 @@ for ref in path_refs:
         fetch_errors.append(f"@{ref}")
         continue
     if full_path.is_dir():
-        # Directory ref: enumerate tree + inline text files under a per-dir budget
+        # Directory ref: always produce a file tree; inline content per dir_mode.
         listing_lines = []
         content_sections = []
         used = 0
@@ -137,16 +176,27 @@ for ref in path_refs:
             except OSError:
                 continue
             listing_lines.append(f"- {rel} ({size} bytes)")
-            if _is_text_file(p) and size <= MAX_FETCH_BYTES and used + size <= MAX_DIR_TOTAL_BYTES:
-                try:
-                    body = p.read_text(encoding="utf-8", errors="replace").rstrip()
-                    content_sections.append(f"### {rel}\n\n```\n{body}\n```")
-                    used += size
-                except OSError as exc:
-                    fetch_errors.append(f"@{ref}/{rel} ({exc})")
+            if dir_mode == "listing":
+                continue
+            if not (_is_text_file(p) and size <= MAX_FETCH_BYTES
+                    and used + size <= MAX_DIR_TOTAL_BYTES):
+                continue
+            if dir_mode == "selective" and not _is_orientation_file(p, rel):
+                continue
+            try:
+                body = p.read_text(encoding="utf-8", errors="replace").rstrip()
+                content_sections.append(f"### {rel}\n\n```\n{body}\n```")
+                used += size
+            except OSError as exc:
+                fetch_errors.append(f"@{ref}/{rel} ({exc})")
+        mode_note = {
+            "listing":   "listing only — sub-agents Read on demand",
+            "selective": "tree + orientation files inlined (SKILL.md, README.md, LICENSE, CHANGELOG, *-template.md)",
+            "full":      f"tree + every text file under {MAX_FETCH_BYTES} B (total cap {MAX_DIR_TOTAL_BYTES} B)",
+        }.get(dir_mode, dir_mode)
         parts = [
             heading,
-            f"_(directory; per-file cap {MAX_FETCH_BYTES} B, total cap {MAX_DIR_TOTAL_BYTES} B, used {used} B)_",
+            f"_(directory; dir-mode={dir_mode} — {mode_note}; used {used} B)_",
             "**File tree:**",
             "\n".join(listing_lines) if listing_lines else "(empty)",
         ]

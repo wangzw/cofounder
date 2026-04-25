@@ -47,6 +47,15 @@ scripts/glossary-probe.sh <target>/.review common/domain-glossary.md
 **Condition**: dispatch if `trigger-flags.yml` reports `glossary_hit: true` OR `sparse_input: true`
 OR user passed `--interactive`. Skip otherwise.
 
+**`--no-consultant` override**: when the user passes this flag, skip the consultant dispatch
+unconditionally — even when triggers fire. The orchestrator synthesizes a minimal
+`<target>/.review/round-0/clarification/<ISO-ts>.yml` locally, setting the four flat
+placeholder keys (`SKILL_NAME`, `SKILL_VERSION`, `SKILL_DESCRIPTION`, `ARTIFACT_ROOT`)
+from the user prompt and `input.md`'s expanded refs (look for `SKILL.md` in any
+`@`-referenced directory for name/version/description; fall back to slug-from-prompt
+and the default `docs/raw/<slug>/` artifact root). Mark R-001..R-007 as `status: deferred`.
+Saves the consultant's opus-tier dispatch cost (~$4 on a 231 KB backup reference).
+
 - **Dispatches**: `generate/domain-consultant-subagent.md`
 - **Inputs consumed by sub-agent**: `round-0/input.md`, `round-0/input-meta.yml`, `round-0/trigger-flags.yml`, `common/domain-glossary.md`
 - **Outputs written by sub-agent**: `<target>/.review/round-0/clarification/<ISO-timestamp>.yml`

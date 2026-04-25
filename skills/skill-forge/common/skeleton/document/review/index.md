@@ -37,6 +37,32 @@ If `--review` was user-triggered (not part of an in-generate loop):
 
 ### Step 3 — Cross-Reviewer Dispatch
 
+**Pre-dispatch drift short-circuit** (Tier-3 cost optimization):
+
+Before launching any LLM, run:
+
+```bash
+scripts/check-drift.sh <target>/
+```
+
+Exit 0 means the target tree is byte-identical (modulo `.review/`) to the latest
+HEAD-reachable `delivery-*` tag that touches this skill. In that case the
+orchestrator MUST synthesize a `verdict: no-drift-converged, next_action: none`
+and skip Steps 3–6 entirely. This saves the full LLM cycle (~$50+ at opus rates)
+on re-runs of `--review` over an unchanged delivered skill. Exit 1 / 2 means drift
+detected or no prior delivery — proceed with normal dispatch below.
+
+**Empty-round short-circuit** (Tier-2 cost optimization):
+
+After `run-checkers` Phase A, if `skip-set.yml.cross_reviewer_focus == []` AND
+the new `carry-forward` records for this round are also empty, there is nothing
+for cross-reviewer to audit. Orchestrator MUST skip Steps 3–4 and proceed
+directly to Step 5; summarizer will aggregate the (empty current-round +
+carried-forward prior) issue set, and judge will rule based on the aggregate
+`open_issues` count (non-zero iff prior rounds still have open findings).
+
+**Normal dispatch** (drift detected + non-empty focus):
+
 - **Dispatches**: `review/cross-reviewer-subagent.md`
 - **Sub-agent inputs**: leaves listed in `skip-set.yml cross_reviewer_focus`, previous-round issue
   frontmatter from `round-<N-1>/issues/`, writer self-review files at
@@ -76,7 +102,7 @@ severity (default: `critical`).
 
 | Verdict | Next Action |
 |---------|------------|
-| `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, this skill exits cleanly |
+| `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, skill-forge exits cleanly |
 | `progressing` | Revise phase: load `revise/index.md`, increment round |
 | `oscillating` | HITL gate: surface to user with oscillating-issue list; wait for `/continue`, `/override`, or `/abort` |
 | `diverging` | HITL gate: surface to user with regression report; same options |
@@ -99,4 +125,4 @@ severity (default: `critical`).
 ## Files in This Directory
 
 - [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L10)
-- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (this skill–specific attack angles)
+- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)

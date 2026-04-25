@@ -23,11 +23,12 @@ grep -q 'dummy requirements' "$TMP/.review2/round-0/input.md" \
   || { echo "FAIL: @ref content not expanded"; exit 1; }
 
 # Test 2b: @ref pointing to a directory expands into tree + inlined text files
+# (use --dir-mode full to match legacy behavior — default is now `selective`)
 mkdir -p "$TMP/refdir/sub"
 echo "top-level content" > "$TMP/refdir/top.md"
 echo "nested content"    > "$TMP/refdir/sub/nested.md"
 mkdir -p "$TMP/refdir/.review" && echo "should-be-skipped" > "$TMP/refdir/.review/skip.md"
-cd "$TMP" && "$SCRIPT" "Reference @refdir" "$TMP/.review2b" >/dev/null 2>&1
+cd "$TMP" && "$SCRIPT" --dir-mode full "Reference @refdir" "$TMP/.review2b" >/dev/null 2>&1
 grep -q '^## @refdir' "$TMP/.review2b/round-0/input.md" \
   || { echo "FAIL: dir @ref heading missing"; exit 1; }
 grep -q 'top.md' "$TMP/.review2b/round-0/input.md" \
@@ -35,11 +36,33 @@ grep -q 'top.md' "$TMP/.review2b/round-0/input.md" \
 grep -q 'sub/nested.md' "$TMP/.review2b/round-0/input.md" \
   || { echo "FAIL: dir tree listing missing sub/nested.md"; exit 1; }
 grep -q 'top-level content' "$TMP/.review2b/round-0/input.md" \
-  || { echo "FAIL: dir inlined top.md content missing"; exit 1; }
+  || { echo "FAIL: full-mode should inline top.md content"; exit 1; }
 grep -q 'nested content' "$TMP/.review2b/round-0/input.md" \
-  || { echo "FAIL: dir inlined sub/nested.md content missing"; exit 1; }
+  || { echo "FAIL: full-mode should inline sub/nested.md content"; exit 1; }
 grep -q 'should-be-skipped' "$TMP/.review2b/round-0/input.md" \
   && { echo "FAIL: dir should have skipped .review/ but inlined it"; exit 1; }
+
+# Test 2d: dir-mode=selective (the new default) — inlines only orientation files
+mkdir -p "$TMP/selref"
+echo "orientation body" > "$TMP/selref/SKILL.md"
+echo "other body"       > "$TMP/selref/other.md"
+echo "readme body"      > "$TMP/selref/README.md"
+cd "$TMP" && "$SCRIPT" "Reference @selref" "$TMP/.review2d" >/dev/null 2>&1
+grep -q 'other.md' "$TMP/.review2d/round-0/input.md" \
+  || { echo "FAIL: selective tree listing missing other.md"; exit 1; }
+grep -q 'orientation body' "$TMP/.review2d/round-0/input.md" \
+  || { echo "FAIL: selective should inline SKILL.md content"; exit 1; }
+grep -q 'readme body' "$TMP/.review2d/round-0/input.md" \
+  || { echo "FAIL: selective should inline README.md content"; exit 1; }
+grep -q 'other body' "$TMP/.review2d/round-0/input.md" \
+  && { echo "FAIL: selective should NOT inline other.md content"; exit 1; }
+
+# Test 2e: dir-mode=listing — no inline content at all
+cd "$TMP" && "$SCRIPT" --dir-mode listing "Reference @selref" "$TMP/.review2e" >/dev/null 2>&1
+grep -q 'other.md' "$TMP/.review2e/round-0/input.md" \
+  || { echo "FAIL: listing mode missing other.md in tree"; exit 1; }
+grep -q 'orientation body' "$TMP/.review2e/round-0/input.md" \
+  && { echo "FAIL: listing mode inlined SKILL.md content — should be tree only"; exit 1; }
 
 # Test 2c: prepare-input drops .review/README.md from the review-readme template (idempotent)
 "$SCRIPT" "seed" "$TMP/.review2c" >/dev/null 2>&1
