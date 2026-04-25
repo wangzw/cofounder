@@ -1,4 +1,0 @@
-{"event": "launched", "trace_id": "R7-R-001", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 2, "dispatched_at": "2026-04-24T16:45:32Z", "prompt_hash": "sha256:af0df35e8e9a752d7dee7bccd238c11a5c51f1fd570fa55ca135337e3108cebb", "linked_issues": ["R6-007"]}
-{"event": "launched", "trace_id": "R7-R-002", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 2, "dispatched_at": "2026-04-24T16:45:32Z", "prompt_hash": "sha256:35d5a7f9795434ad8b42098ededf8ad20a65e6934486d57c24de3f1bcef739fb", "linked_issues": []}
-{"event": "completed", "trace_id": "R7-R-001", "role": "reviser", "ack_status": "OK", "linked_issues": ["R6-007"], "returned_at": "2026-04-24T16:47:06Z"}
-{"event": "completed", "trace_id": "R7-R-002", "role": "reviser", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-24T16:47:06Z"}

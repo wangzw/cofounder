@@ -1,4 +1,0 @@
-{"event": "launched", "trace_id": "R4-S-001", "role": "summarizer", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-24T16:10:18Z", "prompt_hash": "sha256:222df3d4191bd92f9f521a50dbdb70f247b4f0ab2150988fcee64b5c8de18c20", "linked_issues": []}
-{"event": "completed", "trace_id": "R4-S-001", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-24T16:11:30Z"}
-{"event": "launched", "trace_id": "R4-J-001", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-24T16:11:41Z", "prompt_hash": "sha256:f31b62ab399ff19bc61e076fc7029fa3dd87e50a6d28beeeb7bb43105628ca5d", "linked_issues": []}
-{"event": "completed", "trace_id": "R4-J-001", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-24T16:12:22Z"}
