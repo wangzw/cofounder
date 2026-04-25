@@ -1,0 +1,145 @@
+generated_at: 2026-04-25T01:17:19Z
+scope:
+  key: delivery
+  value: 1
+  rounds:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+delivery_id: 1
+pricing_source: /Users/wangzw/workspace/cofounder/skills/skill-forge/common/config.yml
+cost:
+  total_usd: 166.432858
+  by_role:
+    domain_consultant:
+      input_tokens: 14178
+      output_tokens: 10611
+      cache_read_tokens: 622286
+      cache_creation_tokens: 322735
+      usd: 7.993205
+      calls: 1
+    judge:
+      input_tokens: 89
+      output_tokens: 1742
+      cache_read_tokens: 533200
+      cache_creation_tokens: 65495
+      usd: 0.940691
+      calls: 1
+    planner:
+      input_tokens: 109
+      output_tokens: 14296
+      cache_read_tokens: 1150168
+      cache_creation_tokens: 239679
+      usd: 7.293068
+      calls: 1
+    reviewer:
+      input_tokens: 512
+      output_tokens: 107131
+      cache_read_tokens: 18610972
+      cache_creation_tokens: 2112595
+      usd: 75.570119
+      calls: 4
+    reviser:
+      input_tokens: 205
+      output_tokens: 15082
+      cache_read_tokens: 2040502
+      cache_creation_tokens: 550641
+      usd: 2.903899
+      calls: 10
+    summarizer:
+      input_tokens: 2028
+      output_tokens: 9530
+      cache_read_tokens: 2058541
+      cache_creation_tokens: 462323
+      usd: 4.635778
+      calls: 2
+    writer:
+      input_tokens: 39332
+      output_tokens: 240828
+      cache_read_tokens: 24107120
+      cache_creation_tokens: 3290312
+      usd: 67.096097
+      calls: 10
+  by_criterion: {}
+latency_seconds:
+  total: 7485
+  by_role:
+    domain_consultant: 109
+    judge: 186
+    planner: 78
+    reviewer: 774
+    reviser: 896
+    summarizer: 312
+    writer: 5130
+join_stats:
+  dispatched_traces: 29
+  unmatched_dispatches: 0
+  unmatched_ratio: 0
+traces:
+  - trace_id: R0-C-001
+    usd: 7.993205
+  - trace_id: R1-J-001
+    usd: 0.940691
+  - trace_id: R1-P-001
+    usd: 7.293068
+  - trace_id: R1-S-001
+    usd: 2.65823
+  - trace_id: R1-V-001
+    usd: 23.59903
+    reviewer_variant: cross
+  - trace_id: R1-W-001
+    usd: 8.197255
+  - trace_id: R1-W-002
+    usd: 6.931876
+  - trace_id: R1-W-003
+    usd: 6.701307
+  - trace_id: R1-W-004
+    usd: 5.368844
+  - trace_id: R1-W-005
+    usd: 5.827782
+  - trace_id: R1-W-006
+    usd: 4.438039
+  - trace_id: R1-W-007
+    usd: 7.386841
+  - trace_id: R1-W-008
+    usd: 7.21274
+  - trace_id: R1-W-009
+    usd: 6.138065
+  - trace_id: R1-W-010
+    usd: 8.893347
+  - trace_id: R2-R-001
+    usd: 0.759212
+  - trace_id: R2-R-002
+    usd: 0.226264
+  - trace_id: R2-R-003
+    usd: 0.202139
+  - trace_id: R2-R-004
+    usd: 0.221135
+  - trace_id: R2-R-005
+    usd: 0.597805
+  - trace_id: R2-R-006
+    usd: 0.262123
+  - trace_id: R3-S-001
+    usd: 1.977548
+  - trace_id: R3-V-001
+    usd: 33.548466
+    reviewer_variant: cross
+  - trace_id: R4-R-001
+    usd: 0.220174
+  - trace_id: R4-R-002
+    usd: 0.141364
+  - trace_id: R4-R-003
+    usd: 0.134192
+  - trace_id: R4-R-004
+    usd: 0.139492
+  - trace_id: R5-V-001
+    usd: 6.568443
+    reviewer_variant: cross
+  - trace_id: R6-V-001
+    usd: 11.85418
+    reviewer_variant: cross
+warnings: []
