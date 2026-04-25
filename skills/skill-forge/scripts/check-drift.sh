@@ -30,7 +30,14 @@ if [ -z "$REPO_ROOT" ]; then
   exit 1
 fi
 
-TARGET_ABS="$(cd "$TARGET" && pwd)"
+# Use `pwd -P` (physical path with all symlinks resolved) for BOTH the repo
+# root and the target, so the prefix-strip below works on systems where the
+# logical and physical paths differ — e.g. macOS resolves /tmp and /var to
+# /private/tmp and /private/var, and a target reached via /var would otherwise
+# fail to share the /private/var prefix that `git rev-parse --show-toplevel`
+# emits.
+REPO_ROOT="$(cd "$REPO_ROOT" && pwd -P)"
+TARGET_ABS="$(cd "$TARGET" && pwd -P)"
 REL_TARGET="${TARGET_ABS#"$REPO_ROOT"/}"
 [ "$REL_TARGET" = "$TARGET_ABS" ] && REL_TARGET="."
 
@@ -72,12 +79,22 @@ fi
 #
 # `git diff <tag> -- <path>` (no second ref) diffs the tag against the working
 # tree, which catches both committed and unstaged changes.
+#
+# Build the .review/ exclusion prefix. When the target IS the repo root
+# (REL_TARGET="."), git emits paths like `.review/foo.md` with no leading
+# `./`, so the exclude pattern must NOT have one either. When the target is
+# a subdir (REL_TARGET="skills/foo"), git emits `skills/foo/.review/...`.
+if [ "$REL_TARGET" = "." ]; then
+  REVIEW_PREFIX_RE='^\.review/'
+else
+  REVIEW_PREFIX_RE="^${REL_TARGET}/\\.review/"
+fi
 DRIFT="$(git -C "$REPO_ROOT" diff --name-only "$LATEST_TAG" -- "$REL_TARGET" \
-          2>/dev/null | grep -v '^'"$REL_TARGET"'/\.review/' || true)"
+          2>/dev/null | grep -v "$REVIEW_PREFIX_RE" || true)"
 # Also include untracked files under the target (excluding .review/), since
 # `diff` does not see them.
 UNTRACKED="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$REL_TARGET" \
-          2>/dev/null | grep -v '^'"$REL_TARGET"'/\.review/' || true)"
+          2>/dev/null | grep -v "$REVIEW_PREFIX_RE" || true)"
 if [ -n "$UNTRACKED" ]; then
   DRIFT="$(printf '%s\n%s' "$DRIFT" "$UNTRACKED" | grep -v '^$' || true)"
 fi

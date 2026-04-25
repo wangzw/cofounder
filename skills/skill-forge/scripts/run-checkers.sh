@@ -627,14 +627,22 @@ if round_num > 1:
                 # Leaf was re-evaluated this round; do NOT carry forward.
                 # Cross-reviewer will explicitly mark resolved/persistent.
                 continue
-            # Auto-clear stale script-type issues: if the prior issue's criterion
-            # is script-type (CR-S*) and (criterion_id, file) is NOT in this
-            # round's script findings, the originating script no longer reports
-            # it. Skip the carry-forward — the issue is resolved, even if the
-            # leaf is in the cross_reviewer_skip set (script checks ran on the
-            # whole tree regardless of skip-set).
+            # Auto-clear stale script-type issues: a prior issue is script-type
+            # iff its `source` is `script` (filed by run-checkers in some round)
+            # or `carry-forward` (propagated from a script-type origin). Script
+            # checks run on the whole tree every round, so absence of the
+            # (criterion_id, file) pair from this round's `all_issues` is
+            # authoritative — the originating script no longer reports it.
+            # Skip the carry-forward; the issue is resolved, even if the leaf
+            # is in cross_reviewer_skip.
+            #
+            # LLM-type issues (`source: cross-reviewer` / `adversarial-reviewer`)
+            # are NOT auto-resolved here: those reviewers don't run every round,
+            # so script absence carries no information about their criteria.
+            origin = fm.get("source", "")
             crit = fm.get("criterion_id", "")
-            if crit.startswith("CR-S") and (crit, leaf) not in current_script_pairs:
+            if origin in ("script", "carry-forward") \
+                    and (crit, leaf) not in current_script_pairs:
                 auto_resolved += 1
                 continue
             new_id = f"R{round_num}-{next_seq:03d}"
