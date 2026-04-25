@@ -21,7 +21,7 @@ The IPC model is **Direct Write + ACK**:
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
-| `domain_consultant` | 1 write | `.review/round-<N>/clarification.yml` |
+| `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
 ### Blocker-scope taxonomy for writer self-review FAIL rows
 

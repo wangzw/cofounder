@@ -163,7 +163,42 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 
 ## Model Tiers
 
-Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml`.
+Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml` (`model_tier_defaults` + `model_mapping`).
+
+### Per-dispatch model override (MANDATORY for cost control)
+
+When the orchestrator dispatches a sub-agent via the Claude Code Agent tool, it **MUST**
+pass the `model` parameter to override the default (parent-session inheritance). Without
+this override, all sub-agents run on the parent session's model — typically `opus` —
+which costs 5–25× the configured tier rate. Per the `tool_permissions` +
+`model_tier_defaults` sections of `common/config.yml`:
+
+| Role | Default tier | Agent-tool `model` value |
+|------|------|------|
+| domain-consultant | `heavy` | `"opus"` |
+| planner | `heavy` | `"opus"` |
+| writer | `balanced` | `"sonnet"` |
+| reviewer (cross + adversarial) | `heavy` | `"opus"` |
+| reviser | `balanced` | `"sonnet"` |
+| summarizer | `light` | `"haiku"` |
+| judge | `light` | `"haiku"` |
+
+Users may override a single dispatch via `--tier <role>=<tier>` (see CLI Flags).
+
+Orchestrator MUST log both `model_requested` (the tier-mapped value passed to the Agent
+tool) and the `model` actually observed in the harness JSONL for each dispatch, so
+`--diagnose` can flag drift.
+
+## CLI Flags
+
+| Flag | Applies to | Semantics |
+|------|-----------|-----------|
+| `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus`. Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
+| `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input; user wants explicit clarification dialogue. |
+| `--no-consultant` | Generate | Skip the `domain-consultant` dispatch entirely even if `sparse_input: true` or `glossary_hit: true` would normally trigger it. Orchestrator synthesizes a minimal `clarification/<ts>.yml` with R-001..R-007 = `deferred`, using the user prompt + `input.md`'s expanded refs as the sole signal. Cost floor drops by ~$4 at opus (consultant is the single heaviest Round-0 cost); use when the prompt already names R-001 / R-002 explicitly or `@`-references a baseline artifact with a SKILL.md present. |
+| `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round. Requires HITL approval gate; records the override in `.review/hitl/<ts>-force-continue.yml`. |
+| `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g., `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
+| `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled-verdict threshold; default 5). For cheap iteration budgets during testing. |
 
 ## Configuration & Subagent Files
 
