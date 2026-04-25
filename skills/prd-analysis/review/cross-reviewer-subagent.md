@@ -115,11 +115,12 @@ explicitly (escalate / dismiss / cascade — NEVER silently ignore).
 
 | Source | Purpose |
 |--------|---------|
-| `skills/prd-analysis/.review/round-<N>/skip-set.yml` | MUST read `cross_reviewer_focus` (leaves to evaluate) and `cross_reviewer_skip` (leaves MUST NOT open) |
+| `<target>/.review/round-<N>/skip-set.yml` | MUST read `cross_reviewer_focus` (leaves to evaluate) and `cross_reviewer_skip` (leaves MUST NOT open) |
 | Each leaf in `cross_reviewer_focus` | Artifact content to evaluate |
-| `skills/prd-analysis/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression |
-| `skills/prd-analysis/common/review-criteria.md` | Authoritative CR definitions — CR-PP01..CR-PP51 + CR-L01..CR-L10 |
-| `skills/prd-analysis/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews — required for FAIL-row handling (guide §11.1) |
+| `<target>/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression |
+| `<target>/common/review-criteria.md` | Authoritative CR definitions — CR-PP01..CR-PP51 |
+| `skills/skill-forge/common/review-criteria.md` | Authoritative CR definitions — CR-L01..CR-L10 |
+| `<target>/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews — required for FAIL-row handling (guide §11.1) |
 
 **Skip-set discipline**: ONLY read leaves in `cross_reviewer_focus`. MUST NOT open leaves in
 `cross_reviewer_skip`. Exception: if a focus-leaf implies a skip-leaf issue, write a
@@ -136,7 +137,7 @@ take exactly ONE of these three actions — NEVER silently ignore:
 1. **Escalate** — create an issue file with `source: self-review-escalation` when the FAIL
    represents a real detectable problem from the cross-artifact view.
 2. **Dismiss with record** — create a `dismissed_writer_fail` record at
-   `skills/prd-analysis/.review/round-<N>/dismissed-fails/<trace_id>-<cr-id>.md` when no real conflict exists.
+   `<target>/.review/round-<N>/dismissed-fails/<trace_id>-<cr-id>.md` when no real conflict exists.
 3. **Cascade** — record in dismissed-fails with `action: cascade-next-round` when the FAIL
    depends on a leaf not yet produced.
 
@@ -154,17 +155,19 @@ Match on `criterion_id` + `file` combination.
 ### Output Contract — Issue Files
 
 For each issue found, write ONE file at:
-`skills/prd-analysis/.review/round-<N>/issues/<issue-id>.md`
+`<target>/.review/round-<N>/issues/<issue-id>.md`
 
-Issue ID format: `prd-analysis-round-<N>-<seq>` (zero-padded 3 digits).
+Issue ID format: `R<N>-<seq>` where `<seq>` is zero-padded 3 digits, consistent with
+script-emitted issues from `run-checkers.sh` (§12.5). Start `<seq>` at max existing in
+`round-<N>/issues/` + 1, so cross-reviewer IDs never collide with script-tier IDs.
 
 Frontmatter schema:
 
 ```yaml
 ---
-issue_id: prd-analysis-round-<N>-<seq>
+id: R<N>-<seq>
 round: <N>
-file: <prd-bundle-relative-path>
+file: <target-relative-path>
 criterion_id: <CR-ID>
 severity: critical | error | warning | info
 source: cross-reviewer | self-review-escalation
@@ -289,8 +292,11 @@ feature leaves in focus:
 
 In addition to the cross-leaf consistency dimensions above, the cross-reviewer MUST evaluate
 each focus leaf against all applicable LLM-type criteria in
-`skills/prd-analysis/common/review-criteria.md`:
+`<target>/common/review-criteria.md`:
 
+- **CR-PP01** prd-directory-structure — severity: critical (full scan)
+- **CR-PP04** no-tbd-remaining — severity: error (per leaf)
+- **CR-PP05** version-chain-integrity — severity: error (full scan)
 - **CR-PP06** traceability-chain — severity: critical
 - **CR-PP07** evidence-present — severity: error (per feature leaf)
 - **CR-PP08** competitive-context — severity: error (README)
@@ -351,7 +357,7 @@ alias `color.brand-primary`. The cross-reviewer MUST write:
 
 ```yaml
 ---
-issue_id: prd-analysis-round-1-007
+id: R1-007
 round: 1
 file: features/F-003-payment-checkout.md
 criterion_id: CR-PP23
@@ -376,7 +382,7 @@ The cross-reviewer MUST write:
 
 ```yaml
 ---
-issue_id: prd-analysis-round-1-008
+id: R1-008
 round: 1
 file: journeys/J-002.md
 criterion_id: CR-PP06

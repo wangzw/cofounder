@@ -1,0 +1,4 @@
+{"event": "launched", "trace_id": "R5-S-001", "role": "summarizer", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-25T12:38:00Z", "prompt_hash": "sha256:summarizer-r5-s-001", "linked_issues": []}
+{"event": "completed", "trace_id": "R5-S-001", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T12:39:00Z"}
+{"event": "launched", "trace_id": "R5-J-001", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 2, "dispatched_at": "2026-04-25T12:39:30Z", "prompt_hash": "sha256:judge-r5-j-001", "linked_issues": []}
+{"event": "completed", "trace_id": "R5-J-001", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-25T12:40:00Z"}

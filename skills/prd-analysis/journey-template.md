@@ -87,7 +87,7 @@ flowchart LR
 
 | # | Stage | User Action | System Response | Screen/View | Interaction Mode | Emotion | Pain Point | Mapped Feature |
 |---|-------|-------------|-----------------|-------------|------------------|---------|------------|----------------|
-| 1 | {stage name} | {what the user does} | {what the system does} | {screen or view — e.g. "Dashboard", "Settings > Profile", "CLI prompt". Use consistent names across journeys} | {primary interaction pattern: click / form / drag / swipe / long-press / keyboard / scroll / hover / voice / scan} | {positive / neutral / negative} | {frustration or friction, if any} | [F-{XXX}](../features/F-{XXX}-{slug}.md) |
+| 1 | {stage name} | {what the user does} | {what the system does} | {screen or view — e.g. "Dashboard", "Settings > Profile", "CLI prompt". Use consistent names across journeys} | {primary interaction pattern: click / form / drag / swipe / keyboard / scroll / hover / voice / scan} | {positive / neutral / negative} | {frustration or friction, if any} | [F-{XXX}](../features/F-{XXX}-{slug}.md) |
 ```
 
 **Mapped Feature** is backfilled during PRD Step 4 (cross-linking) after features are derived
@@ -204,6 +204,8 @@ Omit for single-touchpoint journeys.}
 ---
 
 ### Applicable Design Tokens
+
+**Required for journeys covering any UI screens. Omit only for journeys with no user-facing screens (e.g. background job monitoring, CLI-only single-command journeys).**
 
 ```markdown
 ## Applicable Design Tokens

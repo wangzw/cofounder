@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Delivery 2 — 2026-04-25
+
+- **Verdict**: converged after 3 rounds
+- **Git SHA**: `dd6107d`
+- **Changes**: LLM-type cross-review via split-scope fan-out (3 sonnet reviewers by scope); 20 issues found and closed in revise cycle; 0 script-type issues post-convergence
+- **Leaves affected**: 10 core leaves (SKILL.md, subagent spec, templates, topic files)
+
 ## Delivery 1 — 2026-04-25
 
 - **Verdict**: converged after 2 rounds

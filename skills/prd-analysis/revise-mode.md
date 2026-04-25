@@ -10,39 +10,39 @@ Review Checklist dimensions are defined in `review-checklist.md` — load it on 
 
 If the invocation prompt already provides answers to Steps 1–4 (downstream state confirmed, PRD overview skipped, change list enumerated, impact analysis resolved), **skip Steps 1–4 entirely** and jump directly to Step 5. Do not re-ask questions or re-run analysis that is already settled.
 
-**Review-driven fix pass:** If `{PRD-dir}/.reviews/REVIEW-*.md` files exist (produced by `--review` Step 4), treat the newest as pre-answered input.
+**Review-driven fix pass:** If `{PRD-dir}/.review/round-<N>/issues/` directories exist (produced by `--review` Step 5), treat the highest-round non-empty issues directory as pre-answered input.
 
-**DO NOT read the REVIEW file in the main agent.** For a PRD with ~30–50 features the file routinely exceeds 800–1500 lines (~20–40k tokens) and, once loaded, stays in the main-agent prompt cache for every subsequent turn (15–20 turns × main-agent cache_read = the largest single avoidable cost line in a revise session). Delegate the read + cluster step to a Sonnet subagent and consume only its compact manifest.
+**DO NOT read the individual issue files in the main agent.** For a PRD with ~30–50 features the issue files collectively can exceed 800–1500 lines (~20–40k tokens) and, once loaded, stay in the main-agent prompt cache for every subsequent turn (15–20 turns × main-agent cache_read = the largest single avoidable cost line in a revise session). Delegate the read + cluster step to a Sonnet subagent and consume only its compact manifest.
 
 **Flow:**
 
-1. **Select the REVIEW file** — list `{PRD-dir}/.reviews/REVIEW-*.md`, sort by timestamp, pick the newest file that does NOT end in `.applied.md`. This is a directory-listing step (`Glob` / `Bash ls`), not a file read — the REVIEW body itself is not loaded into main context.
-2. **Dispatch the Clustering Subagent** (see template below). It reads the REVIEW file, parses per-file findings, packs files into ≤3-file clusters, and returns a structured manifest. The manifest is typically **2–4k tokens** — small enough to stay in main context cheaply.
-3. **Consume the manifest directly** — no further reads of the REVIEW file by the main agent. Use `cluster.target_files` and `cluster.dimensions_tagged` to drive Step 5 dispatch and Step 6 delta-review scoping.
-4. **Jump to Step 5** and dispatch one Fix subagent per cluster using Template A (Template A points each Fix subagent at the REVIEW file itself — Fix subagents read only the sections they need).
+1. **Select the issues directory** — list `{PRD-dir}/.review/round-*/issues/` directories, sort by round number descending, pick the highest round-N directory whose `issues/` subdirectory is non-empty and does NOT contain a `.applied` sentinel file. This is a directory-listing step (`Glob` / `Bash ls`), not a file read — the issue bodies themselves are not loaded into main context.
+2. **Dispatch the Clustering Subagent** (see template below). It reads each issue file under the selected `issues/` directory, parses per-file findings, packs files into ≤3-file clusters, and returns a structured manifest. The manifest is typically **2–4k tokens** — small enough to stay in main context cheaply.
+3. **Consume the manifest directly** — no further reads of the issue files by the main agent. Use `cluster.target_files` and `cluster.dimensions_tagged` to drive Step 5 dispatch and Step 6 delta-review scoping.
+4. **Jump to Step 5** and dispatch one Fix subagent per cluster using Template A (Template A points each Fix subagent at the individual issue files — Fix subagents read only the issues relevant to their target files).
 5. **Step 6 delta-review scope** comes from the manifest's union of `dimensions_tagged` plus the always-run checks. Do not re-run dimensions the review already validated as passing.
-6. **After all edits succeed**, rename the consumed file to `.reviews/REVIEW-{timestamp}.applied.md` (`Bash mv`) so it is not re-applied on a subsequent invocation. `.reviews/` is not version-controlled — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 5.
+6. **After all edits succeed**, create a `.review/round-N/issues/.applied` sentinel file (`Bash touch`) so the issues directory is not re-applied on a subsequent invocation. `.review/` is not version-controlled beyond what git tracks — the durable audit for this revision is the `REVISIONS.md` entry produced by Step 5.
 
 **Clustering-Subagent dispatch template** (main agent emits this):
 
 ```
-Cluster the findings in {REVIEW file absolute path} into fix batches.
+Cluster the findings in {issues directory absolute path} into fix batches.
 
-Read the REVIEW file exactly once. Do not read any other file.
+Read every issue file (`I-*.md` or `<issue-id>.md`) in the issues directory. Do not read any other file.
 
-Parse every `### <relative path>` section under `## Per-File Findings`. For each section, count findings, collect the unique `Dimension:` tags, and note the severities present.
+For each issue file, extract: the `file:` frontmatter field (target file relative path), the `criterion_id:` field (dimension tag), and the `severity:` field.
 
 Produce clusters using these rules:
 - Each cluster contains AT MOST 3 target files.
 - Files are grouped within the same artifact class first (features/*, journeys/*, architecture/*); do not mix classes within a cluster unless a class has <3 files left.
 - Files with >8 findings get their own cluster (1 file only) — large edit counts replay more cache_read per turn.
 - Preserve source order within a class (F-001..F-003, F-004..F-006, ...).
-- Cross-file findings from the `## Cross-File Findings` section are NOT clustered — list them separately in `cross_file_findings` so the main agent can handle them inline after Fix subagents return.
+- Cross-file findings (issues whose `file:` field is blank or set to `*`) are NOT clustered — list them separately in `cross_file_findings` so the main agent can handle them inline after Fix subagents return.
 
 Return the manifest as YAML inside a fenced code block, exactly this shape:
 
 ```yaml
-review_file: <absolute path>
+issues_dir: <absolute path>
 total_findings: <int>
 critical: <int>
 important: <int>
@@ -52,27 +52,30 @@ clusters:
     target_files:
       - <absolute path>
       - <absolute path>
+    issue_files:
+      - <absolute path to issue file>
+      - <absolute path to issue file>
     finding_counts: { critical: N, important: N, suggestion: N }
     dimensions_tagged: [<dimension 1>, <dimension 2>, ...]
   - id: 2
     ...
 cross_file_findings:
-  - dimension: <dimension>
-    severity: <Critical|Important|Suggestion>
-    one_line: <the finding text, no Fix line>
+  - dimension: <criterion_id>
+    severity: <error|warning|suggestion>
+    one_line: <the finding text summary>
 dimensions_tagged_union: [<every dimension that appears anywhere>]
 ```
 
 **Forbidden:**
-- Reading any file other than the REVIEW file.
+- Reading any file other than the issue files in the issues directory.
 - Grep/Glob/Bash exploration of the PRD directory.
-- Emitting the `Fix:` text of individual findings — clusters carry only the list of target files and dimension tags; Fix subagents will read the REVIEW themselves for the edit text (Template A).
+- Emitting the full fix text of individual findings — clusters carry only the list of target files, issue file paths, and dimension tags; Fix subagents will read the issue files themselves for the edit text (Template A).
 - Prose commentary outside the YAML block.
 
-Absolute paths only (resolve them from the REVIEW's `Reviewed:` header + each `### <relative path>` header).
+Absolute paths only (resolve PRD-relative `file:` paths by prepending the PRD directory path).
 ```
 
-The main agent consumes the returned YAML as the cluster plan. Fix-subagent dispatches in Step 5 use `cluster.target_files` directly; Step 6 delta-review scope uses `dimensions_tagged_union`.
+The main agent consumes the returned YAML as the cluster plan. Fix-subagent dispatches in Step 5 use `cluster.target_files` and `cluster.issue_files` directly; Step 6 delta-review scope uses `dimensions_tagged_union`.
 
 **Dispatch execution (MANDATORY — see `parallel-dispatch.md` Rule 1):**
 
@@ -256,18 +259,18 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 **Revise-mode-specific rules:**
 
-- If a `.reviews/REVIEW-*.md` was consumed (Pre-Answered Mode), use **Template A** (reference-based, below).
+- If a `.review/round-N/issues/` directory was consumed (Pre-Answered Mode), use **Template A** (reference-based, below).
 - Otherwise (interactive revise, Step 3 gathered the change list), use **Template B** (inline edits list, below).
 
 When delegating a cluster to a `general-purpose` subagent, the dispatch prompt MUST use this template. Free-form prompts lead to the subagent re-reading files (4× observed on same file) and running its own Glob/Grep to re-discover the change set — both are pure waste.
 
-**Template A — reference-based dispatch** (when REVIEW-*.md exists):
+**Template A — reference-based dispatch** (when `.review/round-N/issues/` was consumed):
 
 ```
-Apply the findings from {REVIEW-*.md absolute path} that target the files listed below.
-The REVIEW file groups findings by file under `### <relative path>` headings; each finding has a `Fix:` line describing the concrete edit.
+Apply the findings from the issue files listed below that target the files listed below.
+Each issue file has a `file:` frontmatter field identifying its target file, and a body describing the finding and the concrete fix to apply.
 
-Read each target file exactly once (in parallel). For each file, collect all matching findings from the REVIEW file, then apply them in a single pass:
+Read each target file and each issue file exactly once (in parallel). For each target file, collect all issue files whose `file:` field matches it, then apply all their fixes in a single pass:
 - file with 1 finding: use `Edit`
 - file with >1 finding: use `MultiEdit` (mandatory — no sequential Edits on the same file)
 Write once per file.
@@ -286,10 +289,15 @@ Write once per file.
 - <absolute path 2>
 - <absolute path 3>
 
+**Issue files (read in parallel):**
+- <absolute path to issue file 1>
+- <absolute path to issue file 2>
+- ...
+
 **On completion**, report per-file: `applied N edits` OR `skipped M: oscillation suspected` OR `file not found` OR `anchor not found: <anchor>`. No prose summary.
 ```
 
-**Template B — inline edits** (interactive revise, no REVIEW-*.md):
+**Template B — inline edits** (interactive revise, no issues directory):
 
 ```
 Apply the following edits. Each file is listed with its queued edits.
@@ -330,10 +338,10 @@ Follow `output-discipline.md` Rule 2 (no inter-dispatch commentary) and Rule 3 (
 
 The orchestrator (main agent) owns the cluster plan — but how it is built depends on mode:
 
-- **Pre-Answered Mode (REVIEW-*.md exists):** the orchestrator MUST delegate the read + group step to the Clustering Subagent described at the top of this file, and consume its YAML manifest. The orchestrator never reads the REVIEW body itself.
+- **Pre-Answered Mode (issues directory consumed):** the orchestrator MUST delegate the read + group step to the Clustering Subagent described at the top of this file, and consume its YAML manifest. The orchestrator never reads the issue files itself.
 - **Interactive mode (Template B):** the orchestrator already has the change list in context from Step 3, so it pre-materializes every edit and dispatches directly. No Clustering Subagent is needed.
 
-When using Template A, Fix subagents extract the exact edit text from the REVIEW file they read; when using Template B, the orchestrator pre-materializes every edit. Do not push cluster-composition into Fix subagents in either mode.
+When using Template A, Fix subagents extract the exact edit text from the issue files they read; when using Template B, the orchestrator pre-materializes every edit. Do not push cluster-composition into Fix subagents in either mode.
 
 ---
 
@@ -358,17 +366,17 @@ In both cases:
 
 `REVISIONS.md` is the version-controlled source of truth used by `review-mode.md` Step 0.5 to count prior passes and detect oscillations. Review-driven fix-pass entries MUST use a stable heading format and include a `**Themes:**` section detailed enough for oscillation detection.
 
-**Heading format for Pre-Answered Mode (REVIEW-driven fix passes) — MANDATORY:**
+**Heading format for Pre-Answered Mode (review-driven fix passes) — MANDATORY:**
 
 ```
-## {YYYY-MM-DD} — {Nth}-pass review-finding fixes (REVIEW-{timestamp})
+## {YYYY-MM-DD} — {Nth}-pass review-finding fixes (round-{N})
 ```
 
 The word `review-finding` MUST appear in the heading — `review-mode.md` Step 0.5 greps `^## .*review-finding` to count passes. Do not rephrase this anchor.
 
 **Required sections in each review-driven entry:**
 
-- **Rationale:** which REVIEW file was consumed, finding counts by severity, remaining-Critical count (explicit "zero Critical remaining" if applicable — this triggers the convergence-gate abort condition on the next `--review`).
+- **Rationale:** which round's issues directory was consumed, finding counts by severity, remaining-Critical count (explicit "zero Critical remaining" if applicable — this triggers the convergence-gate abort condition on the next `--review`).
 - **Themes:** one bullet per thematic cluster of fixes. Each bullet MUST be specific enough that a future reviewer can tell what was added or removed (e.g. "Removed SQL DDL blocks from F-018/F-021/F-022" — not "Scope cleanup"). This powers oscillation detection: future reviews grep Themes to check whether a new finding would swing content back.
 - **Files affected:** count and class breakdown.
 - **Downstream impact:** whether design exists and what it will inherit.
@@ -405,10 +413,10 @@ For non-review-driven revisions (interactive feature add/modify/deprecate), use 
 
 **Do NOT run the full 52-dimension review checklist.** Run only the checklist dimensions relevant to what actually changed. Load `review-checklist.md` only if you need to reference a dimension's exact definition.
 
-**Review-driven fix pass scope:** If this revision consumed a `REVIEW-*.md` file (Pre-Answered Mode), the delta review scope is:
+**Review-driven fix pass scope:** If this revision consumed a `.review/round-N/issues/` directory (Pre-Answered Mode), the delta review scope is:
 
 - The **always-run** set below, **plus**
-- Only the dimensions whose tags appeared in the consumed `REVIEW-*.md`.
+- Only the dimensions whose tags appeared in the consumed issues.
 
 Do not re-run dimensions the review already validated as passing.
 

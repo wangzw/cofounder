@@ -145,6 +145,12 @@ at least one feature.
 **Prototype column:** link to `prototypes/screenshots/F-{NNN}-{slug}/`; use `—` when no prototype
 exists.
 
+> **Mandatory auto-derived features (always include, regardless of product):**
+> Two features MUST appear in every Feature Index as P0/Phase 1 with no journey dependency (`Deps = —`):
+> 1. **Development Infrastructure** — one requirement per architecture convention section (coding standards, tooling, repo setup, etc.); `Type = Backend`.
+> 2. **Deployment Infrastructure** — one requirement per deployment architecture aspect (hosting, CI/CD, environments, monitoring, etc.); `Type = Backend`.
+> These are never derived from user journeys; they are derived from the architecture and deployment convention sections.
+
 ---
 
 ### Design Tokens Summary

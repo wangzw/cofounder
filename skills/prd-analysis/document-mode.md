@@ -11,10 +11,12 @@ against the relevant phase in `questioning-phases.md`.
 
 ## When to Activate Document-Mode
 
-Activate this mode when the user invokes the skill with `--document <path>` or explicitly hands
-over a file (brainstorm notes, user-story map, raw requirements doc, Notion export, etc.) and asks
-to derive a PRD from it. Do NOT activate when the user provides a previously generated PRD bundle
-for review or evolution — use `--review` or `--evolve` respectively.
+Activate this mode when the user invokes the skill with a positional path argument
+(`/prd-analysis path/to/notes.md`) pointing to an existing document, or explicitly hands over a
+file (brainstorm notes, user-story map, raw requirements doc, Notion export, etc.) and asks to
+derive a PRD from it. The trigger is the presence of a path argument to a non-PRD file — not a
+`--document` flag. Do NOT activate when the user provides a previously generated PRD bundle for
+review or evolution — use `--review` or `--evolve` respectively.
 
 ---
 

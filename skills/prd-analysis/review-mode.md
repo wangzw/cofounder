@@ -96,7 +96,7 @@ LLM subagents against a broken bundle is wasteful.
 
 Dispatch **one round** of subagents covering disjoint file sets, split by artifact class.
 Do not dispatch a second review pass for the same files — if a subagent's findings are vague,
-prefer `--revise` over re-reviewing.
+MUST route to `--revise` — re-reviewing the same files is FORBIDDEN.
 
 ### Dispatch rules
 
@@ -164,10 +164,13 @@ Rules:
 - Do not Read, Glob, or Grep any files outside the listed target files and review-checklist.md.
 - Do not read architecture.md or other feature/journey files for cross-reference — cross-file
   checks are handled separately.
-- Do not write or edit anything.
-- Output discipline: emit per-file findings directly as structured text. No prose preamble or
-  "I will now report findings" framing. Do not echo the findings list in your final summary —
-  the structured entries ARE the output.
+- Write your per-file findings to `{PRD-dir}/.review/round-{N}/subagent-findings/{trace_id}.md`
+  using the Write tool. Structure the file with one `### <relative path>` section per reviewed
+  file, findings under each heading.
+- Your Task return MUST be exactly one ACK line:
+  `OK trace_id={trace_id} role=reviewer linked_issues=<comma-list-of-finding-count or empty>`
+- FORBIDDEN: returning findings inline in your reply, summarising findings in assistant text,
+  or writing any prose outside the findings file. The ACK line is the only text returned.
 ```
 
 ## Step 4 — Cross-File Checks (main agent)

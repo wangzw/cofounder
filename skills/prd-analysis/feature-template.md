@@ -22,12 +22,12 @@ The feature file follows this structure. Omit any section that has no useful con
 
 **Relevant data models:** {copy entity definitions this feature reads or writes — field names, types, constraints. A coding agent implementing this feature must not need to open a second file to understand the data shape}
 
-**Relevant conventions:** copy applicable convention text from architecture topic files inline — do not reference the files by path. Include the following where applicable to this feature:
+**Relevant conventions:** copy applicable convention text from architecture topic files inline — do not reference the files by path. **Copy applicable text inline. Do not write "see \<file\>" — the file paths below identify source documents only.**
 
-- *Coding conventions* (error handling, logging, concurrency policies relevant to this feature) — from `architecture/coding-conventions.md`
-- *Test isolation* (resource isolation, parallel safety rules relevant to this feature's tests) — from `architecture/test-isolation.md`
-- *Security* (input validation, secret handling relevant to this feature) — from `architecture/security.md`
-- *Shared conventions* (API format, error structure) — from `architecture/shared-conventions.md`
+- *Coding conventions* (error handling, logging, concurrency policies relevant to this feature) — copy applicable text inline; source: `architecture/coding-conventions.md`
+- *Test isolation* (resource isolation, parallel safety rules relevant to this feature's tests) — copy applicable text inline; source: `architecture/test-isolation.md`
+- *Security* (input validation, secret handling relevant to this feature) — copy applicable text inline; source: `architecture/security.md`
+- *Shared conventions* (API format, error structure) — copy applicable text inline; source: `architecture/shared-conventions.md`
 - *Code review policy* (review dimensions applicable to this feature) — when applicable
 - *Performance testing* (budgets applicable to this feature) — when applicable
 - *Backward compatibility* (API versioning, schema evolution relevant to this feature's API contracts or data models) — when applicable
@@ -50,9 +50,9 @@ Copy the relevant journey context inline. Do not rely on a link being load-beari
 - **Journey:** J-{NNN}: {journey name} — Touchpoints #{touchpoint numbers} — Pain points: {which pain points this feature resolves}
 - **Touchpoint detail** (copy from journey file):
 
-  | Stage | Screen/View | Action | Interaction Mode | System Response | Pain Point |
-  |-------|------------|--------|-----------------|----------------|------------|
-  | {stage} | {screen} | {action} | {mode} | {response} | {pain point if any} |
+  | # | Stage | User Action | System Response | Screen/View | Interaction Mode | Emotion | Pain Point | Mapped Feature |
+  |---|-------|-------------|----------------|------------|-----------------|---------|------------|---------------|
+  | {#} | {stage} | {user action} | {response} | {screen} | {mode} | {emotion} | {pain point if any} | F-{NNN} |
 
 - **Journey:** J-{NNN}: {journey name} — Touchpoints #{touchpoint numbers} — Pain points: {which pain points resolved}
 
@@ -118,7 +118,7 @@ Response (error — {status code}):
 
 **Screen/View:** {which screen(s) this feature appears on — must match Screen/View names from the Journey Context touchpoint table above}
 **Route:** {Web: URL pattern from architecture navigation — must match Route Definitions table. TUI: command/screen identifier from architecture Command Structure, or omit if screen is implicit}
-**Layout:** {describe the visual structure using design token references — e.g. "two-column layout, sidebar width `spacing.64`, main content area with `spacing.6` padding, cards with `radius.lg` and `shadow.md`"}
+**Layout:** {describe the visual structure using design token references — e.g. "two-column layout, sidebar width `spacing.16`, main content area with `spacing.6` padding, cards with `radius.lg` and `shadow.md`"}
 
 **Design Tokens (inline copy):**
 

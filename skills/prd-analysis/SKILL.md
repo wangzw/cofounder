@@ -38,6 +38,10 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 - `.review/` lives at target root. Pyramid-indexed: `round-<N>/` + `metrics/` + `versions/`.
 - Round numbers are cross-delivery monotonic.
 
+**Exception for review-mode Step 1 and Step 4:** The main agent MAY read `README.md`, `REVISIONS.md`, and `architecture.md` (the index file) during inventory — these are index/navigation files, not per-feature or per-journey artifact leaves. The main agent MAY perform targeted reads of single feature or journey files when a cross-file check requires spot-verification. It MUST NOT bulk-read the full feature/journey set.
+
+**Exception for revise-mode Step 2:** The main agent MAY read `README.md` in revise-mode Step 2 for the purpose of presenting a product overview to the user. `README.md` is treated as a navigation index (not a per-feature or per-journey leaf) — the same carve-out applies as in review-mode Step 1. The main agent MUST limit its reads to `README.md` only (no scanning journey or feature file contents in the main agent).
+
 ## Input Modes (Summary)
 
 ```
@@ -71,8 +75,16 @@ docs/raw/prd/YYYY-MM-DD-{product-slug}/
 ├── features/
 │   ├── F-001-{slug}.md      # Self-contained feature spec (inline-copies context)
 │   └── ...
-└── .reviews/                # Transient — not version-controlled
-    └── REVIEW-*.md
+└── .review/                 # Transient — not version-controlled
+    ├── state.yml
+    ├── traces/
+    │   └── round-N/
+    │       └── dispatch-log.jsonl
+    ├── round-N/
+    │   └── issues/
+    │       └── I-NNN.md
+    ├── metrics/
+    └── versions/
 ```
 
 Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture index + topic files), `feature-template.md` (feature specs). Evolve mode uses `evolve-readme-template.md` instead of `prd-template.md`.
