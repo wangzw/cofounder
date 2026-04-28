@@ -442,14 +442,39 @@ with open(skip_set_path, 'w', encoding='utf-8') as f:
 # Run script-type checkers
 all_issues = []
 # Resolve the scripts dir that holds the checker implementations.
-# Priority: explicit env override → target's own scripts/ (self-hosted case) →
-# runtime fall-back to the target dir. The runner script itself already
-# computes its own dir via $SCRIPT_DIR at the shell level (exported below as
-# CHECKER_SCRIPTS_DIR); we honor that when present so sibling check-*.sh
-# files resolve even when the script is invoked via a symlink or a copy.
+# Hard invariant: checker scripts are the REVIEWER's, never the artifact's.
+# A scaffolded skill carries copies of these scripts under <target>/scripts/,
+# but those copies serve the target's own --review of ITS artifacts — never
+# reviewing the target itself. Letting <target>/scripts/ audit <target> means
+# the artifact's writer/reviser can silently weaken the checks against its
+# own changes, and CR-S17 drift detection would be the only line of defence
+# (post-hoc, easy to regress). Source of truth: CHECKER_SCRIPTS_DIR, exported
+# by the running run-checkers.sh as its SCRIPT_DIR — i.e. the reviewer's scripts/.
 scripts_dir = os.environ.get('CHECKER_SCRIPTS_DIR', '')
 if not scripts_dir or not os.path.isdir(scripts_dir):
-    scripts_dir = os.path.join(target, 'scripts')
+    sys.stderr.write(
+        "ERROR: CHECKER_SCRIPTS_DIR must be set to the reviewer's scripts/ "
+        "directory; refusing to fall back to <target>/scripts/ (would let the "
+        "artifact's own scripts review itself). Invoke run-checkers.sh via its "
+        "bash wrapper so SCRIPT_DIR is exported.\n"
+    )
+    sys.exit(2)
+
+# Refuse to run when scripts_dir lives inside <target>: that is the
+# artifact-audits-itself case (e.g. someone invoked the target's own
+# run-checkers.sh on the target). Generated skills always review their own
+# artifacts (output dirs), never themselves — so scripts_dir and target are
+# disjoint trees in legitimate usage.
+target_abs = os.path.abspath(target)
+scripts_dir_abs = os.path.abspath(scripts_dir)
+if scripts_dir_abs == target_abs or scripts_dir_abs.startswith(target_abs + os.sep):
+    sys.stderr.write(
+        f"ERROR: CHECKER_SCRIPTS_DIR ({scripts_dir_abs}) is inside <target> "
+        f"({target_abs}); refusing to use the artifact's own scripts to "
+        f"review itself. Invoke the reviewer skill's run-checkers.sh, not "
+        f"the target's copy.\n"
+    )
+    sys.exit(2)
 
 for c in criteria:
     cid = c.get('id', '')
@@ -464,11 +489,9 @@ for c in criteria:
     if not script_path:
         continue
 
-    # Resolve script path relative to target
-    full_script = os.path.join(target, script_path)
-    if not os.path.isfile(full_script):
-        # Also try relative to scripts_dir (the resolved checker scripts dir)
-        full_script = os.path.join(scripts_dir, os.path.basename(script_path))
+    # Resolve script strictly via scripts_dir (the reviewer's scripts/).
+    # Never fall back to <target>/scripts/ — see scripts_dir invariant above.
+    full_script = os.path.join(scripts_dir, os.path.basename(script_path))
     if not os.path.isfile(full_script):
         # Missing checker => structured meta-issue so it surfaces in review loop
         # and the judge sees a real 'error' until the script is authored or the CR is
@@ -485,7 +508,8 @@ for c in criteria:
             "severity": "error",
             "description": (
                 f"{cid} declares script_path {script_path!r} but no such script exists "
-                f"in the target or resolved scripts/ directory; criterion was not evaluated"
+                f"in the reviewer's scripts/ directory ({scripts_dir!r}); "
+                f"criterion was not evaluated"
             ),
             "suggested_fix": (
                 f"Edit common/review-criteria.md: change {cid}.checker_type to 'llm' if the "

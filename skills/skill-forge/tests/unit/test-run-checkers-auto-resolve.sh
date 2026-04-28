@@ -17,13 +17,30 @@
 # behavior would propagate the issue; under the new behavior it must drop.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-RUN_CHECKERS="$HERE/../../scripts/run-checkers.sh"
+REVIEWER_SCRIPTS_DIR="$(cd "$HERE/../../scripts" && pwd)"
+RUN_CHECKERS="$REVIEWER_SCRIPTS_DIR/run-checkers.sh"
 [ -x "$RUN_CHECKERS" ] || { echo "FAIL: $RUN_CHECKERS not executable"; exit 1; }
 
 TMP=$(mktemp -d)
-trap "rm -rf $TMP" EXIT
 
-mkdir -p "$TMP/common" "$TMP/generate" "$TMP/scripts"
+# Plant the fragile checker in the REVIEWER's scripts/, not the target's.
+# Per the scripts_dir invariant in run-checkers.sh, target/scripts/ is never
+# consulted (the artifact's own scripts must not review the artifact); a custom
+# fixture-only checker therefore lives next to the canonical check-*.sh
+# implementations and is removed on test exit.
+FRAGILE_DEST="$REVIEWER_SCRIPTS_DIR/fragile.sh"
+if [ -e "$FRAGILE_DEST" ]; then
+  echo "FAIL: $FRAGILE_DEST already exists; refusing to overwrite"
+  rm -rf "$TMP"
+  exit 1
+fi
+cleanup() {
+  rm -rf "$TMP" "${TMP2:-/dev/null}"
+  rm -f "$FRAGILE_DEST"
+}
+trap cleanup EXIT
+
+mkdir -p "$TMP/common" "$TMP/generate"
 
 # A criteria registry with a script-type CR pointing at a controllable checker.
 cat > "$TMP/common/review-criteria.md" <<'EOF'
@@ -46,7 +63,7 @@ EOF
 # A controllable checker. Mode is selected by the presence of a sentinel file:
 # - sentinel absent → reports an issue on generate/a.md
 # - sentinel present → reports nothing (mimics a bugfix that closed the issue)
-cat > "$TMP/scripts/fragile.sh" <<'EOF'
+cat > "$FRAGILE_DEST" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 TARGET="${1:-}"
@@ -67,7 +84,7 @@ cat <<JSON
 JSON
 exit 1
 EOF
-chmod +x "$TMP/scripts/fragile.sh"
+chmod +x "$FRAGILE_DEST"
 
 echo "# a" > "$TMP/generate/a.md"
 
@@ -105,12 +122,10 @@ echo "PASS round-2 issues/ contains 0 carry-forwards (the stale CR-TEST-S01 was 
 # MUST still propagate (auto-resolve is conditional on the script no longer
 # reporting it).
 TMP2=$(mktemp -d)
-trap "rm -rf $TMP $TMP2" EXIT
-mkdir -p "$TMP2/common" "$TMP2/generate" "$TMP2/scripts"
+mkdir -p "$TMP2/common" "$TMP2/generate"
 cp "$TMP/common/review-criteria.md" "$TMP2/common/"
-cp "$TMP/scripts/fragile.sh" "$TMP2/scripts/"
-chmod +x "$TMP2/scripts/fragile.sh"
 echo "# a" > "$TMP2/generate/a.md"
+# fragile.sh stays planted in the reviewer's scripts/ — it serves both fixtures.
 "$RUN_CHECKERS" "$TMP2" round-1 >/dev/null 2>&1 || true
 # Do NOT touch the sentinel — checker keeps firing across rounds.
 OUT2=$("$RUN_CHECKERS" "$TMP2" round-2 2>&1 || true)

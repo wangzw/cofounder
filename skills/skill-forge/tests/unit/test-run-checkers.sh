@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# test-run-checkers.sh — unit tests for run-checkers.sh
+# test-run-checkers.sh — end-to-end smoke test for run-checkers.sh against
+# a tmp fixture target. Previously ran against $SKILL_ROOT itself, but the
+# scripts_dir-vs-target disjoint-trees invariant (artifact's own scripts MUST
+# NOT review the artifact) forbids that — skill-forge's run-checkers.sh
+# reviews artifact skills, not skill-forge itself.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="$(cd "${SCRIPT_DIR}/../../scripts" && pwd)"
-SKILL_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 PASS=0
 FAIL=0
@@ -12,25 +15,54 @@ FAIL=0
 pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
 fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
 
-cleanup() {
-  rm -rf "${SKILL_ROOT}/.review"
-}
-trap cleanup EXIT
+TMP=$(mktemp -d)
+trap "rm -rf $TMP" EXIT
 
-# --- Run against skill-forge itself (round 1) ---
-# May exit 0 or 1 (skill-forge is incomplete), but NOT 2
+# --- Build a minimal artifact-skill fixture ---
+# Just enough structure for extract-criteria.sh + run-checkers.sh to operate:
+# common/review-criteria.md with one script-type CR pointing at an existing
+# checker in skill-forge's scripts/ (CR-S03 → check-skill-structure.sh).
+mkdir -p "$TMP/common" "$TMP/scripts" "$TMP/generate" "$TMP/review" "$TMP/revise" "$TMP/shared"
+cat > "$TMP/SKILL.md" <<'EOF'
+---
+name: fixture
+version: 0.0.1
+description: "Use when running run-checkers smoke tests."
+---
+EOF
+cat > "$TMP/common/review-criteria.md" <<'EOF'
+# Review Criteria
+
+## CR-S03 skill-structure
+
+```yaml
+- id: CR-S03
+  name: "skill-structure"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-skill-structure.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+  incremental_skip: full_scan
+```
+EOF
+
+# --- Run against the fixture (round 1) ---
+# Should exit 0 or 1 (fixture is incomplete and check-skill-structure.sh will
+# likely flag issues), but NOT 2.
 set +e
-"${SCRIPTS_DIR}/run-checkers.sh" "$SKILL_ROOT" round-1 >/dev/null 2>&1
+"${SCRIPTS_DIR}/run-checkers.sh" "$TMP" round-1 >/dev/null 2>&1
 EXIT_CODE=$?
 set -e
 
 if [ "$EXIT_CODE" -ne 2 ]; then
-  pass "run-checkers.sh runs on skill-forge without error (exit $EXIT_CODE, not 2)"
+  pass "run-checkers.sh runs on fixture without script error (exit $EXIT_CODE, not 2)"
 else
-  fail "run-checkers.sh should not exit 2 on skill-forge; got exit 2"
+  fail "run-checkers.sh should not exit 2 on fixture; got exit 2"
 fi
 
-ROUND_DIR="${SKILL_ROOT}/.review/round-1"
+ROUND_DIR="${TMP}/.review/round-1"
 
 # --- Confirm manifest.yml written ---
 if [ -f "${ROUND_DIR}/manifest.yml" ]; then
@@ -109,7 +141,7 @@ fi
 
 # --- Negative: missing round arg -> exit 2 ---
 set +e
-"${SCRIPTS_DIR}/run-checkers.sh" "$SKILL_ROOT" >/dev/null 2>&1
+"${SCRIPTS_DIR}/run-checkers.sh" "$TMP" >/dev/null 2>&1
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -eq 2 ]; then
