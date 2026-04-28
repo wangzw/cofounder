@@ -218,7 +218,7 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 ## Configuration & Subagent Files
 
 - **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions)
-- **Review criteria**: `common/review-criteria.md` (27 CR entries: 16 script + 11 LLM)
+- **Review criteria**: `common/review-criteria.md` (28 CR entries: 17 script + 11 LLM)
 - **Domain glossary**: `common/domain-glossary.md` (disambiguation terms for consultant)
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`

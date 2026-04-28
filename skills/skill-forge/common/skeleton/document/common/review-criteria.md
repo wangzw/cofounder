@@ -325,6 +325,35 @@ pattern.
 
 ---
 
+## CR-S17 checker-implements-declared-cr
+
+For every script-tier criterion in `review-criteria.md` that declares a `script_path:`, the target's script at that path MUST grep-contain the literal CR-ID string. This is the structural guard against the silent stale-checker drift that the round-6 audit surfaced: skill-forge updated `check-skill-structure.sh` to implement CR-S16 (skeleton-conformance), but prd-analysis target still shipped the older copy of the script with no CR-S16 logic. `run-checkers.sh` invoked the target's script (per the self-contained-skill principle), got `[]` issues, and the missing CR-S16 violation was invisible to Phase B even though 11+ stray root-level files existed.
+
+CR-S17 closes that hole: any time skill-forge's canonical `script_path` is updated to add a new CR-ID, every existing target whose copy is stale will fail CR-S17 on its next `--review`. Operators then sync the script (selective re-scaffold of just the affected checker), and the new CR's violations surface in the next round.
+
+The check is a textual grep, not a behavioural one. False negatives are possible (a script could contain the CR-ID string in a comment without actually implementing the check) but that is intentional — the cheaper structural signal catches the common case (deleted/renamed CR-ID logic) without trying to parse program semantics.
+
+```yaml
+- id: CR-S17
+  name: "checker-implements-declared-cr"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-checker-implementations.sh
+  severity: error
+  applies_to: ["common/review-criteria.md", "scripts/check-*.sh"]
+  conflicts_with: []
+  priority: 2
+  incremental_skip: full_scan
+  rationale: |
+    Round-6 audit on prd-analysis found that skill-forge's canonical
+    check-skill-structure.sh had CR-S16 logic but the target's stale copy
+    did not. Phase B reported `[]` even though 11+ CR-S16 violations
+    existed. CR-S17 detects this stale-implementation drift at the script
+    tier so it cannot recur silently.
+```
+
+---
+
 ## CR-L01 orchestrator-pure-dispatch
 
 The orchestrator body MUST explicitly forbid: reading leaf files, summarizing content, computing verdicts, rewriting artifacts, and analyzing issue priority. MUST include an explicit "Pure dispatch + bookkeeping only" statement. An orchestrator that does semantic work violates the role boundary and creates non-deterministic round behavior.
