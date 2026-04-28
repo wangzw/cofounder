@@ -15,7 +15,13 @@ The orchestrator reads the issue manifest for the current round:
 
 - Read frontmatter only (status, severity, file, criterion_id). Do NOT read issue bodies.
 - Collect all issues where `status` ∈ {`new`, `persistent`, `regressed`} — these are open.
-- Issues with `status: resolved` are already closed; skip them.
+- Issues with `status` ∈ {`resolved`, `dismissed`} are already closed; skip them.
+
+The open set includes carry-forwards from prior rounds (run-checkers.sh writes them
+unconditionally — see "Carry-forward" block in scripts/run-checkers.sh). When `--review`
+exited via Step 1 short-circuit (script-tier errors → cross-reviewer skipped), those
+carry-forwards are the *only* record of unresolved LLM-tier findings; the reviser must
+explicitly transition each one (see Step 3 status-mutation contract).
 
 ### Step 2 — Group Issues by Target File
 
@@ -48,17 +54,34 @@ constraints, so they do not conflict).
   - The current content of the target leaf
   - Resolved-issues history injected up to `config.yml regression_gate.max_injected_resolved`
     (default: 20) — regression-protection rail
-- **Outputs written by each sub-agent**: the revised artifact leaf at `<target>/<leaf-path>`
+- **Outputs written by each sub-agent**:
+  1. The revised artifact leaf at `<target>/<leaf-path>`
+  2. Frontmatter `status:` mutation on EACH addressed issue file at
+     `<target>/.review/round-<N>/issues/<issue-id>.md` — exactly one of
+     `resolved` | `persistent` | `dismissed` per issue (with `defer_reason:` /
+     `dismiss_reason:` companion field where applicable). See
+     `per-issue-reviser-subagent.md` "Issue Status Mutation" for the full contract.
 - **Orchestrator action on all ACKs**: collect `linked_issues` from each ACK; update
   `state.yml`; proceed to Step 4.
 
-### Step 4 — Summarizer: Update Issue Status
+**Why the reviser owns status mutation** (and not the cross-reviewer in the next
+review round): cross-reviewer can be skipped by Step 1 short-circuit when the round
+has script-tier errors. Revise is the only phase guaranteed to run after a
+non-converged round, so it is the single source of truth for issue state transitions.
+The next `--review` round's carry-forward block reads the post-revise status to
+decide what to inherit.
+
+### Step 4 — Summarizer: Aggregate Post-Revise State
 
 - **Dispatches**: `shared/summarizer-subagent.md` (update-status phase)
-- The summarizer aggregates from `round-N/issues/*.md` frontmatter (status field on each issue)
-  and writes `round-N/index.md` with the issue-count summary. Status transitions
-  (new → resolved, resolved → regressed, etc.) are set by the cross-reviewer in the next review
-  round — NOT by summarizer. Summarizer does NOT read artifact leaves.
+- The summarizer aggregates from `round-N/issues/*.md` frontmatter (status field on each issue,
+  post-revise) and writes `round-N/index.md` with the issue-count summary. Status
+  transitions (new/persistent → resolved | persistent | dismissed) are written by the
+  per-issue-reviser in Step 3 — summarizer is a pure aggregator and does NOT mutate
+  status. Summarizer does NOT read artifact leaves.
+- Open count = `len(status ∈ {new, persistent, regressed})`. Closed count =
+  `len(status ∈ {resolved, dismissed})`. Both `resolved` and `dismissed` exit the open
+  set; the distinction is preserved in the index for audit but not for verdict gating.
 - **Orchestrator action on ACK**: proceed to Step 5.
 
 ### Step 5 — Judge: Evaluate New Round Verdict

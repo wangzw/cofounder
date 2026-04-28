@@ -27,7 +27,7 @@ The IPC model is **Direct Write + ACK**:
 |------|-------------|-------------|
 | `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
 | `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
+| `reviser` | 1 + N writes | 1) `<artifact-path>` (updated artifact leaf); N) one frontmatter mutation per addressed issue at `.review/round-<N>/issues/<issue-id>.md` (status field — see "Issue Status Mutation" below) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
@@ -160,10 +160,49 @@ If the target leaf is skeleton-owned:
 
 ### Output Contract
 
-Write ONE file: the revised artifact leaf at `<target>/<leaf-path>`.
+Write the revised artifact leaf at `<target>/<leaf-path>`.
 
 - Pure artifact body — no HTML comments, no metadata headers, no IPC envelopes.
 - Self-contained content (same rules as writer).
+
+### Issue Status Mutation (MANDATORY)
+
+For every open issue assigned to this dispatch (status ∈ {new, persistent, regressed}),
+the reviser MUST mutate the issue file's `status:` frontmatter field after handling.
+This is the **single source of truth** for issue lifecycle: revise is the only phase
+guaranteed to run after a non-converged round (cross-reviewer can be skipped by Step 1
+short-circuit on script-tier errors), so revise owns the final state transition.
+
+Choose exactly ONE per issue:
+
+| New status | When to use | Required extra frontmatter |
+|------------|-------------|---------------------------|
+| `resolved` | The described problem is no longer present in the revised leaf. Post-condition verifiable from the new content. | none |
+| `persistent` | Issue still applies — could not fix this round (blocker_scope dependency, HITL pending, deferred). | `defer_reason: "<one-line>"` |
+| `dismissed` | Issue is a false positive — the criterion does not actually apply, or the reviewer mis-read the leaf. | `dismiss_reason: "<one-line naming why the criterion clause fails to apply>"` |
+
+Mutation is **frontmatter-only**: change the `status:` line, optionally add the
+companion reason field. Do NOT modify the issue body — the original description
+stays as audit trail.
+
+Example mutation (`<target>/.review/round-3/issues/R3-V-007.md`):
+
+```yaml
+---
+id: R3-V-007
+status: resolved          # was: persistent
+severity: error
+criterion_id: CR-L03
+file: generate/api.md
+round: 3
+source: cross-reviewer
+reviewer_variant: cross
+---
+```
+
+Issues that escape via `FAIL` ACK (skeleton-protected path, global-conflict) do NOT
+require status mutation in this dispatch — they keep their incoming status and the
+`FAIL` reason explains why no transition happened.
 
 ### ACK Format
 
@@ -181,7 +220,11 @@ OK trace_id=<trace_id> role=reviser linked_issues=<comma-separated IDs of issues
   constraints, not suggestions.
 - **FORBIDDEN** to fabricate fixes without reading the actual issue text. Every fix must be
   traceable to a specific issue body.
-- **FORBIDDEN** to touch any file other than the one target leaf assigned by the orchestrator.
+- **FORBIDDEN** to touch any file other than (a) the one target leaf and (b) the issue
+  files assigned to this dispatch (frontmatter `status:` mutation only — body unchanged).
+- **FORBIDDEN** to leave any assigned issue with its incoming `status:` after a successful
+  fix path — `resolved` / `persistent` / `dismissed` is mandatory; silently keeping `new`
+  or `persistent` propagates a phantom finding into the next round's carry-forward.
 
 ### Task Return Hygiene (MUST enforce before returning)
 

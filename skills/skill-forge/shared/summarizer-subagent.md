@@ -126,11 +126,14 @@ round: <N>
 delivery_id: <D>
 open_issues: <count of new+persistent+regressed>
 resolved_this_round: <count of resolved>
+dismissed_this_round: <count of dismissed — false-positive acks recorded by reviser>
 regressed_count: <count of regressed>
 # Severity counts are scoped to OPEN issues only (status ∈ {new, persistent, regressed}).
-# Resolved issues are excluded — else a converged verdict would be impossible once any
-# resolved error/critical exists (judge-subagent §Verdict Definitions requires
-# critical_count == 0 AND error_count == 0 for convergence).
+# Resolved AND dismissed issues are both excluded — both states exit the open set.
+# `dismissed` is a reviser-issued false-positive ack carrying a `dismiss_reason:` field;
+# `resolved` is a verified fix. The distinction is preserved for audit but the verdict
+# treats them identically (judge-subagent §Verdict Definitions requires critical_count
+# == 0 AND error_count == 0 over the OPEN set for convergence).
 critical_count: <open count where severity=critical>
 error_count: <open count where severity=error>
 warning_count: <open count where severity=warning>

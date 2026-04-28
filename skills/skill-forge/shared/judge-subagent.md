@@ -98,7 +98,7 @@ emit one of 5 verdicts with a `next_action`. One write: `verdict.yml`. No furthe
 | Source | What to read |
 |--------|-------------|
 | `<target>/.review/round-<N>/index.md` frontmatter | `open_issues`, `critical_count`, `error_count`, `regressed_count`, `coverage_percent`, `writer_fail_count_sum` — these are the pre-computed numbers from the summarizer. Trust them; do NOT recount. |
-| `<target>/.review/round-<N>/issues/*.md` frontmatter | `status`, `severity`, `criterion_id`, `round` fields only. Count by status and severity. Do NOT open issue bodies. |
+| `<target>/.review/round-<N>/issues/*.md` frontmatter | `status`, `severity`, `criterion_id`, `round` fields only. Count by status and severity. Open set = `status ∈ {new, persistent, regressed}`; closed set = `status ∈ {resolved, dismissed}` (both treated identically for verdict math — the distinction is audit-only). Do NOT open issue bodies. |
 | `<target>/.review/round-<N>/self-reviews/*.md` frontmatter | `fail_count`, `self_review_status` per writer dispatch — for the hard converged condition check |
 | Last `config.yml regression_gate.recent_rounds_window` rounds' `index.md` frontmatter | Trend data for oscillation detection (default window: 3 rounds) |
 
@@ -124,11 +124,13 @@ All six conditions must be simultaneously true. If any is non-zero, `converged` 
 
 **`oscillating`** (checked before `progressing`):
 - The same `criterion_id` + `file` combination has appeared with status cycling between
-  `resolved` and (`new` or `persistent` or `regressed`) across the last
-  `regression_gate.recent_rounds_window` rounds (default: 3).
+  closed (`resolved` or `dismissed`) and open (`new` or `persistent` or `regressed`)
+  across the last `regression_gate.recent_rounds_window` rounds (default: 3).
 - Detection: compare issue frontmatter across the window rounds — look for criterion+file
-  pairs that were resolved in round N-1 but re-appear in round N (status `regressed`), and
-  that pattern has repeated at least twice in the window.
+  pairs that were closed in round N-1 but re-appear open in round N (status `regressed`), and
+  that pattern has repeated at least twice in the window. A `dismissed`→`regressed` cycle
+  signals a reviser that wrongly dismissed a real finding; treat as oscillating like a
+  `resolved`→`regressed` cycle.
 
 **`diverging`**:
 - `regressed_count` >= `config.yml regression_gate.diverging_threshold` (default: 3).

@@ -634,36 +634,24 @@ for issue in all_issues:
 print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
 
 # ────────────────────────────────────────────────────────────────────────────
-# Carry-forward: for each leaf in THIS round's cross_reviewer_skip list, copy
-# any prior-round open issues (status ∈ {new, persistent, regressed}) into
-# THIS round's issues/ as status=persistent. This closes the incremental-review
-# carry-forward gap — without it, issues on skipped leaves would vanish from
-# the summarizer's open_issues count and the judge could falsely see a
-# converged round just because the cross-reviewer wasn't re-dispatched.
+# Carry-forward: copy every prior-round open issue (status ∈ {new, persistent,
+# regressed}) into THIS round's issues/ as status=persistent. UNCONDITIONAL —
+# we do NOT filter by cross_reviewer_focus/skip. Rationale:
+#   - skip leaves: cross-reviewer doesn't re-evaluate, so the issue must be
+#     carried so the operator (and judge) still sees it.
+#   - focus leaves: cross-reviewer normally re-evaluates and writes
+#     resolved/persistent records, but Step 1 short-circuit (script-tier
+#     errors) skips cross-reviewer dispatch entirely. Carrying focus-leaf
+#     issues unconditionally guarantees they survive a short-circuited round
+#     and reach the revise phase, which is the only phase guaranteed to run
+#     and which owns final state transitions (resolved | persistent | dismissed).
 # ────────────────────────────────────────────────────────────────────────────
 carried_forward = 0
 if round_num > 1:
     prev_round_dir = os.path.join(
         os.path.dirname(round_dir), f"round-{round_num - 1}")
     prev_issues_dir = os.path.join(prev_round_dir, "issues")
-    # Parse skip-list — we look in skip-set.yml's cross_reviewer_skip section.
-    skip_set_path = os.path.join(round_dir, "skip-set.yml")
-    cross_skip: list = []
-    if os.path.isfile(skip_set_path):
-        in_skip = False
-        for line in open(skip_set_path, encoding="utf-8"):
-            s = line.rstrip("\n")
-            if s.startswith("cross_reviewer_skip:"):
-                in_skip = True
-                continue
-            if in_skip:
-                if s.startswith("  - "):
-                    leaf = s[4:].strip().strip('"').strip("'")
-                    cross_skip.append(leaf)
-                elif s and not s.startswith("  "):
-                    in_skip = False
-    if os.path.isdir(prev_issues_dir) and cross_skip:
-        cross_skip_set = set(cross_skip)
+    if os.path.isdir(prev_issues_dir):
         for fname in sorted(os.listdir(prev_issues_dir)):
             m = re.match(r'^R(\d+)-(\d{3})\.md$', fname)
             if not m:
@@ -686,13 +674,10 @@ if round_num > 1:
                 if ":" in ln:
                     k, _, v = ln.partition(":")
                     fm[k.strip()] = v.strip().strip('"').strip("'")
-            # Carry-forward filter: open status + file is skipped this round
+            # Open-status filter: only carry forward issues that haven't been
+            # explicitly closed. `resolved` and `dismissed` (revise-phase
+            # status mutations) drop out here.
             if fm.get("status") not in ("new", "persistent", "regressed"):
-                continue
-            leaf = fm.get("file", "")
-            if leaf not in cross_skip_set:
-                # Leaf was re-evaluated this round; do NOT carry forward.
-                # Cross-reviewer will explicitly mark resolved/persistent.
                 continue
             new_id = f"R{round_num}-{next_seq:03d}"
             next_seq += 1
