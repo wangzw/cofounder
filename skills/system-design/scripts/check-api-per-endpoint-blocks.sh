@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+# check-api-per-endpoint-blocks.sh — CR-L1 (api-per-endpoint-blocks)
+# Usage: check-api-per-endpoint-blocks.sh <design-dir> [--quiet] [--strict]
+#
+# Lint check CR-L1: every endpoint defined in <design-dir>/api/API-*.md MUST
+# have all seven required subsections:
+#   1. Description              (**Description:**)
+#   2. Authentication & Perms   (**Authentication & Permissions:**)
+#   3. Request                  (**Request:**)
+#   4. Request example          (**Request example:**)
+#   5. Response                 (**Response:**)
+#   6. Response example         (**Response example:**)
+#   7. Constraints              (**Constraints:**)
+#
+# Missing subsection → emits <design-dir>/.reviews/LINT-<NNN>.md per violation.
+# Output: "OK 0 findings" or "FAIL <N> findings" to stdout.
+# Exit codes: 0 = no findings; 1 = findings (only fatal with --strict); 2 = invalid args.
+set -euo pipefail
+
+# ── argument parsing ─────────────────────────────────────────────────────────
+DESIGN_DIR=""
+QUIET=0
+STRICT=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --quiet)  QUIET=1 ;;
+    --strict) STRICT=1 ;;
+    -*)
+      echo "ERROR: unknown flag: $arg" >&2
+      echo "Usage: check-api-per-endpoint-blocks.sh <design-dir> [--quiet] [--strict]" >&2
+      exit 2
+      ;;
+    *)
+      if [ -z "$DESIGN_DIR" ]; then
+        DESIGN_DIR="$arg"
+      else
+        echo "ERROR: unexpected argument: $arg" >&2
+        exit 2
+      fi
+      ;;
+  esac
+done
+
+if [ -z "$DESIGN_DIR" ]; then
+  echo "ERROR: <design-dir> is required" >&2
+  echo "Usage: check-api-per-endpoint-blocks.sh <design-dir> [--quiet] [--strict]" >&2
+  exit 2
+fi
+
+if [ ! -d "$DESIGN_DIR" ]; then
+  echo "ERROR: design dir not found: $DESIGN_DIR" >&2
+  exit 2
+fi
+
+DESIGN_DIR="${DESIGN_DIR%/}"
+API_DIR="$DESIGN_DIR/api"
+REVIEWS_DIR="$DESIGN_DIR/.reviews"
+
+# ── ensure .reviews/ exists ───────────────────────────────────────────────────
+mkdir -p "$REVIEWS_DIR"
+
+# ── determine next LINT sequence number ───────────────────────────────────────
+# Scan for existing LINT-NNN.md files; next id = max + 1 (or 1 if none).
+next_lint_id() {
+  local max=0
+  local n
+  if [ -d "$REVIEWS_DIR" ]; then
+    for f in "$REVIEWS_DIR"/LINT-*.md; do
+      [ -e "$f" ] || continue
+      # Extract numeric part from filename LINT-NNN.md or LINT-NNN-*.md
+      n=$(basename "$f" | sed 's/^LINT-\([0-9][0-9]*\).*/\1/')
+      if [ "$n" -gt "$max" ] 2>/dev/null; then
+        max="$n"
+      fi
+    done
+  fi
+  echo $((max + 1))
+}
+
+# ── seven required subsection patterns (grep -i friendly) ────────────────────
+# Each entry: "label|grep_pattern"
+# Patterns match the bold-heading style used in api-template.md:
+#   **Description:**  **Authentication & Permissions:**  **Request:**
+#   **Request example:**  **Response:**  **Response example:**  **Constraints:**
+# Also accept common alternatives (case-insensitive matching applied at grep time).
+SUBSECTION_LABELS=(
+  "Description"
+  "Authentication & Permissions"
+  "Request"
+  "Request example"
+  "Response"
+  "Response example"
+  "Constraints"
+)
+SUBSECTION_PATTERNS=(
+  '^\*\*[Dd]escription:'
+  '^\*\*[Aa]uth'
+  '^\*\*[Rr]equest:'
+  '^\*\*[Rr]equest[[:space:]]\{1,\}[Ee]xample:'
+  '^\*\*[Rr]esponse:'
+  '^\*\*[Rr]esponse[[:space:]]\{1,\}[Ee]xample:'
+  '^\*\*[Cc]onstraint'
+)
+
+TOTAL_SUBSECTIONS=${#SUBSECTION_LABELS[@]}
+
+# ── main lint loop ─────────────────────────────────────────────────────────────
+FINDING_COUNT=0
+
+# Collect API files; if none, exit cleanly.
+if [ ! -d "$API_DIR" ]; then
+  echo "OK 0 findings (no api/ directory)"
+  exit 0
+fi
+
+# Build list of API-*.md files
+API_FILES=""
+for f in "$API_DIR"/API-*.md; do
+  [ -e "$f" ] || continue
+  API_FILES="$API_FILES $f"
+done
+
+if [ -z "$API_FILES" ]; then
+  echo "OK 0 findings (no API-*.md files)"
+  exit 0
+fi
+
+# ── process each API file ─────────────────────────────────────────────────────
+for api_file in $API_FILES; do
+  rel_file="api/$(basename "$api_file")"
+
+  # Extract endpoint headings: lines matching **METHOD /path** where METHOD is
+  # one of GET POST PUT PATCH DELETE HEAD OPTIONS.
+  # Format in api-template.md: **{METHOD} {/path}**
+  # We collect: line_number|heading_text
+  endpoint_lines=$(grep -n '^\*\*\(GET\|POST\|PUT\|PATCH\|DELETE\|HEAD\|OPTIONS\)[[:space:]]' "$api_file" || true)
+
+  if [ -z "$endpoint_lines" ]; then
+    # No REST endpoints in this file; skip (might be gRPC/CLI).
+    continue
+  fi
+
+  # Total lines in file (for end-of-file boundary)
+  total_lines=$(wc -l < "$api_file" | tr -d ' ')
+
+  # Process each endpoint
+  # endpoint_lines is newline-separated "linenum:heading" strings
+  # We need pairs of consecutive endpoints to extract the block between them.
+
+  # Write endpoint start lines to a temp file for indexed access
+  tmp_ep=$(mktemp /tmp/check-api-ep-XXXXXX)
+  # Use printf to preserve newlines properly
+  printf '%s\n' "$endpoint_lines" > "$tmp_ep"
+
+  # Count endpoints
+  ep_count=$(wc -l < "$tmp_ep" | tr -d ' ')
+
+  ep_index=0
+  while IFS= read -r ep_line; do
+    ep_index=$((ep_index + 1))
+
+    # Parse line number and heading text
+    ep_lineno=$(echo "$ep_line" | cut -d: -f1)
+    ep_heading=$(echo "$ep_line" | cut -d: -f2-)
+
+    # Determine block end: next endpoint start - 1, or end of file
+    if [ "$ep_index" -lt "$ep_count" ]; then
+      next_ep_line=$(sed -n "${ep_index}p" "$tmp_ep" 2>/dev/null || true)
+      # This gives us the CURRENT endpoint; we need the NEXT one (ep_index+1)
+      next_ep_line=$(sed -n "$((ep_index + 1))p" "$tmp_ep")
+      block_end=$(echo "$next_ep_line" | cut -d: -f1)
+      block_end=$((block_end - 1))
+    else
+      block_end=$total_lines
+    fi
+
+    # Extract the block for this endpoint (from its heading to block_end)
+    block=$(sed -n "${ep_lineno},${block_end}p" "$api_file")
+
+    # Check each required subsection
+    for i in $(seq 0 $((TOTAL_SUBSECTIONS - 1))); do
+      label="${SUBSECTION_LABELS[$i]}"
+      pattern="${SUBSECTION_PATTERNS[$i]}"
+
+      # Special case: **Response:** must not match **Response example:** accidentally.
+      # The plain Response pattern uses '^\*\*[Rr]esponse:' which ends at ':',
+      # so it won't match '**Response example:**'. Same for Request vs Request example.
+      # (Both patterns are already anchored with ':' at the end, so no collision.)
+
+      if ! echo "$block" | grep -q "$pattern"; then
+        # Severity: blocker for Auth/Constraints; mechanical for others
+        case "$i" in
+          1|6) severity="blocker" ;;
+          *)   severity="mechanical" ;;
+        esac
+
+        # Allocate LINT id
+        lint_id=$(next_lint_id)
+        lint_id_padded=$(printf '%03d' "$lint_id")
+        lint_file="$REVIEWS_DIR/LINT-${lint_id_padded}.md"
+
+        FINDING_COUNT=$((FINDING_COUNT + 1))
+
+        # Emit LINT-NNN.md
+        cat > "$lint_file" << LINT_EOF
+# LINT-${lint_id_padded}
+
+**ID**: LINT-${lint_id_padded}
+**Severity**: ${severity}
+**CR-id**: CR-L1
+**File**: ${rel_file}
+**Line**: ${ep_lineno}
+**Title**: Endpoint ${ep_heading} missing required subsection: ${label}
+
+## Reasoning
+
+The endpoint \`${ep_heading}\` (line ${ep_lineno}) in \`${rel_file}\` does not contain
+a \`**${label}:**\` subsection block before the next endpoint heading or end of file.
+
+Per the CR-L1 rule (structural-lint.md §L1), every REST endpoint defined in \`api/API-*.md\`
+MUST carry all seven required subsections inline:
+
+1. \`**Description:**\`
+2. \`**Authentication & Permissions:**\`
+3. \`**Request:**\`
+4. \`**Request example:**\`
+5. \`**Response:**\`
+6. \`**Response example:**\`
+7. \`**Constraints:**\`
+
+Missing subsection: **${label}**
+
+## Suggested Fix
+
+Add the missing \`**${label}:**\` subsection to the endpoint block for
+\`${ep_heading}\` in \`${rel_file}\`, following the format defined in
+\`common/templates/api-template.md\` (REST Endpoints section).
+
+A reader opening a single endpoint must see all contract fields inline;
+file-level notes do not substitute for per-endpoint subsections.
+LINT_EOF
+
+        if [ "$QUIET" -eq 0 ]; then
+          echo "[CR-L1] ${severity}: ${rel_file}:${ep_lineno} — endpoint '${ep_heading}' missing subsection '${label}' → $(basename "$lint_file")"
+        fi
+      fi
+    done
+
+  done < "$tmp_ep"
+
+  rm -f "$tmp_ep"
+done
+
+# ── summary ───────────────────────────────────────────────────────────────────
+if [ "$FINDING_COUNT" -eq 0 ]; then
+  echo "OK 0 findings"
+  exit 0
+else
+  echo "FAIL $FINDING_COUNT findings"
+  if [ "$STRICT" -eq 1 ]; then
+    exit 1
+  fi
+  exit 0
+fi

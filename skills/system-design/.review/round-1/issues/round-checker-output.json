@@ -1,0 +1,310 @@
+[
+  {
+    "criterion_id": "CR-S10",
+    "file": ".review/round-1/self-reviews/R1-W-009.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": ".review/round-1/self-reviews/R1-W-012.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "SKILL.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '`' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "common/snippets.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "common/snippets.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/domain-consultant-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/domain-consultant-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/domain-consultant-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/domain-consultant-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/planner-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/planner-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/planner-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/writer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/writer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "generate/writer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/adversarial-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/adversarial-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/adversarial-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/adversarial-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/cross-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/cross-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "review/cross-reviewer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "revise/per-issue-reviser-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "revise/per-issue-reviser-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "revise/per-issue-reviser-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "revise/per-issue-reviser-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "shared/judge-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "shared/summarizer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<trace_id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "shared/summarizer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S10",
+    "file": "shared/summarizer-subagent.md",
+    "severity": "error",
+    "description": "Malformed trace_id value '<id>' \u2014 expected R<digits>-[CPWVRSJ]-<3 digits>",
+    "suggested_fix": "Use format R<N>-<role-letter>-<nnn> e.g. R3-W-007"
+  },
+  {
+    "criterion_id": "CR-S13",
+    "file": "common/templates/artifact-template.md",
+    "severity": "error",
+    "description": "artifact-template.md does not appear to describe a multi-level (README + subdirs) structure",
+    "suggested_fix": "Ensure template shows README.md as index with subdirectory paths for artifact leaves"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-api-per-endpoint-blocks.sh",
+    "severity": "error",
+    "description": "CR-L1 checker stdout is not valid JSON (first 100 chars: 'OK 0 findings (no api/ directory)'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-api-per-endpoint-blocks.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-placeholder-json.sh",
+    "severity": "error",
+    "description": "CR-L2 checker stdout is not valid JSON (first 100 chars: 'INFO: no api/*.md or modules/*.md files found in skills/system-design'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-placeholder-json.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-L3",
+    "file": "scripts/check-boundary-enforcement-cols.sh",
+    "severity": "error",
+    "description": "CR-L3 checker script exited 2 (internal error); criterion not evaluated: ERROR: modules/ directory not found under: skills/system-design",
+    "suggested_fix": "inspect script scripts/check-boundary-enforcement-cols.sh stderr for root cause"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-api-surface-cols.sh",
+    "severity": "error",
+    "description": "CR-L4 checker stdout is not valid JSON (first 100 chars: 'INFO: no modules/ directory found in skills/system-design \u2014 nothing to check.'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-api-surface-cols.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-module-interface-types.sh",
+    "severity": "error",
+    "description": "CR-L5 checker stdout is not valid JSON (first 100 chars: 'INFO: no modules/ directory found under skills/system-design \u2014 nothing to check.'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-module-interface-types.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-module-deps-vs-protocols.sh",
+    "severity": "error",
+    "description": "CR-X1 checker stdout is not valid JSON (first 100 chars: 'INFO: no modules/ directory found under skills/system-design \u2014 nothing to check.'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-module-deps-vs-protocols.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-endpoint-literal-vs-api.sh",
+    "severity": "error",
+    "description": "CR-X2 checker stdout is not valid JSON (first 100 chars: 'INFO: no api/ directory in skills/system-design \u2014 CR-X2 skipped.'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-endpoint-literal-vs-api.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-X3",
+    "file": "scripts/check-architecture-coverage.sh",
+    "severity": "error",
+    "description": "CR-X3 checker script exited 2 (internal error); criterion not evaluated: ERROR: README.md not found in: skills/system-design",
+    "suggested_fix": "inspect script scripts/check-architecture-coverage.sh stderr for root cause"
+  },
+  {
+    "criterion_id": "CR-X4",
+    "file": "scripts/check-analytics-coverage.sh",
+    "severity": "error",
+    "description": "CR-X4 checker script exited 2 (internal error); criterion not evaluated: ERROR: README.md not found in: skills/system-design",
+    "suggested_fix": "inspect script scripts/check-analytics-coverage.sh stderr for root cause"
+  },
+  {
+    "criterion_id": "CR-X5",
+    "file": "scripts/check-feature-module-traceability.sh",
+    "severity": "error",
+    "description": "CR-X5 checker script exited 2 (internal error); criterion not evaluated: ERROR: README.md not found in design dir: skills/system-design",
+    "suggested_fix": "inspect script scripts/check-feature-module-traceability.sh stderr for root cause"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-dependency-layering.sh",
+    "severity": "error",
+    "description": "CR-X6 checker stdout is not valid JSON (first 100 chars: 'INFO: no modules/ directory found under skills/system-design \u2014 nothing to check.'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-dependency-layering.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-META-checker-contract-violation",
+    "file": "scripts/check-single-source-of-truth.sh",
+    "severity": "error",
+    "description": "CR-X7 checker stdout is not valid JSON (first 100 chars: 'OK 0 findings'); expected JSON array per \u00a712.4",
+    "suggested_fix": "fix scripts/check-single-source-of-truth.sh to emit JSON array on stdout (empty list [] on pass, list of issue dicts on findings); all diagnostic output must go to stderr"
+  },
+  {
+    "criterion_id": "CR-X8",
+    "file": "scripts/check-readme-references.sh",
+    "severity": "error",
+    "description": "CR-X8 checker script exited 2 (internal error); criterion not evaluated: ERROR: README.md not found in: skills/system-design",
+    "suggested_fix": "inspect script scripts/check-readme-references.sh stderr for root cause"
+  }
+]

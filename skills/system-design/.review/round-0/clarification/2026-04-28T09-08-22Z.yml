@@ -1,0 +1,50 @@
+# Synthesized clarification — --no-consultant override per skill-forge from-scratch.md Step 4.
+# The four flat placeholder keys are derived from the user prompt and the @-expanded reference
+# at @skills/system-design.backup/SKILL.md. R-001..R-006 are marked `deferred` so the planner
+# defers to the prompt + input.md content directly.
+
+SKILL_NAME: "system-design"
+SKILL_VERSION: "0.1.0"
+SKILL_DESCRIPTION: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, or review existing designs."
+ARTIFACT_ROOT: "docs/raw/design/"
+
+clarification_at: "2026-04-28T09:08:22Z"
+no_consultant: true
+no_consultant_reason: "User passed --no-consultant; input is dense (1201 words, 2 expanded references including the legacy SKILL.md as substantive content source)."
+
+normalized_requirements:
+  R-001:
+    value: "system-design"
+    status: confirmed
+    note: "Slug is unambiguous from prompt and matches retired-and-archived skills/system-design.backup precedent."
+  R-002:
+    value: ""
+    status: deferred
+    note: "Defer to user-prompt and input.md `# Output` section: README.md + modules/M-NNN-{slug}.md + api/API-NNN-{slug}.md + REVISIONS.md + .reviews/."
+  R-003:
+    value: ""
+    status: deferred
+    note: "Defer to user-prompt `# Input Modes` and `# Modes` sections: PRD path | draft path | interactive | --review | --revise | --output | --diagnose."
+  R-004:
+    value: ""
+    status: deferred
+    note: "Defer to user-prompt `# Hard Constraints` + `# Acceptance Criteria` and the legacy `structural-lint.md` mined via @skills/system-design.backup/. Catalog must include L1..L5 + X1..X8."
+  R-005:
+    value: ""
+    status: deferred
+    note: "Defer to user-prompt `# Core Principles` + the legacy `design-review-checklist.md` mined via @skills/system-design.backup/."
+  R-006:
+    value: ""
+    status: not-applicable
+    note: "FromScratch generation; new-version semantics are out of scope for delivery-1."
+
+domain_terms_aligned:
+  - term: "generative skill"
+    user_clarification: "User explicitly identifies the new skill as a generative skill and specifies skill-forge multi-role architecture."
+    resolved_to: "generative skill (per common/domain-glossary.md): a Claude Code skill that produces artifacts from sparse intent via orchestrator + sub-agent dispatch."
+  - term: "artifact"
+    user_clarification: "User uses 'output' interchangeably with 'artifact'; the artifact root is `docs/raw/design/YYYY-MM-DD-{slug}/`."
+    resolved_to: "artifact (per common/domain-glossary.md): an output file produced by a writer sub-agent — here, README.md, modules/*.md, api/*.md, REVISIONS.md."
+  - term: "role"
+    user_clarification: "User enumerates the seven sub-agent roles explicitly (planner, writer, cross-reviewer, adversarial-reviewer, reviser, summarizer, judge)."
+    resolved_to: "role (per common/domain-glossary.md): a sub-agent function in the orchestrator-dispatch contract; mapped to model tier in common/config.yml."
