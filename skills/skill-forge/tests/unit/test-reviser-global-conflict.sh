@@ -56,7 +56,7 @@ done
 # the same anti-pattern (so the contract stays self-consistent: per-issue-
 # reviser refuses, adversarial-reviewer flags any future regression).
 ADV="$ROOT/review/adversarial-reviewer-subagent.md"
-grep -q '6\. Reviser 硬修 of Global Conflicts\|Reviser 硬修\|fix it anyway' "$ADV" \
+grep -q '6\. Reviser Force-Fix of Global Conflicts\|Reviser force-fix\|fix it anyway' "$ADV" \
   || { echo "FAIL: adversarial-reviewer no longer documents the attack angle that catches this anti-pattern"; exit 1; }
 echo "PASS: adversarial-reviewer attack angle #6 still in place"
 

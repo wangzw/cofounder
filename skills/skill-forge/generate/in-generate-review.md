@@ -57,7 +57,7 @@ Every FAIL row MUST select exactly one `blocker_scope`:
 | `needs-human-decision` | The choice requires information only a human can provide — no skill-internal evidence can resolve it |
 | `input-ambiguity` | The input spec is ambiguous or incomplete; a clarification not yet covered by domain-consultant output is needed |
 
-**Critical rule**: NEVER attempt to resolve a `global-conflict` in-place ("硬修"). Write the FAIL
+**Critical rule**: NEVER attempt to resolve a `global-conflict` in-place (force-fix). Write the FAIL
 row, set `self_review_status: PARTIAL` in ACK, and let the cross-reviewer + reviser loop handle it.
 
 ---

@@ -69,7 +69,7 @@ MUST return `OK ... self_review_status=PARTIAL fail_count=<N>`.
   IPC envelope into artifact leaves — artifact nudity is a hard constraint (guide §3.9).
 - **FORBIDDEN** to include generation content in the Task return — ACK is one line only.
 - **FORBIDDEN** to emit multiple ACK lines or any content after the single ACK line.
-- **FORBIDDEN** (writer) to "硬修" (force-fix in-place) a `global-conflict` self-review FAIL.
+- **FORBIDDEN** (writer) to force-fix in-place a `global-conflict` self-review FAIL.
 
 ---
 

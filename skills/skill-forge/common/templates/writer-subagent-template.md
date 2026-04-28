@@ -111,7 +111,7 @@ The writer sub-agent prompt MUST contain (CR-L09 hard check):
 
 **FORBIDDEN in the generated writer prompt** (these failures cause CR-L07 on review):
 - Soft language for hard requirements: "try to ensure", "ideally", "prefer" — use MUST/MUST NOT/FORBIDDEN
-- Instructing the writer to "硬修" a `global-conflict` FAIL — FORBIDDEN per §11.2; writer records and returns PARTIAL
+- Instructing the writer to force-fix a `global-conflict` FAIL — FORBIDDEN per §11.2; writer records and returns PARTIAL
 - Omitting the Snippet D fingerprint on line 1 (CR-S08 fires immediately)
 
 ---
@@ -200,7 +200,7 @@ After writing, check each criterion. Mark FAIL with a note if anything is wrong.
 # CR-L09 fires: blocker-scope-taxonomy not present
 ```
 
-**Anti-pattern C — instructing writer to 硬修 a global-conflict FAIL** → §11.2 violation:
+**Anti-pattern C — instructing writer to force-fix a global-conflict FAIL** → §11.2 violation:
 
 ```markdown
 If you detect a conflict with another leaf, fix it in place before returning OK.

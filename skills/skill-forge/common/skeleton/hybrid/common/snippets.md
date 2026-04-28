@@ -180,7 +180,7 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
   artifact body must never appear in the return value (orchestrator context pollution, guide §3.9
   hard constraint 2).
 - **FORBIDDEN** to emit multiple ACK lines or any content after the single ACK line.
-- **FORBIDDEN** (writer) to "硬修" (force-fix in-place) a `global-conflict` self-review FAIL —
+- **FORBIDDEN** (writer) to force-fix in-place a `global-conflict` self-review FAIL —
   use the blocker-scope taxonomy, record the FAIL row with `blocker_scope`, and return
   `OK ... self_review_status=PARTIAL`. The cross-reviewer and reviser handle global conflicts
   in the review/revise loop (§11.2).
