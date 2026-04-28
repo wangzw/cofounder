@@ -66,7 +66,7 @@ carried-forward prior) issue set, and judge will rule based on the aggregate
 - **Dispatches**: `review/cross-reviewer-subagent.md`
 - **Sub-agent inputs**: leaves listed in `skip-set.yml cross_reviewer_focus`, previous-round issue
   frontmatter from `round-<N-1>/issues/`, writer self-review files at
-  `<target>/.review/round-<N>/self-reviews/`, and `common/review-criteria.md` (CR-L01..CR-L10).
+  `<target>/.review/round-<N>/self-reviews/`, and `common/review-criteria.md` (CR-L01..CR-L11).
 - **Sub-agent outputs**: one issue file per issue found at
   `<target>/.review/round-<N>/issues/<issue-id>.md`.
 - **Orchestrator action on ACK**: record `trace_id` in `state.yml`. If ACK is `FAIL` → apply §16
@@ -124,5 +124,5 @@ severity (default: `critical`).
 
 ## Files in This Directory
 
-- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L10)
+- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L11)
 - [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)

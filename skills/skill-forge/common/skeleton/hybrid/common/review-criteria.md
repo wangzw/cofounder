@@ -276,6 +276,49 @@ each section; that would require an LLM check.
     every new generation.
 ```
 
+## CR-S16 skeleton-conformance
+
+The target skill's root directory MUST conform to the canonical skeleton: only
+`SKILL.md`, `CHANGELOG.md`, and (optionally) `README.md` may exist as loose
+files at the skill root. The only permitted top-level subdirectories are
+`common/`, `generate/`, `review/`, `revise/`, `shared/`, `scripts/`, and
+`.review/`. All templates, mode files, sub-agent prompts, and discipline files
+MUST live under their prescribed skeleton subdirectory (e.g. `*-template.md`
+and `*-checklist.md` under `common/templates/`; `*-subagent.md` under the
+matching role directory `generate/`/`review/`/`revise/`/`shared/`; `*-mode.md`
+folded into the corresponding role directory's `index.md` or generate/ topic
+file).
+
+Without this gate, skills accumulate stray root-level `.md` files (templates,
+mode docs, checklists) over their lifetime — CR-S03 only verifies that the
+required directories *exist*, not that loose files *outside* them are
+forbidden. The prd-analysis delivery-1 audit surfaced 11+ stray `.md` files at
+the skill root that CR-S03 could not catch, breaking the assumption that
+downstream agents can navigate by directory rather than ad-hoc filename.
+
+The check emits one `CR-S16` issue per stray file or directory, with a concrete
+`suggested_fix` proposing the canonical target path inferred from the filename
+pattern.
+
+```yaml
+- id: CR-S16
+  name: "skeleton-conformance"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-skill-structure.sh
+  severity: error
+  applies_to: ["**"]
+  conflicts_with: []
+  priority: 1
+  incremental_skip: full_scan
+  rationale: |
+    CR-S03 verifies that the canonical skeleton directories EXIST; CR-S16
+    verifies that no stray files or directories live OUTSIDE the canonical
+    skeleton. Without the strict whitelist, skill scaffolds drift over their
+    lifetime as templates / mode files / checklists are added at the root
+    rather than placed in the prescribed skeleton subdirectories.
+```
+
 ---
 
 ## Semantic Criteria (LLM-Type)
@@ -430,4 +473,37 @@ The writer sub-agent prompt's self-review instructions MUST list all 4 `blocker_
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+```
+
+## CR-L11 cross-reference-consistency
+
+A stated contract in any artifact MUST agree with the implementation, list, or path it references in another artifact. CR-L04 covers ONLY oscillation-prone `conflicts_with` pairs inside `review-criteria.md`; CR-L11 covers the **broader cross-artifact contract** — any case where one file declares a name, path, count, or behavior that another file implements differently.
+
+Concrete patterns that violate CR-L11:
+
+- `review-criteria.md` declares `script_path: scripts/X.sh` but the inventory check or scaffold doesn't list `X.sh`.
+- A mode file (e.g. `review-mode.md` at the skill root) and its canonical counterpart (e.g. `review/index.md`) ship two different orchestration models for the same `--review` mode, so `SKILL.md` Mode Routing cannot point to a single source of truth.
+- A shell script's stated contract in its header comment (`# Auto-init + bootstrap commit`) is contradicted by its actual execution path (e.g., a quoting bug that makes bootstrap impossible — `git -c user.name=this skill` word-splits).
+- An ID, count, or convention referenced in two places (e.g. "10 LLM-type criteria" in cross-reviewer-subagent.md vs the actual 11 in review-criteria.md after this addition) drifts because no script enforces consistency.
+
+Reviewers WERE using CR-L04 as a catch-all for these patterns (round 6 surfaced 11 such mis-tags). CR-L11 formalizes the broader scope so reviewers can tag accurately. CR-L04 stays narrow — strictly the `conflicts_with` oscillation-prone pair check.
+
+Severity is `error` rather than `critical` because individual cross-reference inconsistencies usually do not block the round (the orchestrator can still dispatch); they degrade clarity over time and bake in drift. Critical-level escalation belongs to CR-L01/CR-L02 (orchestrator pure-dispatch / ACK-contract fidelity), which protect the dispatch loop itself.
+
+```yaml
+- id: CR-L11
+  name: "cross-reference-consistency"
+  version: 1.0.0
+  checker_type: llm
+  severity: error
+  conflicts_with: []
+  priority: 2
+  incremental_skip: per_file
+  rationale: |
+    Round-6 audit found 11 of 21 LLM-tier issues mis-tagged as CR-L04 because
+    no broader cross-reference criterion existed. CR-L04's literal definition
+    is narrow (only review-criteria.md conflicts_with pairs); reviewers
+    stretched it to mean "any cross-artifact inconsistency". CR-L11 carves out
+    the broader scope as its own criterion so future reviewers tag accurately
+    and CR-L04 stops bearing semantic load it was not designed for.
 ```

@@ -133,4 +133,109 @@ set -e
 [ "$ec" = "1" ] || { echo "FAIL: subdir target with untracked outside .review/ expected exit 1, got $ec"; exit 1; }
 echo "PASS: subdir target — .review/ exclusion + drift detection both work"
 
-echo "=== PASS test-check-drift.sh (10 sub-tests) ==="
+# Regression tests for the reviewer-drift fix.
+# Before the fix, drift was computed only against the TARGET tree. If
+# skill-forge itself (the reviewer logic — criteria, checkers, prompts) was
+# modified after the baseline tag, the no-drift gate would still short-circuit
+# the review, suppressing issues that the new reviewer logic would surface.
+# The fix reads `skill_forge_dir` from <target>/.review/state.yml and includes
+# its diff against the baseline tag in the drift computation.
+
+# Helper: build a fixture repo with a target skill AND a sibling skill-forge
+# directory, both committed at the baseline tag.
+make_dual_repo() {
+  local repo="$1"
+  (cd "$repo" && git init -q \
+      && mkdir -p target/.review skill-forge/scripts skill-forge/common \
+      && echo "SKILL" > target/SKILL.md \
+      && echo "criteria-v1" > skill-forge/common/review-criteria.md \
+      && echo "#!/bin/sh" > skill-forge/scripts/check-drift.sh \
+      && chmod +x skill-forge/scripts/check-drift.sh \
+      && git add . \
+      && git -c user.email=t@t -c user.name=t commit -q -m "init" \
+      && git tag -a delivery-1-init -m "d1" HEAD)
+  cat > "$repo/target/.review/state.yml" <<EOF
+skill_forge_dir: $repo/skill-forge
+delivery_id: 1
+current_round: 1
+EOF
+}
+
+# Test 11: skill-forge drift in same repo → drift detected (THE BUG)
+TMP4=$(mktemp -d)
+trap "rm -rf $TMP $TMP2 $TMP3 $TMP4" EXIT
+make_dual_repo "$TMP4"
+# Modify a reviewer-relevant file in skill-forge; target tree is untouched.
+(cd "$TMP4" && echo "criteria-v2-new-rule" >> skill-forge/common/review-criteria.md)
+set +e
+"$SCRIPT" "$TMP4/target" >/dev/null 2>&1
+ec=$?
+set -e
+[ "$ec" = "1" ] || { echo "FAIL: skill-forge drift in same repo expected exit 1, got $ec"; exit 1; }
+echo "PASS: skill-forge drift in same repo triggers drift"
+
+# Test 12: clean target + clean skill-forge → no-drift (fix must not regress)
+TMP5=$(mktemp -d)
+trap "rm -rf $TMP $TMP2 $TMP3 $TMP4 $TMP5" EXIT
+make_dual_repo "$TMP5"
+set +e
+out=$("$SCRIPT" "$TMP5/target" 2>/dev/null)
+ec=$?
+set -e
+[ "$ec" = "0" ] || { echo "FAIL: clean dual-repo expected exit 0, got $ec"; exit 1; }
+echo "$out" | grep -q "no-drift since delivery-1-init" \
+  || { echo "FAIL: expected no-drift message, got: $out"; exit 1; }
+echo "PASS: clean target + clean skill-forge → no-drift"
+
+# Test 13: skill-forge in different repo → warning, fallback to target-only check
+TMP6_TARGET=$(mktemp -d)
+TMP6_FORGE=$(mktemp -d)
+trap "rm -rf $TMP $TMP2 $TMP3 $TMP4 $TMP5 $TMP6_TARGET $TMP6_FORGE" EXIT
+(cd "$TMP6_TARGET" && git init -q \
+    && mkdir -p .review \
+    && echo "SKILL" > SKILL.md \
+    && git add . \
+    && git -c user.email=t@t -c user.name=t commit -q -m "init" \
+    && git tag -a delivery-1-cross -m "d1" HEAD)
+(cd "$TMP6_FORGE" && git init -q \
+    && echo "criteria-v1" > review-criteria.md \
+    && git add . \
+    && git -c user.email=t@t -c user.name=t commit -q -m "init")
+cat > "$TMP6_TARGET/.review/state.yml" <<EOF
+skill_forge_dir: $TMP6_FORGE
+delivery_id: 1
+current_round: 1
+EOF
+# Even with skill-forge "drifted" (different repo, can't verify), target is clean
+# → fall back to target-only check, exit 0, but emit a stderr warning.
+set +e
+out=$("$SCRIPT" "$TMP6_TARGET" 2>/tmp/cdrift-stderr-$$)
+ec=$?
+err=$(cat /tmp/cdrift-stderr-$$); rm -f /tmp/cdrift-stderr-$$
+set -e
+[ "$ec" = "0" ] || { echo "FAIL: cross-repo skill-forge expected exit 0 with target clean, got $ec"; exit 1; }
+echo "$err" | grep -qi "skill-forge.*different repo\|cannot verify reviewer drift" \
+  || { echo "FAIL: expected stderr warning about cross-repo skill-forge, got: $err"; exit 1; }
+echo "PASS: cross-repo skill-forge → warning + target-only fallback"
+
+# Test 14: state.yml missing skill_forge_dir → no skill-forge check, target-only
+TMP7=$(mktemp -d)
+trap "rm -rf $TMP $TMP2 $TMP3 $TMP4 $TMP5 $TMP6_TARGET $TMP6_FORGE $TMP7" EXIT
+(cd "$TMP7" && git init -q \
+    && mkdir -p .review \
+    && echo "SKILL" > SKILL.md \
+    && git add . \
+    && git -c user.email=t@t -c user.name=t commit -q -m "init" \
+    && git tag -a delivery-1-nostate -m "d1" HEAD)
+# Empty state.yml — no skill_forge_dir key.
+echo "delivery_id: 1" > "$TMP7/.review/state.yml"
+set +e
+out=$("$SCRIPT" "$TMP7" 2>/dev/null)
+ec=$?
+set -e
+[ "$ec" = "0" ] || { echo "FAIL: missing skill_forge_dir expected exit 0 (target-only), got $ec"; exit 1; }
+echo "$out" | grep -q "no-drift since delivery-1-nostate" \
+  || { echo "FAIL: expected no-drift, got: $out"; exit 1; }
+echo "PASS: missing skill_forge_dir → target-only check"
+
+echo "=== PASS test-check-drift.sh (14 sub-tests) ==="

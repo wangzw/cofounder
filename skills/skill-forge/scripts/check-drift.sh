@@ -99,10 +99,70 @@ if [ -n "$UNTRACKED" ]; then
   DRIFT="$(printf '%s\n%s' "$DRIFT" "$UNTRACKED" | grep -v '^$' || true)"
 fi
 
-if [ -z "$DRIFT" ]; then
+# Reviewer drift: target-tree byte-equality is necessary but not sufficient for
+# short-circuit. If skill-forge itself (the reviewer logic — review-criteria.md,
+# scripts/check-*.sh, sub-agent prompts, config.yml) has changed since the
+# baseline tag, a re-review on an unchanged target may surface NEW issues that
+# the prior reviewer would not have caught. Skipping the LLM review in that
+# case silently regresses correctness.
+#
+# We read `skill_forge_dir` from <target>/.review/state.yml (written by
+# Bootstrap Precheck) and diff that path against the SAME baseline tag.
+REVIEWER_DRIFT=""
+STATE_YML="$TARGET_ABS/.review/state.yml"
+if [ -f "$STATE_YML" ]; then
+  SKILL_FORGE_DIR="$(grep -E '^[[:space:]]*skill_forge_dir:' "$STATE_YML" \
+                       | head -1 \
+                       | sed -E 's/^[[:space:]]*skill_forge_dir:[[:space:]]*//' \
+                       | sed -E 's/^["'"'"']//; s/["'"'"']$//' \
+                       || true)"
+else
+  SKILL_FORGE_DIR=""
+fi
+
+if [ -n "$SKILL_FORGE_DIR" ] && [ -d "$SKILL_FORGE_DIR" ]; then
+  SKILL_FORGE_ABS="$(cd "$SKILL_FORGE_DIR" && pwd -P)"
+  SKILL_FORGE_REPO="$(git -C "$SKILL_FORGE_ABS" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "$SKILL_FORGE_REPO" ]; then
+    SKILL_FORGE_REPO="$(cd "$SKILL_FORGE_REPO" && pwd -P)"
+    if [ "$SKILL_FORGE_REPO" = "$REPO_ROOT" ]; then
+      # Same repo as target — diff skill-forge tree against the same tag.
+      REL_FORGE="${SKILL_FORGE_ABS#"$REPO_ROOT"/}"
+      [ "$REL_FORGE" = "$SKILL_FORGE_ABS" ] && REL_FORGE="."
+      # Skip skill-forge's own .review/ if it exists (mirrors target rule).
+      if [ "$REL_FORGE" = "." ]; then
+        FORGE_REVIEW_RE='^\.review/'
+      else
+        FORGE_REVIEW_RE="^${REL_FORGE}/\\.review/"
+      fi
+      REVIEWER_DRIFT="$(git -C "$REPO_ROOT" diff --name-only "$LATEST_TAG" -- "$REL_FORGE" \
+                          2>/dev/null | grep -v "$FORGE_REVIEW_RE" || true)"
+      FORGE_UNTRACKED="$(git -C "$REPO_ROOT" ls-files --others --exclude-standard -- "$REL_FORGE" \
+                          2>/dev/null | grep -v "$FORGE_REVIEW_RE" || true)"
+      if [ -n "$FORGE_UNTRACKED" ]; then
+        REVIEWER_DRIFT="$(printf '%s\n%s' "$REVIEWER_DRIFT" "$FORGE_UNTRACKED" | grep -v '^$' || true)"
+      fi
+    else
+      # skill-forge lives in a different git repo. We cannot diff against the
+      # target's baseline tag (the tag refs a commit in the target's repo, not
+      # the skill-forge repo). Surface a warning so the user understands the
+      # no-drift gate is target-only in this configuration.
+      echo "warning: skill-forge in different repo ($SKILL_FORGE_REPO != $REPO_ROOT); cannot verify reviewer drift" >&2
+    fi
+  else
+    echo "warning: skill_forge_dir is not in a git repo ($SKILL_FORGE_DIR); cannot verify reviewer drift" >&2
+  fi
+fi
+
+if [ -z "$DRIFT" ] && [ -z "$REVIEWER_DRIFT" ]; then
   echo "no-drift since $LATEST_TAG — skipping LLM review"
   exit 0
 fi
 
-echo "drift detected against $LATEST_TAG (${DRIFT})" >&2
+if [ -n "$DRIFT" ]; then
+  echo "drift detected against $LATEST_TAG (target: ${DRIFT})" >&2
+fi
+if [ -n "$REVIEWER_DRIFT" ]; then
+  echo "drift detected against $LATEST_TAG (reviewer/skill-forge: ${REVIEWER_DRIFT})" >&2
+fi
 exit 1

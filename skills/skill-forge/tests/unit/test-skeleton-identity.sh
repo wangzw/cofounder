@@ -32,6 +32,7 @@ VERBATIM_FILES=(
   "scripts/check-criteria-consistency.sh"
   "scripts/check-index-consistency.sh"
   "scripts/check-changelog-consistency.sh"
+  "common/review-criteria.md"
   "common/snippets.md"
   "generate/from-scratch.md"
   "generate/new-version.md"

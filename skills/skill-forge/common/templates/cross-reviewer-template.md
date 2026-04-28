@@ -44,7 +44,7 @@ explicitly (escalate / dismiss / cascade — NEVER silently ignore).
 | `<target>/.review/round-<N>/skip-set.yml` | MUST read `cross_reviewer_focus` (leaves to evaluate) and `cross_reviewer_skip` (leaves MUST NOT open) |
 | Each leaf in `cross_reviewer_focus` | Artifact content to evaluate |
 | `<target>/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression |
-| `<skill-forge>/common/review-criteria.md` | Authoritative CR definitions — CR-L01..CR-L10 + domain CRs |
+| `<skill-forge>/common/review-criteria.md` | Authoritative CR definitions — CR-L01..CR-L11 + domain CRs |
 | `<target>/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews — required for FAIL-row handling (guide §11.1) |
 
 **Skip-set discipline**: ONLY read leaves in `cross_reviewer_focus`. MUST NOT open leaves in

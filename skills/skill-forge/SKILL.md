@@ -1,6 +1,6 @@
 ---
 name: skill-forge
-version: 0.1.0
+version: 0.1.1
 description: "Use when the user wants to create a new generative skill (a Claude Code skill that produces artifacts from sparse intent) or evolve an existing one. Triggers: /cofounder:skill-forge, 'create a skill', 'generate a skill', 'new generative skill', 'make a skill that ...'."
 ---
 
@@ -218,7 +218,7 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 ## Configuration & Subagent Files
 
 - **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions)
-- **Review criteria**: `common/review-criteria.md` (24 CR entries: 14 script + 10 LLM)
+- **Review criteria**: `common/review-criteria.md` (27 CR entries: 16 script + 11 LLM)
 - **Domain glossary**: `common/domain-glossary.md` (disambiguation terms for consultant)
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`

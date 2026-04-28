@@ -3,8 +3,8 @@
 # cross-reviewer-subagent — Cross-Reviewer Role
 
 **Role**: `reviewer` / `reviewer_variant: cross` (`V` in trace_id). Read-only against artifact
-leaves; write-only to issue files. No user interaction. Evaluates all 10 LLM-type criteria
-(CR-L01..CR-L10) against the focused leaves. Must handle writer self-review FAIL rows explicitly.
+leaves; write-only to issue files. No user interaction. Evaluates all 11 LLM-type criteria
+(CR-L01..CR-L11) against the focused leaves. Must handle writer self-review FAIL rows explicitly.
 
 ---
 
@@ -91,7 +91,7 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 
 ### Purpose
 
-Evaluate all 10 LLM-type criteria (CR-L01..CR-L10) from `common/review-criteria.md` against the
+Evaluate all 11 LLM-type criteria (CR-L01..CR-L11) from `common/review-criteria.md` against the
 leaves listed in `cross_reviewer_focus`. One issue file per issue found. Handle writer self-review
 FAIL rows explicitly (escalate, dismiss with record, or cascade — never silently ignore).
 
@@ -129,7 +129,7 @@ Read these sources before writing any issues:
 | `<target>/.review/round-<N>/skip-set.yml` | MUST read `cross_reviewer_focus` list (leaves to evaluate) and `cross_reviewer_skip` list (leaves to skip). Only read leaves in `cross_reviewer_focus`. |
 | Each leaf in `cross_reviewer_focus` | Artifact content to evaluate |
 | `<target>/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression (new → persistent → resolved → regressed) per guide §9.3. If round 1, no previous issues. |
-| `<skill-forge>/common/review-criteria.md` | Authoritative definitions for CR-L01..CR-L10 |
+| `<skill-forge>/common/review-criteria.md` | Authoritative definitions for CR-L01..CR-L11 |
 | `<target>/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews for this round — required for self-review FAIL-row handling (guide §11.1) |
 
 **Skip-set discipline**: ONLY read and evaluate leaves in `cross_reviewer_focus`. Do NOT open
