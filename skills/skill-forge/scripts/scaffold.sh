@@ -77,13 +77,27 @@ if [ ! -f "$CLARIFICATION_YML" ]; then
   exit 2
 fi
 
+# Capture this generator's version so we can embed it in scaffold-provenance.yml.
+# "This generator" = whichever skill owns this scaffold.sh — skill-forge here, but
+# any future scaffolder (prd-analysis-generated sub-skill, etc.) reads its own
+# SKILL.md the same way. The value is recorded into the target's
+# scaffold-provenance.yml as `scaffolder_version`, and consumed by the target's
+# run-checkers.sh on every round to detect criteria/prompt drift after a
+# generator bump. See run-checkers.sh's auto-force-full block.
+SCAFFOLDER_VERSION=""
+if [ -f "${SKILL_FORGE_DIR}/SKILL.md" ]; then
+  SCAFFOLDER_VERSION=$(grep -E '^version:' "${SKILL_FORGE_DIR}/SKILL.md" | head -1 \
+    | sed -E 's/^version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+
 # Load placeholder values from clarification YAML (simple key: value parsing)
-python3 - "$SKELETON_DIR" "$TARGET_PATH" "$CLARIFICATION_YML" <<'PYEOF'
+python3 - "$SKELETON_DIR" "$TARGET_PATH" "$CLARIFICATION_YML" "$SCAFFOLDER_VERSION" <<'PYEOF'
 import sys, os, re, hashlib, shutil
 
 skeleton_dir = sys.argv[1]
 target_path = sys.argv[2]
 clarification_yml = sys.argv[3]
+scaffolder_version = sys.argv[4]
 
 # No-substitute files (sha-pinned)
 NO_SUBSTITUTE = {
@@ -247,8 +261,16 @@ provenance_lines = [
     "# provenance=scaffold and default into cross_reviewer_skip. Writer /",
     "# reviser dispatches mutate a file → sha drifts → provenance=authored →",
     "# file re-enters cross_reviewer_focus automatically.",
-    "files:",
+    "#",
+    "# `scaffolder_version` records the version of the generator that produced",
+    "# this skill (skill-forge for skill-forge-scaffolded skills; whatever",
+    "# generator owns scaffold.sh in the recursive case). run-checkers.sh",
+    "# compares it to state.yml.reviewer_version_seen and auto-forces a full",
+    "# review when they drift — old criteria pass under new criteria fail.",
 ]
+if scaffolder_version:
+    provenance_lines.append(f'scaffolder_version: "{scaffolder_version}"')
+provenance_lines.append("files:")
 for dirpath, dirnames, filenames in os.walk(target_path):
     dirnames[:] = [d for d in dirnames if not d.startswith('.')]
     for fname in sorted(filenames):

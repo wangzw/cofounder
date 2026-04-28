@@ -53,30 +53,57 @@ if ! echo "$ROUND" | grep -qE '^round-[0-9]+$'; then
 fi
 
 
-# Auto-force-full when this skill's reviewer version differs from last-seen.
+# Auto-force-full when the scaffolder (the generator that produced this skill)
+# has bumped version since the last recorded round.
 #
-# When the reviewer's SKILL.md version bumps (new criteria, updated prompts,
-# bug fixes in reviewer logic), the incremental skip-set computed from
-# target-tree drift alone misses leaves that pass under old criteria but
-# fail under new criteria. We detect the drift by comparing the reviewer's
-# current SKILL.md version to `reviewer_version_seen` recorded in target's
-# state.yml on the previous round. Mismatch → auto-set FORCED_FULL=1.
+# Why we read scaffold-provenance.yml, not $SCRIPT_DIR/../SKILL.md:
+#   run-checkers.sh is COPIED into every scaffolded skill, so $SCRIPT_DIR/..
+#   resolves to the target itself — yielding the target's own version, not
+#   the scaffolder's. The target's version doesn't change when the scaffolder
+#   bumps (e.g. skill-forge 0.2.1 → 0.2.2 propagates new scripts into
+#   prd-analysis without touching prd-analysis's SKILL.md), so a comparison
+#   against state.yml never detects criteria-bundle drift. The 0.2.1 release
+#   of skill-forge had this exact bug; this 0.2.2 logic fixes it.
+#
+# Source of truth: scaffold-provenance.yml carries `scaffolder_version`,
+# written by the scaffolder (e.g. skill-forge/scripts/scaffold.sh) at scaffold
+# time AND on every re-scaffold. When the scaffolder's logic / criteria / prompts
+# evolve, propagation rewrites scaffold-provenance.yml with the new version,
+# this comparison detects it, and force-full overrides the incremental
+# skip-set so reviewer changes don't silently miss leaves.
+#
+# Self-review fallback: a generator (e.g. skill-forge reviewing skill-forge)
+# is not scaffolded, so it has no scaffold-provenance.yml. In that case we
+# read $TARGET/SKILL.md directly — for self-review, target IS the scaffolder.
+#
+# This concept recurses: if {{SKILL_NAME}} ever generates a sub-skill, the
+# sub-skill's scaffold-provenance.yml records {{SKILL_NAME}}'s version (since
+# {{SKILL_NAME}} owns scaffold.sh in that case). The same logic applies.
+#
+# After a successful round, state.yml's `reviewer_version_seen` is updated to
+# the current scaffolder_version so the next round has a baseline.
 STATE_YML="$TARGET/.review/state.yml"
+PROVENANCE_YML="$TARGET/common/scaffold-provenance.yml"
 LAST_SEEN_VERSION=""
 if [ -f "$STATE_YML" ]; then
   LAST_SEEN_VERSION=$(grep -E '^reviewer_version_seen:' "$STATE_YML" | head -1 \
     | sed -E 's/^reviewer_version_seen:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
 fi
-REVIEWER_ROOT="$SCRIPT_DIR/.."
 CURRENT_REVIEWER_VERSION=""
-if [ -d "$REVIEWER_ROOT" ] && [ -f "$REVIEWER_ROOT/SKILL.md" ]; then
-  CURRENT_REVIEWER_VERSION=$(grep -E '^version:' "$REVIEWER_ROOT/SKILL.md" | head -1 \
+if [ -f "$PROVENANCE_YML" ]; then
+  CURRENT_REVIEWER_VERSION=$(grep -E '^scaffolder_version:' "$PROVENANCE_YML" | head -1 \
+    | sed -E 's/^scaffolder_version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+# Self-review fallback: TARGET IS the scaffolder (generators aren't scaffolded
+# themselves, so there is no provenance file). Read its own SKILL.md.
+if [ -z "$CURRENT_REVIEWER_VERSION" ] && [ -f "$TARGET/SKILL.md" ]; then
+  CURRENT_REVIEWER_VERSION=$(grep -E '^version:' "$TARGET/SKILL.md" | head -1 \
     | sed -E 's/^version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
 fi
 if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -n "$LAST_SEEN_VERSION" ] \
    && [ "$CURRENT_REVIEWER_VERSION" != "$LAST_SEEN_VERSION" ] \
    && [ "$FORCED_FULL" = "0" ]; then
-  echo "INFO: reviewer version changed (${LAST_SEEN_VERSION} → ${CURRENT_REVIEWER_VERSION}); auto-forcing full review (incremental skip-set would miss leaves that pass under old criteria but fail under new)" >&2
+  echo "INFO: scaffolder version changed (${LAST_SEEN_VERSION} → ${CURRENT_REVIEWER_VERSION}); auto-forcing full review (incremental skip-set would miss leaves that pass under old criteria but fail under new)" >&2
   FORCED_FULL=1
 fi
 

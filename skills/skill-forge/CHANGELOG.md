@@ -7,7 +7,59 @@ skill-forge release history. Versions follow semantic versioning per
 
 ---
 
-## 0.2.1 — 2026-04-28
+## 0.2.2 — 2026-04-28
+
+### Fixed
+
+- **Auto-force-full now actually fires for scaffolded targets** (corrects 0.2.1).
+  The 0.2.1 release added an auto-force-full path on "reviewer version drift",
+  but the resolution was wrong: `run-checkers.sh` read `$SCRIPT_DIR/../SKILL.md`
+  to determine the "current reviewer version". Because `run-checkers.sh` is
+  *copied into every scaffolded target* by `scaffold.sh`, `$SCRIPT_DIR/..`
+  resolves to the **target itself** — yielding the target's own SKILL.md
+  version, not the scaffolder's. Scaffolded targets don't bump their own
+  version when skill-forge bumps; the comparison to `state.yml.reviewer_version_seen`
+  was therefore always equal, and auto-force-full never triggered for any
+  non-self-review target. The bug only worked accidentally for skill-forge
+  reviewing skill-forge (where `$SCRIPT_DIR/..` truly is skill-forge), which
+  is exactly why the 0.2.1 unit tests passed.
+
+  The 0.2.2 fix decouples the two concepts:
+
+  - `scaffold.sh` writes a top-level `scaffolder_version: "<X.Y.Z>"` field
+    into `<target>/common/scaffold-provenance.yml` at scaffold and
+    re-scaffold time, recording the version of whichever generator produced
+    this skill (skill-forge today, but the field name is generator-agnostic
+    to support the recursive case where an artifact-skill itself scaffolds
+    sub-skills).
+
+  - `run-checkers.sh` reads `scaffolder_version` from the target's provenance
+    file as the "current reviewer version". For self-review of the generator
+    (no provenance file because generators are not themselves scaffolded),
+    it falls back to `$TARGET/SKILL.md`. The `$SCRIPT_DIR/..` resolution is
+    gone.
+
+  - The auto-force-full comparison is now: `state.yml.reviewer_version_seen`
+    vs `scaffold-provenance.yml.scaffolder_version`. Drift means propagation
+    has updated criteria/prompts in the target tree since the last round,
+    and the incremental skip-set must be overridden.
+
+  Propagated to all 4 skeleton variants. Existing scaffolded targets need
+  one-time backfill of `scaffolder_version` in their `scaffold-provenance.yml`
+  (re-running `scaffold.sh` does this; alternatively, hand-edit one line).
+
+  Regression test: `tests/unit/test-run-checkers-version-drift.sh` rewritten
+  with 6 sub-tests, including:
+  - **Test 1 (regression guard for the 0.2.1 bug)**: scaffolded target where
+    SKILL.md is unchanged, `scaffolder_version` advances 0.2.1 → 0.2.2 →
+    must force-full. The original 0.2.1 tests never exercised this path.
+  - **Test 6 (negative guard)**: target self-bumps its own SKILL.md without
+    a scaffolder bump → must NOT force-full. Catches the inverse failure
+    mode of the 0.2.1 bug.
+
+---
+
+## 0.2.1 — 2026-04-28 — *INCORRECT FIX, see 0.2.2*
 
 ### Fixed
 
@@ -37,6 +89,11 @@ skill-forge release history. Versions follow semantic versioning per
   explicit `--full` still works regardless).
 
   Test suite: 39 unit-test files, all passing.
+
+  > **Note**: The "$SCRIPT_DIR/../SKILL.md" resolution above resolves to the
+  > target itself (not the scaffolder) because `run-checkers.sh` is copied
+  > into every scaffolded target. This 0.2.1 fix therefore did not work for
+  > any non-self-review target. Corrected in 0.2.2.
 
 ---
 

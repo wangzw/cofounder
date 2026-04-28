@@ -1,6 +1,6 @@
 ---
 name: skill-forge
-version: 0.2.1
+version: 0.2.2
 description: "Use when the user wants to create a new generative skill (a Claude Code skill that produces artifacts from sparse intent) or evolve an existing one. Triggers: /cofounder:skill-forge, 'create a skill', 'generate a skill', 'new generative skill', 'make a skill that ...'."
 ---
 
