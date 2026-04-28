@@ -1,6 +1,6 @@
 skill_forge_dir: /Users/wangzw/.claude/skills/skill-forge
 delivery_id: 3
-current_round: 9
+current_round: 10
 mode: review
 target: /Users/wangzw/workspace/cofounder/skills/prd-analysis
 forced_full_cross_review: false
@@ -28,7 +28,7 @@ round_8_notes: |
   revise-mode Step 2" carve-out deleted). Post-revise verdict:
   progressing (issue frontmatter still status:new — cross-review in
   round-9 will transition to resolved). Trend 21→6→2.
-mode_phase: idle-awaiting-review-round-10
+mode_phase: review-round-10-cross-reviewer-dispatched
 round_9_notes: |
   Round 9 cross-review + revise (post-revise verification of round-8 fixes).
   Phase A+B clean (0 script-tier issues). Skip-set focus = 5 leaves.
