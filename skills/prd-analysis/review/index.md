@@ -17,7 +17,7 @@ scripts/run-checkers.sh <target>/ round-<N>
 - **Phase A**: manifest validation + depgraph consistency + skip-set computation for round N.
   Outputs `<target>/.review/round-<N>/skip-set.yml` (lists `cross_reviewer_focus` and
   `cross_reviewer_skip` leaves) and manifest/depgraph issue files.
-- **Phase B**: runs all 12 script-type checkers (CR-S01..CR-S12) against the target tree;
+- **Phase B**: runs all script-type checkers (every entry with `checker_type: script` in `common/review-criteria.md`) against the target tree;
   aggregates all script-detected issues to
   `<target>/.review/round-<N>/issues/round-checker-output.json`.
 
@@ -66,7 +66,8 @@ carried-forward prior) issue set, and judge will rule based on the aggregate
 - **Dispatches**: `review/cross-reviewer-subagent.md`
 - **Sub-agent inputs**: leaves listed in `skip-set.yml cross_reviewer_focus`, previous-round issue
   frontmatter from `round-<N-1>/issues/`, writer self-review files at
-  `<target>/.review/round-<N>/self-reviews/`, and `common/review-criteria.md` (CR-L01..CR-L10).
+  `<target>/.review/round-<N>/self-reviews/`, and `common/review-criteria.md`
+  (every entry with `checker_type: llm`).
 - **Sub-agent outputs**: one issue file per issue found at
   `<target>/.review/round-<N>/issues/<issue-id>.md`.
 - **Orchestrator action on ACK**: record `trace_id` in `state.yml`. If ACK is `FAIL` → apply §16
@@ -124,5 +125,5 @@ severity (default: `critical`).
 
 ## Files in This Directory
 
-- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (LLM-type criteria CR-L01..CR-L10)
+- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (all LLM-type criteria — `checker_type: llm` in `common/review-criteria.md`)
 - [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)

@@ -1,13 +1,13 @@
 skill_forge_dir: /Users/wangzw/.claude/skills/skill-forge
 delivery_id: 3
-current_round: 8
+current_round: 9
 mode: review
 target: /Users/wangzw/workspace/cofounder/skills/prd-analysis
 forced_full_cross_review: false
 prior_delivery: 2
 prior_delivery_tag: delivery-2-llm-cross-review-fan-out
 last_verdict: progressing
-last_verdict_round: 8
+last_verdict_round: 9
 last_verdict_phase: post-revise
 round_7_notes: |
   CR-S16 violations resolved by manual bash mv/rm of 14 stray root-level
@@ -28,7 +28,22 @@ round_8_notes: |
   revise-mode Step 2" carve-out deleted). Post-revise verdict:
   progressing (issue frontmatter still status:new — cross-review in
   round-9 will transition to resolved). Trend 21→6→2.
-mode_phase: idle-awaiting-review-round-9
+mode_phase: idle-awaiting-review-round-10
+round_9_notes: |
+  Round 9 cross-review + revise (post-revise verification of round-8 fixes).
+  Phase A+B clean (0 script-tier issues). Skip-set focus = 5 leaves.
+  Cross-reviewer R9-V-001 (opus): R8-001 + R8-002 confirmed resolved;
+  1 new CR-L11 error R9-001 in review/index.md (3 stale CR-count ranges:
+  line 20 "CR-S01..CR-S12" vs canonical CR-S01..CR-S17; lines 69 + 127
+  "CR-L01..CR-L10" vs canonical CR-L01..CR-L11). Adversarial: skipped
+  (no critical). Pre-revise verdict: progressing.
+  Revise: single reviser R9-R-001 (sonnet) rewrote review/index.md lines
+  20, 69, 127 with namespace-based phrasing (checker_type: script /
+  checker_type: llm). R9-001 status stays `new` pending round-10
+  cross-reviewer verification. Post-revise summarizer R9-S-002 timed out
+  (stream idle); retry R9-S-003 (haiku) succeeded. Post-revise judge
+  R9-J-002: progressing (next_action: revise → operator runs --review
+  for round-10). Trend 21→6→2→1.
 revise_skipped_skeleton_protected:
   - issue: R6-V003-004
     file: scripts/lib/aggregate.py
