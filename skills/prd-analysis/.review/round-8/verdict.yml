@@ -1,0 +1,15 @@
+phase: post-revise
+round: 8
+delivery_id: 3
+verdict: progressing
+next_action: revise
+evidence:
+  open_issues: 2
+  critical_count: 0
+  error_count: 2
+  regressed_count: 0
+  coverage_percent: 100
+  writer_fail_count_sum: 0
+  rounds_elapsed: 3
+  oscillating_pairs: []
+notes: Post-revise re-evaluation. All 6 round-7 issues confirmed resolved. 2 derivative fixes (R8-R-001, R8-R-002) committed to disk await round-9 cross-review verification. Trend strongly positive (21→6→2). No critical, no regressions, no oscillation.

@@ -1,8 +1,8 @@
 # Parallel Dispatch Protocol
 
-Shared dispatch rules for fan-out generation of feature/journey/architecture leaves (generation Step 3),
-review subagents (review-mode Step 2), the clustering subagent (revise-mode Pre-Answered Mode), and
-fix subagents (revise-mode Step 5). These rules take precedence over any per-mode wording that conflicts.
+Shared dispatch rules for fan-out generation of feature/journey/architecture leaves (generation
+Step 3), review subagents (review-mode Step 2), and per-issue reviser subagents (revise-mode
+Step 2 fan-out). These rules take precedence over any per-mode wording that conflicts.
 
 ---
 
