@@ -31,3 +31,8 @@ notes: |
   CR-S16 added to review-criteria.md, plus check-skill-structure.sh updates).
   Forced-full cross-review is in effect for the first cross-reviewer dispatch
   of this delivery. 3-way fan-out across 66 focus leaves, mirroring delivery-2.
+# Pre-seeded by hand for round-8 to capture skill-forge 0.2.0 → 0.2.2 drift.
+# Rounds 6/7 were reviewed under skill-forge 0.2.0 criteria; 0.2.1 introduced
+# (and 0.2.2 corrected) the scaffolder_version drift detector. After round-8,
+# run-checkers.sh advances this to 0.2.2 automatically.
+reviewer_version_seen: "0.2.2"

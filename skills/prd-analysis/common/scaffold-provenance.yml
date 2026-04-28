@@ -4,6 +4,13 @@
 # provenance=scaffold and default into cross_reviewer_skip. Writer /
 # reviser dispatches mutate a file → sha drifts → provenance=authored →
 # file re-enters cross_reviewer_focus automatically.
+#
+# `scaffolder_version` records the version of the generator that produced
+# this skill (skill-forge for skill-forge-scaffolded skills; whatever
+# generator owns scaffold.sh in the recursive case). run-checkers.sh
+# compares it to state.yml.reviewer_version_seen and auto-forces a full
+# review when they drift — old criteria pass under new criteria fail.
+scaffolder_version: "0.2.2"
 files:
   SKILL.md: 687e639bf09395f552b2e7bdc8598637565cd3204e2c30c205f5d8058dab4db2
   shared/judge-subagent.md: 39d1434ad14e5d1e16f50b9efa0dcda8ccd0c01a985ac72b1f4c503da85e58b6

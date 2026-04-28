@@ -44,6 +44,60 @@ if ! echo "$ROUND" | grep -qE '^round-[0-9]+$'; then
   exit 2
 fi
 
+# Auto-force-full when the scaffolder (the generator that produced this skill)
+# has bumped version since the last recorded round.
+#
+# Why we read scaffold-provenance.yml, not $SCRIPT_DIR/../SKILL.md:
+#   run-checkers.sh is COPIED into every scaffolded skill, so $SCRIPT_DIR/..
+#   resolves to the target itself — yielding the target's own version, not
+#   the scaffolder's. The target's version doesn't change when the scaffolder
+#   bumps (e.g. skill-forge 0.2.1 → 0.2.2 propagates new scripts into
+#   prd-analysis without touching prd-analysis's SKILL.md), so a comparison
+#   against state.yml never detects criteria-bundle drift. The 0.2.1 release
+#   of skill-forge had this exact bug; this 0.2.2 logic fixes it.
+#
+# Source of truth: scaffold-provenance.yml carries `scaffolder_version`,
+# written by the scaffolder (e.g. skill-forge/scripts/scaffold.sh) at scaffold
+# time AND on every re-scaffold. When the scaffolder's logic / criteria / prompts
+# evolve, propagation rewrites scaffold-provenance.yml with the new version,
+# this comparison detects it, and force-full overrides the incremental
+# skip-set so reviewer changes don't silently miss leaves.
+#
+# Self-review fallback: a generator (e.g. skill-forge reviewing skill-forge)
+# is not scaffolded, so it has no scaffold-provenance.yml. In that case we
+# read $TARGET/SKILL.md directly — for self-review, target IS the scaffolder.
+#
+# This concept recurses: if prd-analysis ever generates a sub-skill, the
+# sub-skill's scaffold-provenance.yml records prd-analysis's version (since
+# prd-analysis owns scaffold.sh in that case). The same logic applies.
+#
+# After a successful round, state.yml's `reviewer_version_seen` is updated to
+# the current scaffolder_version so the next round has a baseline.
+STATE_YML="$TARGET/.review/state.yml"
+PROVENANCE_YML="$TARGET/common/scaffold-provenance.yml"
+LAST_SEEN_VERSION=""
+if [ -f "$STATE_YML" ]; then
+  LAST_SEEN_VERSION=$(grep -E '^reviewer_version_seen:' "$STATE_YML" | head -1 \
+    | sed -E 's/^reviewer_version_seen:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+CURRENT_REVIEWER_VERSION=""
+if [ -f "$PROVENANCE_YML" ]; then
+  CURRENT_REVIEWER_VERSION=$(grep -E '^scaffolder_version:' "$PROVENANCE_YML" | head -1 \
+    | sed -E 's/^scaffolder_version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+# Self-review fallback: TARGET IS the scaffolder (generators aren't scaffolded
+# themselves, so there is no provenance file). Read its own SKILL.md.
+if [ -z "$CURRENT_REVIEWER_VERSION" ] && [ -f "$TARGET/SKILL.md" ]; then
+  CURRENT_REVIEWER_VERSION=$(grep -E '^version:' "$TARGET/SKILL.md" | head -1 \
+    | sed -E 's/^version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -n "$LAST_SEEN_VERSION" ] \
+   && [ "$CURRENT_REVIEWER_VERSION" != "$LAST_SEEN_VERSION" ] \
+   && [ "$FORCED_FULL" = "0" ]; then
+  echo "INFO: scaffolder version changed (${LAST_SEEN_VERSION} → ${CURRENT_REVIEWER_VERSION}); auto-forcing full review (incremental skip-set would miss leaves that pass under old criteria but fail under new)" >&2
+  FORCED_FULL=1
+fi
+
 ROUND_NUM="${ROUND#round-}"
 PREV_ROUND_NUM=$((ROUND_NUM - 1))
 ROUND_DIR="${TARGET}/.review/${ROUND}"
@@ -563,6 +617,7 @@ print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
 # converged round just because the cross-reviewer wasn't re-dispatched.
 # ────────────────────────────────────────────────────────────────────────────
 carried_forward = 0
+auto_resolved = 0
 if round_num > 1:
     prev_round_dir = os.path.join(
         os.path.dirname(round_dir), f"round-{round_num - 1}")
@@ -583,6 +638,17 @@ if round_num > 1:
                     cross_skip.append(leaf)
                 elif s and not s.startswith("  "):
                     in_skip = False
+    # Build a fingerprint set of (criterion_id, file) pairs found by THIS round's
+    # script-type checks. Used to auto-clear stale script-type carry-forwards: if
+    # a prior CR-S* issue's (criterion_id, file) does not appear in this round's
+    # findings, the underlying script no longer reports it (e.g. the script bug
+    # was fixed, or the file was edited to satisfy the rule via a non-targeted
+    # change). Such issues MUST NOT be carried forward — that would propagate a
+    # phantom finding indefinitely.
+    current_script_pairs = {
+        (i.get("criterion_id", ""), i.get("file", ""))
+        for i in all_issues
+    }
     if os.path.isdir(prev_issues_dir) and cross_skip:
         cross_skip_set = set(cross_skip)
         for fname in sorted(os.listdir(prev_issues_dir)):
@@ -615,6 +681,24 @@ if round_num > 1:
                 # Leaf was re-evaluated this round; do NOT carry forward.
                 # Cross-reviewer will explicitly mark resolved/persistent.
                 continue
+            # Auto-clear stale script-type issues: a prior issue is script-type
+            # iff its `source` is `script` (filed by run-checkers in some round)
+            # or `carry-forward` (propagated from a script-type origin). Script
+            # checks run on the whole tree every round, so absence of the
+            # (criterion_id, file) pair from this round's `all_issues` is
+            # authoritative — the originating script no longer reports it.
+            # Skip the carry-forward; the issue is resolved, even if the leaf
+            # is in cross_reviewer_skip.
+            #
+            # LLM-type issues (`source: cross-reviewer` / `adversarial-reviewer`)
+            # are NOT auto-resolved here: those reviewers don't run every round,
+            # so script absence carries no information about their criteria.
+            origin = fm.get("source", "")
+            crit = fm.get("criterion_id", "")
+            if origin in ("script", "carry-forward") \
+                    and (crit, leaf) not in current_script_pairs:
+                auto_resolved += 1
+                continue
             new_id = f"R{round_num}-{next_seq:03d}"
             next_seq += 1
             out_md_path = os.path.join(issues_dir, new_id + ".md")
@@ -642,6 +726,8 @@ if round_num > 1:
             carried_forward += 1
 if carried_forward:
     print(f"OK carry-forward: {carried_forward} open issues inherited from round-{round_num-1}")
+if auto_resolved:
+    print(f"OK auto-resolved: {auto_resolved} stale script-type issues dropped (originating script no longer reports them)")
 
 # Clean up temp state
 try:
@@ -658,4 +744,27 @@ set -e
 if [ $EXIT_CODE -eq 1 ]; then
   echo "INFO: checkers found critical/error issues (exit 1)" >&2
 fi
+
+# Record current reviewer version in state.yml so the NEXT round's
+# version-drift check has a baseline. We do this after the skip-set is
+# written (regardless of has-blocking), so a round that found issues still
+# advances the seen-version pointer — the issues themselves don't invalidate
+# the version comparison for the next round's skip-set computation.
+if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -f "$STATE_YML" ]; then
+  if grep -q '^reviewer_version_seen:' "$STATE_YML"; then
+    python3 - "$STATE_YML" "$CURRENT_REVIEWER_VERSION" <<'PYEOF'
+import sys, re
+path, ver = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as f:
+    text = f.read()
+text = re.sub(r'^reviewer_version_seen:.*$',
+              f'reviewer_version_seen: "{ver}"', text, count=1, flags=re.MULTILINE)
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(text)
+PYEOF
+  else
+    echo "reviewer_version_seen: \"$CURRENT_REVIEWER_VERSION\"" >> "$STATE_YML"
+  fi
+fi
+
 exit $EXIT_CODE
