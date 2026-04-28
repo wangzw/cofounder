@@ -116,12 +116,12 @@ Each entry in `add` and `modify` MUST include:
 
 ### Reasoning Guidelines
 
-- For FromScratch: derive the file list from `clarification.yml` R-001 through R-007. The
-  artifact type (R-002) determines which skeleton variant was used; domain-specific files are the
-  ones writers must fill.
+- For FromScratch: derive the file list from `clarification.yml` R-001 through R-006. The
+  skeleton at `common/skeleton/document/` provides the boilerplate scaffold; domain-specific files
+  are the ones writers must fill.
 - For NewVersion: compare `input.md` change description against `versions/<N-1>.md` to determine
   which existing files are affected. Files not mentioned in the change scope go to `keep`.
-- Do not add files not listed in any skeleton variant. If the user's requirement implies a novel
+- Do not add files not listed in the skeleton. If the user's requirement implies a novel
   file, note it in `rationale` and add it to `add` with `template: null`.
 
 ### ACK Format

@@ -100,7 +100,7 @@ ACK format matches Snippet D specification.
 ## Checklist
 
 - CR-S01 skill-md-frontmatter: PASS
-- CR-S02 mode-routing-complete: FAIL — blocker_scope: input-ambiguity — note: clarification.yml R-007 is deferred; new-version semantics row in mode routing table cannot be fully specified without it
+- CR-S02 mode-routing-complete: FAIL — blocker_scope: input-ambiguity — note: clarification.yml R-006 is deferred; new-version semantics row in mode routing table cannot be fully specified without it
 - CR-S09 dispatch-log-snippet: PASS
 - CR-L01 orchestrator-pure-dispatch: PASS
 - CR-L04 model-tiers-declared: PASS
@@ -109,7 +109,7 @@ ACK format matches Snippet D specification.
 
 **FULL_PASS**: no
 **fail_count**: 1
-**Scope notes**: CR-S02 FAIL is input-ambiguity on R-007 (new-version mode row). Cross-reviewer
-should verify whether deferred R-007 materially affects mode routing completeness or if the
+**Scope notes**: CR-S02 FAIL is input-ambiguity on R-006 (new-version mode row). Cross-reviewer
+should verify whether deferred R-006 materially affects mode routing completeness or if the
 default new-version row is sufficient.
 ```

@@ -77,7 +77,7 @@ MUST return `OK ... self_review_status=PARTIAL fail_count=<N>`.
 
 ### Purpose
 
-Clarify user intent until all requirements R-001 through R-007 are unambiguous. Convert sparse
+Clarify user intent until all requirements R-001 through R-006 are unambiguous. Convert sparse
 natural-language input into a structured `clarification.yml` the planner can act on directly.
 
 ### Input Contract
@@ -91,7 +91,7 @@ Read these files (provided by orchestrator via injected context or file paths):
 | `<target>/.review/round-0/trigger-flags.yml` | Always |
 | `<skill-forge>/common/domain-glossary.md` | Always |
 | `<target>/README.md` | NewVersion only |
-| `<skill-forge>/common/skeleton/<variant>/README.md` | After R-002 resolved (variant known) |
+| `<skill-forge>/common/skeleton/document/README.md` | Always (skeleton-replay step) |
 
 ### Output Contract
 
@@ -107,35 +107,32 @@ Content shape:
 
 ```yaml
 # Flat placeholder keys — REQUIRED top-level mapping consumed by scripts/scaffold.sh.
-# Must be derived from the resolved R-001..R-003 values. scaffold.sh's parse_yaml_simple
+# Must be derived from the resolved R-001..R-002 values. scaffold.sh's parse_yaml_simple
 # reads only top-level flat `KEY: "value"` lines; these four keys must be present
 # BEFORE any nested block.
 SKILL_NAME: "<R-001 slug>"                    # e.g. "decision-log"
 SKILL_VERSION: "0.1.0"                        # always 0.1.0 for FromScratch; consultant may override if user asks
 SKILL_DESCRIPTION: "<one-line 'Use when' description>"
-ARTIFACT_ROOT: "<R-003 artifact root path>"   # e.g. "docs/raw/decision-log/"
+ARTIFACT_ROOT: "<artifact root path>"         # e.g. "docs/raw/decision-log/" — typically docs/raw/<R-001 slug>/
 
 clarification_at: "2026-04-24T10:15:00Z"
 normalized_requirements:
   R-001:  # target skill name and namespace
     value: "<slug>"
     status: confirmed | deferred
-  R-002:  # artifact type: document | code | schema | hybrid
-    value: "<type>"
-    status: confirmed | deferred
-  R-003:  # artifact structure (file count, naming, index shape)
+  R-002:  # artifact structure (file count, naming, index shape)
     value: "<description>"
     status: confirmed | deferred
-  R-004:  # input modality (conversational / file-ref / --interactive flag)
+  R-003:  # input modality (conversational / file-ref / --interactive flag)
     value: "<description>"
     status: confirmed | deferred
-  R-005:  # structural review criteria (script-type CRs applicable to artifact type)
+  R-004:  # structural review criteria (script-type CRs applicable to artifact)
     value: "<description>"
     status: confirmed | deferred
-  R-006:  # semantic review criteria (LLM-type CRs)
+  R-005:  # semantic review criteria (LLM-type CRs)
     value: "<description>"
     status: confirmed | deferred
-  R-007:  # new-version semantics (only relevant when evolving an existing skill)
+  R-006:  # new-version semantics (only relevant when evolving an existing skill)
     value: "<description>"
     status: confirmed | deferred | not-applicable
 domain_terms_aligned:
@@ -151,11 +148,11 @@ in the skeleton will be left un-substituted, silently polluting the scaffolded a
 ### Dialogue Behavior
 
 - **Multi-turn**: ask ONE question per turn. Do not ask multiple questions at once.
-- **Order**: resolve R-002 (artifact type) first — it determines which skeleton README to load.
-- **Variant replay** (after R-002 confirmed): read `common/skeleton/<variant>/README.md` and
-  present a one-paragraph summary to the user anchoring R-003/R-005/R-006 to concrete expectations
+- **Order**: resolve R-001 (skill name) first, then R-002 (artifact structure).
+- **Skeleton replay** (after R-001/R-002 confirmed): read `common/skeleton/document/README.md` and
+  present a one-paragraph summary to the user anchoring R-002/R-004/R-005 to concrete expectations
   (e.g., "Your skill will produce 8 markdown files following this structure: …"). This is the
-  variant-replay step — it aligns the user's mental model with the skeleton before asking about
+  skeleton-replay step — it aligns the user's mental model with the skeleton before asking about
   review criteria.
 - **Confirmed vs deferred**: mark a requirement `deferred` only if the user explicitly says "default
   is fine" or similar; do not defer ambiguous requirements without asking.

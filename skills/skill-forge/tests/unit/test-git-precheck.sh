@@ -43,43 +43,39 @@ TRACKED=$(git -C "$TMP" ls-tree -r HEAD --name-only 2>/dev/null | wc -l | tr -d 
   || { echo "FAIL: precheck deleted cwd content"; exit 1; }
 echo "PASS: bootstrap commit uses --allow-empty (0638f6d)"
 
-# Test 5: skeleton git-precheck.sh files MUST also bootstrap successfully when run
-# in a non-git directory. Earlier the skeleton variants shipped with
+# Test 5: the document-skeleton git-precheck.sh MUST also bootstrap successfully
+# when run in a non-git directory. Earlier the skeleton shipped with
 # `git -c user.name=this skill -c user.email=this skill@local` — unquoted values
 # with embedded whitespace. bash word-splits these, git sees `skill` as a positional
 # arg and aborts with `git: 'skill' is not a git command`, breaking bootstrap for
 # every freshly-scaffolded skill that lands in a non-repo directory.
 #
-# This test runs each of the 4 skeleton variants' git-precheck.sh in a fresh
-# non-git tmp dir and verifies bootstrap succeeds (exit 0 + .git exists + 0
-# tracked files).
-SKELETON_ROOT="$HERE/../../common/skeleton"
-for variant in code document hybrid schema; do
-  SKEL_SCRIPT="$SKELETON_ROOT/$variant/scripts/git-precheck.sh"
-  [ -x "$SKEL_SCRIPT" ] || { echo "FAIL: skeleton $variant git-precheck.sh not executable"; exit 1; }
+# This test runs the document-skeleton's git-precheck.sh in a fresh non-git tmp dir
+# and verifies bootstrap succeeds (exit 0 + .git exists + 0 tracked files).
+SKEL_SCRIPT="$HERE/../../common/skeleton/document/scripts/git-precheck.sh"
+[ -x "$SKEL_SCRIPT" ] || { echo "FAIL: skeleton git-precheck.sh not executable"; exit 1; }
 
-  TMP_VAR=$(mktemp -d)
-  set +e
-  (cd "$TMP_VAR" && "$SKEL_SCRIPT") >/dev/null 2>&1
-  ec=$?
-  set -e
-  if [ "$ec" != "0" ]; then
-    rm -rf "$TMP_VAR"
-    echo "FAIL: skeleton $variant git-precheck.sh exited $ec in non-git dir (quoting bug?)"
-    exit 1
-  fi
-  [ -d "$TMP_VAR/.git" ] || {
-    rm -rf "$TMP_VAR"
-    echo "FAIL: skeleton $variant did not create .git/ on bootstrap"
-    exit 1
-  }
-  TRACKED=$(git -C "$TMP_VAR" ls-tree -r HEAD --name-only 2>/dev/null | wc -l | tr -d ' ')
+TMP_VAR=$(mktemp -d)
+set +e
+(cd "$TMP_VAR" && "$SKEL_SCRIPT") >/dev/null 2>&1
+ec=$?
+set -e
+if [ "$ec" != "0" ]; then
   rm -rf "$TMP_VAR"
-  [ "$TRACKED" = "0" ] || {
-    echo "FAIL: skeleton $variant bootstrap commit staged $TRACKED files"
-    exit 1
-  }
-done
-echo "PASS: all 4 skeleton git-precheck.sh variants bootstrap cleanly in non-git dir"
+  echo "FAIL: skeleton git-precheck.sh exited $ec in non-git dir (quoting bug?)"
+  exit 1
+fi
+[ -d "$TMP_VAR/.git" ] || {
+  rm -rf "$TMP_VAR"
+  echo "FAIL: skeleton did not create .git/ on bootstrap"
+  exit 1
+}
+TRACKED=$(git -C "$TMP_VAR" ls-tree -r HEAD --name-only 2>/dev/null | wc -l | tr -d ' ')
+rm -rf "$TMP_VAR"
+[ "$TRACKED" = "0" ] || {
+  echo "FAIL: skeleton bootstrap commit staged $TRACKED files"
+  exit 1
+}
+echo "PASS: document-skeleton git-precheck.sh bootstraps cleanly in non-git dir"
 
 echo "PASS test-git-precheck.sh"

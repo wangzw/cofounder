@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
-# scaffold.sh — copy skeleton variant tree with placeholder substitution
-# Usage: scaffold.sh <variant> <target-path> <clarification-yml-path>
-# Variants: document, code, schema, hybrid
+# scaffold.sh — copy skeleton tree with placeholder substitution
+# Usage: scaffold.sh <target-path> <clarification-yml-path>
 # Exit: 0=success, 2=error
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_FORGE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VALID_VARIANTS=("document" "code" "schema" "hybrid")
-
 usage() {
   cat <<'EOF'
-Usage: scaffold.sh <variant> <target-path> <clarification-yml-path>
+Usage: scaffold.sh <target-path> <clarification-yml-path>
 
-Copy a skeleton variant tree to <target-path> with placeholder substitution.
+Copy the skeleton tree to <target-path> with placeholder substitution.
 
 Arguments:
-  variant               Scaffold variant: document | code | schema | hybrid
   target-path           Destination directory for the scaffolded skill
   clarification-yml-path YAML file with placeholder values from domain-consultant
 
@@ -28,10 +24,9 @@ Supported placeholders in skeleton files:
   {{SKILL_DESCRIPTION}} The skill description (must start with "Use when")
 
 Notes:
-  - Skeletons live at <generator-skill-root>/common/skeleton/<variant>/
+  - The skeleton lives at <generator-skill-root>/common/skeleton/document/
     (the generator is whatever meta-skill invokes this script; for skill-forge
     the root is skill-forge itself — this comment is tool-agnostic).
-  - scaffold.sh exits 2 if the skeleton for the requested variant is not yet implemented
   - scaffold.sh exits 2 if target-path exists and any file drifts from the skeleton
   - scripts/metrics-aggregate.sh and scripts/lib/aggregate.py are never substituted
     (they are sha-pinned shared infrastructure)
@@ -43,31 +38,20 @@ if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   exit 0
 fi
 
-VARIANT="${1:-}"
-TARGET_PATH="${2:-}"
-CLARIFICATION_YML="${3:-}"
+TARGET_PATH="${1:-}"
+CLARIFICATION_YML="${2:-}"
 
-if [ -z "$VARIANT" ] || [ -z "$TARGET_PATH" ] || [ -z "$CLARIFICATION_YML" ]; then
-  echo "ERROR: three arguments required: variant, target-path, clarification-yml-path" >&2
+if [ -z "$TARGET_PATH" ] || [ -z "$CLARIFICATION_YML" ]; then
+  echo "ERROR: two arguments required: target-path, clarification-yml-path" >&2
   usage >&2
   exit 2
 fi
 
-# Validate variant
-VALID=false
-for v in "${VALID_VARIANTS[@]}"; do
-  [ "$VARIANT" = "$v" ] && VALID=true && break
-done
-if [ "$VALID" = "false" ]; then
-  echo "ERROR: unknown variant '${VARIANT}'; must be one of: ${VALID_VARIANTS[*]}" >&2
-  exit 2
-fi
-
-SKELETON_DIR="${SKILL_FORGE_DIR}/common/skeleton/${VARIANT}"
+SKELETON_DIR="${SKILL_FORGE_DIR}/common/skeleton/document"
 
 # Check skeleton exists
 if [ ! -d "$SKELETON_DIR" ]; then
-  echo "ERROR: skeleton for variant '${VARIANT}' not yet implemented" >&2
+  echo "ERROR: skeleton not found at ${SKELETON_DIR}" >&2
   exit 2
 fi
 

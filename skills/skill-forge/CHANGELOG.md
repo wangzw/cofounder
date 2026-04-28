@@ -7,6 +7,69 @@ skill-forge release history. Versions follow semantic versioning per
 
 ---
 
+## 0.4.0 — 2026-04-28
+
+### Changed (BREAKING, scope reduction)
+
+- **Skeleton variants collapsed to `document` only.** The `code`, `schema`, and
+  `hybrid` skeletons under `common/skeleton/` have been removed. skill-forge
+  now generates only document-shaped skills (markdown artifact trees per
+  guide §7.1). This is a substantial simplification — the four variants
+  shared ~95% of their structure and differed only in the artifact-template
+  hints, two extension scripts (`check-lint.sh` for code, `check-breaking-
+  changes.sh` for schema), and a per-variant comment in `run-checkers.sh`.
+  In practice all skill-forge usage in cofounder produces document skills,
+  so the variant routing was inert overhead.
+
+  Concrete changes:
+  - Deleted `common/skeleton/{code,schema,hybrid}/` (3 directory trees).
+  - `scripts/scaffold.sh` (canonical + document-skeleton mirror): dropped
+    the `<variant>` positional arg; signature is now
+    `scaffold.sh <target-path> <clarification-yml-path>`. Skeleton path
+    is hard-coded to `common/skeleton/document/`.
+  - `generate/domain-consultant-subagent.md`: R-002 (artifact type:
+    document/code/schema/hybrid) removed; R-003..R-007 renumbered to
+    R-002..R-006. Variant-replay step renamed to skeleton-replay (always
+    loads `common/skeleton/document/README.md`).
+  - `SKILL.md`, `generate/from-scratch.md`, `generate/new-version.md`,
+    `generate/planner-subagent.md`, `generate/in-generate-review.md`,
+    `common/templates/{artifact,skill-md,writer-subagent,review-criteria}-
+    template.md`, `tests/bootstrap/input.md`: removed `<variant>` placeholders
+    and `clarification.artifact_variant` field references.
+  - `tests/unit/test-skeleton-identity.sh`: deleted (cross-variant identity
+    check is no longer meaningful with one variant).
+  - `tests/unit/test-skeleton-self-contained.sh`,
+    `tests/unit/test-git-precheck.sh`,
+    `tests/unit/test-mode-boundary-no-auto-chain.sh`,
+    `tests/unit/test-reviser-global-conflict.sh`,
+    `tests/unit/test-aggregate-trace-id-regex.sh`,
+    `tests/unit/test-criteria-references.sh`: per-variant loops collapsed
+    to single document-skeleton checks.
+  - `tests/unit/test-scaffold.sh`: removed unknown-variant + non-existent-
+    skeleton tests; remaining scaffold invocations no longer pass a variant
+    arg.
+
+  **Migration**:
+  - **scaffold.sh callers**: drop the leading `<variant>` argument. New
+    signature: `scaffold.sh <target-path> <clarification-yml-path>`.
+  - **clarification.yml flat placeholder keys**: unchanged — `SKILL_NAME`,
+    `SKILL_VERSION`, `SKILL_DESCRIPTION`, `ARTIFACT_ROOT` are still required.
+  - **clarification.yml `normalized_requirements`**: R-002 (the old
+    "artifact type" key holding `'document'` / `'code'` / `'schema'` /
+    `'hybrid'`) is gone. R-003..R-007 are renumbered down by one:
+    - R-003 (artifact structure) → R-002
+    - R-004 (input modality) → R-003
+    - R-005 (structural review criteria) → R-004
+    - R-006 (semantic review criteria) → R-005
+    - R-007 (new-version semantics) → R-006
+
+    Any tooling that read `normalized_requirements.R-002.value` previously
+    expected `'document'` etc.; it must drop that read entirely (the new
+    R-002 holds the artifact-structure description). Tooling that read
+    R-003..R-007 must shift its index down by one.
+
+---
+
 ## 0.3.0 — 2026-04-28
 
 ### Changed (behaviour, mode-boundary)

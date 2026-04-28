@@ -19,52 +19,12 @@ else
   fail "scaffold.sh not found or not executable at $SCAFFOLD"
 fi
 
-# --- --help contains "variant" ---
+# --- --help contains "skeleton" ---
 HELP_OUTPUT=$("$SCAFFOLD" --help 2>&1 || true)
-if echo "$HELP_OUTPUT" | grep -q 'variant'; then
-  pass "--help output contains 'variant'"
+if echo "$HELP_OUTPUT" | grep -q 'skeleton'; then
+  pass "--help output contains 'skeleton'"
 else
-  fail "--help should contain 'variant'"
-fi
-
-# --- Unknown variant -> exit 2 with clear error ---
-set +e
-OUTPUT=$("$SCAFFOLD" "unknownvariant" "/tmp/test-scaffold-target" "/dev/null" 2>&1)
-EXIT_CODE=$?
-set -e
-if [ "$EXIT_CODE" -eq 2 ]; then
-  pass "unknown variant -> exit 2"
-else
-  fail "unknown variant should exit 2; got $EXIT_CODE"
-fi
-if echo "$OUTPUT" | grep -qi 'unknown variant\|must be one of'; then
-  pass "unknown variant error message is clear"
-else
-  fail "unknown variant error should mention variant; got: $OUTPUT"
-fi
-
-# --- Non-existent skeleton path -> exit 2 ---
-# 'document' variant skeleton doesn't exist yet (Phase 7)
-SKILL_FORGE_DIR="$(cd "${SCRIPTS_DIR}/.." && pwd)"
-SKEL_DIR="${SKILL_FORGE_DIR}/common/skeleton/document"
-if [ ! -d "$SKEL_DIR" ]; then
-  set +e
-  OUTPUT=$("$SCAFFOLD" "document" "/tmp/test-scaffold-doc-target" "/dev/null" 2>&1)
-  EXIT_CODE=$?
-  set -e
-  if [ "$EXIT_CODE" -eq 2 ]; then
-    pass "non-existent skeleton -> exit 2"
-  else
-    fail "non-existent skeleton should exit 2; got $EXIT_CODE"
-  fi
-  if echo "$OUTPUT" | grep -qi 'not yet implemented\|skeleton'; then
-    pass "non-existent skeleton error message is clear"
-  else
-    fail "non-existent skeleton error should mention skeleton; got: $OUTPUT"
-  fi
-else
-  pass "skeleton/document exists — non-existent test skipped (Phase 7 complete)"
-  pass "non-existent skeleton error message skipped"
+  fail "--help should contain 'skeleton'"
 fi
 
 # --- Missing arguments -> exit 2 ---
@@ -105,7 +65,7 @@ normalized_requirements:
 EOF
 TARGET_NESTED="$TMP_FIXTURE/target-nested-bad"
 set +e
-OUTPUT=$("$SCAFFOLD" document "$TARGET_NESTED" "$NESTED_BAD" 2>&1)
+OUTPUT=$("$SCAFFOLD" "$TARGET_NESTED" "$NESTED_BAD" 2>&1)
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -ne 0 ]; then
@@ -125,11 +85,11 @@ rm -f "$NESTED_BAD"
 # (sha-stable files); only drift would error. Earlier the script unconditionally
 # refused if the target dir existed.
 TARGET_IDEM="$TMP_FIXTURE/target-idempotent"
-"$SCAFFOLD" document "$TARGET_IDEM" "$TMP_FIXTURE/clarification.yml" >/dev/null 2>&1 \
+"$SCAFFOLD" "$TARGET_IDEM" "$TMP_FIXTURE/clarification.yml" >/dev/null 2>&1 \
   && pass "first scaffold run succeeds" \
   || fail "first scaffold run failed unexpectedly"
 set +e
-OUTPUT=$("$SCAFFOLD" document "$TARGET_IDEM" "$TMP_FIXTURE/clarification.yml" 2>&1)
+OUTPUT=$("$SCAFFOLD" "$TARGET_IDEM" "$TMP_FIXTURE/clarification.yml" 2>&1)
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -eq 0 ]; then
@@ -147,7 +107,7 @@ TARGET_FRESH="$TMP_FIXTURE/target-only-review"
 mkdir -p "$TARGET_FRESH/.review/round-0"
 echo "input" > "$TARGET_FRESH/.review/round-0/input.md"
 set +e
-OUTPUT=$("$SCAFFOLD" document "$TARGET_FRESH" "$TMP_FIXTURE/clarification.yml" 2>&1)
+OUTPUT=$("$SCAFFOLD" "$TARGET_FRESH" "$TMP_FIXTURE/clarification.yml" 2>&1)
 EXIT_CODE=$?
 set -e
 if [ "$EXIT_CODE" -eq 0 ]; then

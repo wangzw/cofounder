@@ -13,7 +13,7 @@
 # 0.3.0 makes each top-level /skill-forge --<mode> invocation single-phase:
 # the orchestrator updates state.yml mode_phase to signal the next phase
 # the operator should invoke, and exits. This test asserts that property
-# at the spec level (canonical + 4 skeleton variants).
+# at the spec level (canonical + document skeleton).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$HERE/../.."
@@ -23,15 +23,12 @@ fail() {
   exit 1
 }
 
-# The 5 review/index.md files (canonical + 4 skeletons) MUST contain the
-# exit-on-progressing semantics on Step 7's `progressing` row, and MUST
+# The 2 review/index.md files (canonical + document skeleton) MUST contain
+# the exit-on-progressing semantics on Step 7's `progressing` row, and MUST
 # NOT contain the legacy auto-chain phrase.
 REVIEW_FILES=(
   "$ROOT/review/index.md"
-  "$ROOT/common/skeleton/code/review/index.md"
   "$ROOT/common/skeleton/document/review/index.md"
-  "$ROOT/common/skeleton/hybrid/review/index.md"
-  "$ROOT/common/skeleton/schema/review/index.md"
 )
 
 for f in "${REVIEW_FILES[@]}"; do
@@ -61,15 +58,12 @@ for f in "${REVIEW_FILES[@]}"; do
   fi
 done
 
-# The 5 revise/index.md files MUST contain the exit-on-progressing semantics
+# The 2 revise/index.md files MUST contain the exit-on-progressing semantics
 # on Step 5's `progressing` row, and MUST NOT contain the legacy
 # loop-back-to-review phrase.
 REVISE_FILES=(
   "$ROOT/revise/index.md"
-  "$ROOT/common/skeleton/code/revise/index.md"
   "$ROOT/common/skeleton/document/revise/index.md"
-  "$ROOT/common/skeleton/hybrid/revise/index.md"
-  "$ROOT/common/skeleton/schema/revise/index.md"
 )
 
 for f in "${REVISE_FILES[@]}"; do
@@ -91,4 +85,4 @@ for f in "${REVISE_FILES[@]}"; do
   fi
 done
 
-echo "OK mode-boundary no-auto-chain (10 files: 5 review + 5 revise)"
+echo "OK mode-boundary no-auto-chain (4 files: 2 review + 2 revise)"

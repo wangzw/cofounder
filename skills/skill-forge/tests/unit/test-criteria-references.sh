@@ -17,7 +17,7 @@
 #      matches the actual LLM count.
 #   4. No stale `CR-L01..CR-L10` references exist outside of historical
 #      review-archive content (.review/) or test files.
-#   5. CR-L11 specifically is present in main + all 4 skeleton variants
+#   5. CR-L11 specifically is present in main + the document skeleton
 #      (forward regression guard for the round-6 fix).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -65,13 +65,11 @@ STALE_HITS=$(grep -rn 'CR-L01\.\.CR-L10\b' "$ROOT" 2>/dev/null \
   || { echo "FAIL: stale 'CR-L01..CR-L10' references exist:"; echo "$STALE_HITS"; exit 1; }
 echo "PASS: no stale CR-L01..CR-L10 references"
 
-# Test 5: CR-L11 present in main + all 4 skeleton variants
+# Test 5: CR-L11 present in main + document skeleton
 grep -q '^- id: CR-L11$' "$ROOT/common/review-criteria.md" \
   || { echo "FAIL: CR-L11 missing from main review-criteria.md"; exit 1; }
-for v in code document hybrid schema; do
-  grep -q '^- id: CR-L11$' "$ROOT/common/skeleton/$v/common/review-criteria.md" \
-    || { echo "FAIL: CR-L11 missing from skeleton/$v/common/review-criteria.md"; exit 1; }
-done
-echo "PASS: CR-L11 cross-reference-consistency present in main + 4 skeletons"
+grep -q '^- id: CR-L11$' "$ROOT/common/skeleton/document/common/review-criteria.md" \
+  || { echo "FAIL: CR-L11 missing from skeleton/document/common/review-criteria.md"; exit 1; }
+echo "PASS: CR-L11 cross-reference-consistency present in main + document skeleton"
 
 echo "=== PASS test-criteria-references.sh (5 sub-tests) ==="

@@ -85,7 +85,6 @@ Each CR entry MUST contain:
 Draw from `clarification.yml`:
 - `clarification.domain_code` → DOMAIN prefix for CR IDs
 - `clarification.review_criteria[]` → list of domain-specific criteria to author
-- `clarification.artifact_variant` → determines which structural checks are relevant
 
 ---
 

@@ -53,7 +53,7 @@ unconditionally — even when triggers fire. The orchestrator synthesizes a mini
 placeholder keys (`SKILL_NAME`, `SKILL_VERSION`, `SKILL_DESCRIPTION`, `ARTIFACT_ROOT`)
 from the user prompt and `input.md`'s expanded refs (look for `SKILL.md` in any
 `@`-referenced directory for name/version/description; fall back to slug-from-prompt
-and the default `docs/raw/<slug>/` artifact root). Mark R-001..R-007 as `status: deferred`.
+and the default `docs/raw/<slug>/` artifact root). Mark R-001..R-006 as `status: deferred`.
 Saves the consultant's opus-tier dispatch cost (~$4 on a 231 KB backup reference).
 
 - **Dispatches**: `generate/domain-consultant-subagent.md`
@@ -84,11 +84,11 @@ Wait for user response:
 ### Step 7 — Scaffold (script)
 
 ```bash
-scripts/scaffold.sh <variant> <target>/ <target>/.review/round-0/clarification/<ts>.yml
+scripts/scaffold.sh <target>/ <target>/.review/round-0/clarification/<ts>.yml
 ```
 
-- **Inputs**: variant name (from clarification.yml), target directory, clarification.yml
-- **Outputs**: full skeleton tree at `<target>/` (copied from `common/skeleton/<variant>/`)
+- **Inputs**: target directory, clarification.yml
+- **Outputs**: full skeleton tree at `<target>/` (copied from `common/skeleton/document/`)
 - **Orchestrator**: if exit non-zero → report error; halt.
 
 ### Step 8 — Writer Fan-out (parallel sub-agent dispatch)

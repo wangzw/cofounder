@@ -98,7 +98,7 @@ Fill the following:
 |---------|--------|
 | Snippet D fingerprint + body | Copied verbatim from `<skill-forge>/common/snippets.md` §Snippet D |
 | `Role: writer for <skill-name>` heading | `clarification.skill_name` |
-| Domain-specific generation guidance | `clarification.generation_guidance` + `clarification.artifact_variant` |
+| Domain-specific generation guidance | `clarification.generation_guidance` |
 | Positive quality example | `clarification.positive_example` — concrete well-generated artifact excerpt |
 | Negative quality example | `clarification.negative_example` — poorly-generated excerpt with annotation |
 

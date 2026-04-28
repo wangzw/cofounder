@@ -62,7 +62,7 @@ scripts/check-scaffold-sha.sh <target>/ (manifest-pinned scripts enforced via CR
 passed `--interactive`. Most NewVersion invocations skip this step.
 
 - Same dispatch contract as FromScratch Step 4.
-- **Inputs additionally consumed**: `<target>/README.md` (for variant-replay summary).
+- **Inputs additionally consumed**: `<target>/README.md` (for skeleton-replay summary).
 
 ### Step 6 — Planner (sub-agent dispatch)
 

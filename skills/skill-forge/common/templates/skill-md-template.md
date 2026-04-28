@@ -17,9 +17,9 @@ description: "Use when <trigger condition — one or two sentences max>. ≤ 102
 
 # <skill-name> — <one-line purpose>
 
-## Artifact Variant: <Document | Code | Schema | Hybrid>
+## Artifact
 
-<One-paragraph explanation of what this skill generates and which guide §7.x variant applies.>
+<One-paragraph explanation of what this skill generates per the baseline generative-skill shape (guide §7.1).>
 
 ## Mode Routing
 
@@ -116,7 +116,7 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 |------|-----------|-----------|
 | `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus`. Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
-| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-007 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
+| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-006 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations`. |
@@ -148,7 +148,6 @@ Fill the following from `clarification.yml`:
 | `<skill-name>` | `clarification.skill_name` |
 | `<one-line purpose>` | `clarification.purpose` |
 | `<trigger condition>` | `clarification.trigger` — MUST start with "Use when" |
-| Artifact Variant paragraph | `clarification.artifact_variant` + `clarification.variant_notes` |
 | Mode Routing "Semantics" column | `clarification.mode_semantics.*` |
 | Snippet C body | Copied verbatim from `common/snippets.md` — never paraphrase |
 

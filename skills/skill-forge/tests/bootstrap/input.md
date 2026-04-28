@@ -5,7 +5,7 @@ This fixture exercises skill-forge against itself — the "Appendix B" bootstrap
 ## Fixture Prompt
 
 ```
-/cofounder:skill-forge "I want a skill that generates generative Claude Code skills from sparse user intent. The artifact is a skill directory at skills/<name>/ following the 8-role generative-skill guide. Input is the user's description of the target skill's purpose and artifact domain. Supports 4 artifact variants: document, code, schema, hybrid. Reviews the generated skill against ~24 structural and semantic criteria."
+/cofounder:skill-forge "I want a skill that generates generative Claude Code skills from sparse user intent. The artifact is a skill directory at skills/<name>/ following the 8-role generative-skill guide. Input is the user's description of the target skill's purpose and artifact domain. Output is a markdown-document artifact tree. Reviews the generated skill against ~24 structural and semantic criteria."
 ```
 
 ## Expected Assertions

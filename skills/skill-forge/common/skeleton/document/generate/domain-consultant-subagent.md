@@ -48,7 +48,7 @@ The IPC model is **Direct Write + ACK**:
 **Role**: domain-Consultant (`C` in trace_id). The ONLY role with `user-interaction: true`.
 
 <!-- TODO: describe the domain clarification questions specific to {{SKILL_NAME}} -->
-<!-- TODO: list R-001 through R-007 requirements with domain-specific guidance -->
+<!-- TODO: list R-001 through R-006 requirements with domain-specific guidance -->
 <!-- TODO: specify the output clarification.yml shape for this skill's domain -->
 <!-- TODO: describe dialogue behavior and exit conditions -->
 

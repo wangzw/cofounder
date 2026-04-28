@@ -7,17 +7,10 @@ writer's reference for what a FILLED artifact template looks like.
 
 ---
 
-## Variant Selector
+## Document Artifact Shape
 
-Choose exactly one variant based on `clarification.artifact_variant`. The four variants are
-described below. Each has a distinct directory layout, index structure, and leaf shape.
-
----
-
-## Variant 1: Document
-
-**Use when**: the skill produces human-readable markdown documents (PRDs, decision logs, design
-docs, wikis, runbooks).
+skill-forge produces document artifacts: human-readable markdown documents (PRDs, decision logs,
+design docs, wikis, runbooks). Every scaffolded skill produces this shape.
 
 ### Canonical Directory Layout
 
@@ -34,7 +27,7 @@ docs, wikis, runbooks).
 └── CHANGELOG.md            # Delivery history (written by summarizer, not artifact writer)
 ```
 
-### Leaf Shape (document variant)
+### Leaf Shape
 
 ```markdown
 ---
@@ -56,101 +49,9 @@ MUST NOT be load-bearing (i.e., the leaf must be fully comprehensible without op
 
 ---
 
-## Variant 2: Code
-
-**Use when**: the skill produces executable code artifacts (API specs, component libraries,
-configuration generators, code templates).
-
-### Canonical Directory Layout
-
-```
-<artifact-root>/
-├── README.md               # Top-level index: what this code does, entry points, build steps
-├── src/
-│   ├── index.md            # Module index: list of modules with one-line descriptions
-│   ├── <module-A>/
-│   │   ├── index.md        # Module-level index
-│   │   └── <file>.ts       # Individual source file
-│   └── <module-B>/
-│       ├── index.md
-│       └── <file>.ts
-├── tests/
-│   ├── index.md
-│   └── <test-file>.ts
-└── CHANGELOG.md
-```
-
-### Leaf Shape (code variant)
-
-Code leaves are source files. Each leaf MUST include an inline header comment block describing:
-- Purpose of the module
-- Public API surface (exports)
-- Dependencies (with versions if non-obvious)
-
-This header comment fulfills the self-contained file principle for code artifacts.
-
----
-
-## Variant 3: Schema
-
-**Use when**: the skill produces data schema artifacts (database schemas, API contracts,
-configuration schemas, JSON Schema / OpenAPI definitions).
-
-### Canonical Directory Layout
-
-```
-<artifact-root>/
-├── README.md               # Index: list of all schema files with their purpose
-├── schemas/
-│   ├── index.md            # Schema index with stability annotations
-│   ├── <entity-A>.json     # Individual schema file (≤ 300 lines)
-│   └── <entity-B>.yaml
-├── migrations/
-│   ├── index.md
-│   └── <timestamp>-<slug>.sql
-└── CHANGELOG.md
-```
-
-### Leaf Shape (schema variant)
-
-Schema leaves MUST include:
-- A `$schema` or equivalent version declaration
-- A `description` at the root level explaining the schema's purpose
-- Inline comments (or a companion `<name>.notes.md`) for non-obvious constraints
-
----
-
-## Variant 4: Hybrid
-
-**Use when**: the skill produces a mix of document, code, and/or schema artifacts that form a
-unified deliverable (e.g., a system design skill that produces docs + module skeletons + API specs).
-
-### Canonical Directory Layout
-
-Hybrid artifacts use a routing layer at the top level:
-
-```
-<artifact-root>/
-├── README.md               # Master index: subsection per artifact type
-├── docs/
-│   ├── index.md
-│   └── <doc-leaf>.md
-├── src/
-│   ├── index.md
-│   └── <code-leaf>.ts
-├── schemas/
-│   ├── index.md
-│   └── <schema-leaf>.json
-└── CHANGELOG.md
-```
-
-Each sub-tree follows its own variant rules (document, code, or schema) independently.
-
----
-
 ## Multi-Level Index Requirement (CR-S13)
 
-ALL variants MUST satisfy:
+Artifacts MUST satisfy:
 
 1. **No single leaf exceeds 300 lines** — split large content across multiple leaves.
 2. **README.md at root** — lists all subdirectories with brief descriptions (pyramid apex).
@@ -162,7 +63,7 @@ A flat single-file artifact (one file, 1000+ lines) violates both CR-S13 and CR-
 
 ---
 
-## Positive Example — decision-log (document variant)
+## Positive Example — decision-log
 
 Directory layout:
 
@@ -243,8 +144,7 @@ Violations:
 
 ## How to Fill
 
-1. Read `clarification.artifact_variant` to select Variant 1, 2, 3, or 4 above.
-2. Read `clarification.artifact_structure` for the domain-specific directory layout and leaf shape.
-3. Adapt the canonical directory layout for the domain (replace `<section-A>` etc. with real names from `clarification.sections`).
-4. Ensure the filled template explicitly states the 300-line leaf limit and pyramid index requirement.
-5. Ensure the filled template describes leaf self-containedness — inline context, not cross-references.
+1. Read `clarification.artifact_structure` for the domain-specific directory layout and leaf shape.
+2. Adapt the canonical directory layout for the domain (replace `<section-A>` etc. with real names from `clarification.sections`).
+3. Ensure the filled template explicitly states the 300-line leaf limit and pyramid index requirement.
+4. Ensure the filled template describes leaf self-containedness — inline context, not cross-references.

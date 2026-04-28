@@ -1,6 +1,6 @@
 ---
 name: skill-forge
-version: 0.3.0
+version: 0.4.0
 description: "Use when the user wants to create a new generative skill (a Claude Code skill that produces artifacts from sparse intent) or evolve an existing one. Triggers: /cofounder:skill-forge, 'create a skill', 'generate a skill', 'new generative skill', 'make a skill that ...'."
 ---
 
@@ -10,7 +10,7 @@ description: "Use when the user wants to create a new generative skill (a Claude
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:skill-forge "<description>"` | `generate/from-scratch.md`, `common/review-criteria.md`, `common/skeleton/<variant>/` | New skill from sparse description; domain-consultant clarifies intent, planner plans, writers fan-out |
+| generate (from scratch) | `/cofounder:skill-forge "<description>"` | `generate/from-scratch.md`, `common/review-criteria.md`, `common/skeleton/document/` | New skill from sparse description; domain-consultant clarifies intent, planner plans, writers fan-out |
 | generate (new version) | `/cofounder:skill-forge --target skills/<name> "<change>"` | `generate/new-version.md`, `common/review-criteria.md` | Evolve existing skill; planner emits delta plan (delete/modify/add/keep); forced full cross-review on first round |
 | review | `/cofounder:skill-forge --review --target skills/<name>` | `review/index.md`, `common/review-criteria.md` | Script-type checks + LLM cross/adversarial review; produces issue files under `.review/round-<N>/issues/` |
 | revise | `/cofounder:skill-forge --revise --target skills/<name>` | `revise/index.md`, `common/review-criteria.md` | Per-issue revise loop driven by open issues from last review round |
@@ -210,7 +210,7 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 |------|-----------|-----------|
 | `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus` (guide §8.6). Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
 | `--interactive` | Generate | Force-dispatch `domain-consultant` regardless of §6.2 triggers; used when user wants explicit clarification dialogue even on dense input. |
-| `--no-consultant` | Generate | Skip the `domain-consultant` dispatch entirely even if `sparse_input: true` or `glossary_hit: true` would normally trigger it. Orchestrator synthesizes a minimal `clarification/<ts>.yml` with R-001..R-007 = `deferred`, using the user prompt + `input.md`'s expanded refs as the sole signal. Cost floor drops by ~$4 at opus (consultant is the single heaviest Round-0 cost); use when the prompt already names R-001 / R-002 explicitly or `@`-references a baseline artifact with a SKILL.md present. |
+| `--no-consultant` | Generate | Skip the `domain-consultant` dispatch entirely even if `sparse_input: true` or `glossary_hit: true` would normally trigger it. Orchestrator synthesizes a minimal `clarification/<ts>.yml` with R-001..R-006 = `deferred`, using the user prompt + `input.md`'s expanded refs as the sole signal. Cost floor drops by ~$4 at opus (consultant is the single heaviest Round-0 cost); use when the prompt already names R-001 explicitly or `@`-references a baseline artifact with a SKILL.md present. |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round. Requires HITL `force_continue` approval gate; records the override in `.review/hitl/<ts>-force-continue.yml`. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g., `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled verdict threshold; default 5). For cheap iteration budgets during testing. |

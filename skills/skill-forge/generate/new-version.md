@@ -50,7 +50,7 @@ scripts/glossary-probe.sh <target>/.review/round-<K+1> <skill-forge>/common/doma
 ### Step 4 — Scaffold Drift Check (script)
 
 ```bash
-scripts/check-scaffold-sha.sh <target>/ <skill-forge>/common/skeleton/<variant>/
+scripts/check-scaffold-sha.sh <target>/ <skill-forge>/common/skeleton/document/
 ```
 
 - Verifies that boilerplate files in `<target>/` have not drifted from the skeleton SHA pins.
@@ -62,7 +62,7 @@ scripts/check-scaffold-sha.sh <target>/ <skill-forge>/common/skeleton/<variant>/
 passed `--interactive`. Most NewVersion invocations skip this step.
 
 - Same dispatch contract as FromScratch Step 4.
-- **Inputs additionally consumed**: `<target>/README.md` (for variant-replay summary).
+- **Inputs additionally consumed**: `<target>/README.md` (for skeleton-replay summary).
 
 ### Step 6 — Planner (sub-agent dispatch)
 

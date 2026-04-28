@@ -28,18 +28,16 @@ grep -qE 'TRACE_ID_RE.*\[CPWVRSJ\].*\\d\{3\}' "$PYFILE" \
   || { echo "FAIL: aggregate.py TRACE_ID_RE missing canonical [CPWVRSJ] + \\d{3}"; grep -n 'TRACE_ID_RE' "$PYFILE"; exit 1; }
 echo "PASS: main aggregate.py uses canonical TRACE_ID_RE"
 
-# Test 2: same constraint across all 4 skeleton variants
-for v in code document hybrid schema; do
-  SK_PY="$ROOT/common/skeleton/$v/scripts/lib/aggregate.py"
-  [ -f "$SK_PY" ] || { echo "FAIL: skeleton $v aggregate.py missing"; exit 1; }
-  if grep -q 'TRACE_ID_RE.*\[A-Za-z\]' "$SK_PY"; then
-    echo "FAIL: skeleton $v aggregate.py TRACE_ID_RE still uses [A-Za-z]"
-    exit 1
-  fi
-  grep -qE 'TRACE_ID_RE.*\[CPWVRSJ\].*\\d\{3\}' "$SK_PY" \
-    || { echo "FAIL: skeleton $v aggregate.py TRACE_ID_RE missing canonical pattern"; exit 1; }
-done
-echo "PASS: all 4 skeleton aggregate.py variants use canonical TRACE_ID_RE"
+# Test 2: same constraint in the document skeleton
+SK_PY="$ROOT/common/skeleton/document/scripts/lib/aggregate.py"
+[ -f "$SK_PY" ] || { echo "FAIL: skeleton aggregate.py missing"; exit 1; }
+if grep -q 'TRACE_ID_RE.*\[A-Za-z\]' "$SK_PY"; then
+  echo "FAIL: skeleton aggregate.py TRACE_ID_RE still uses [A-Za-z]"
+  exit 1
+fi
+grep -qE 'TRACE_ID_RE.*\[CPWVRSJ\].*\\d\{3\}' "$SK_PY" \
+  || { echo "FAIL: skeleton aggregate.py TRACE_ID_RE missing canonical pattern"; exit 1; }
+echo "PASS: document skeleton aggregate.py uses canonical TRACE_ID_RE"
 
 # Test 3: behavioural — regex matches valid canonical IDs and rejects malformed ones.
 # We extract the TRACE_ID_RE pattern via grep instead of importing the module,

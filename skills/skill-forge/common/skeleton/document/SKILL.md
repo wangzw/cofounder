@@ -6,9 +6,9 @@ description: "{{SKILL_DESCRIPTION}}"
 
 # {{SKILL_NAME}} — A Generative Skill
 
-## Artifact Variant: Document
+## Artifact
 
-This skill generates markdown-based documents (PRDs, design docs, wikis, specs). Baseline generative-skill shape per guide §7.1; no variant-specific extensions.
+This skill generates markdown-based documents (PRDs, design docs, wikis, specs) per the baseline generative-skill shape (guide §7.1).
 
 ## Mode Routing
 
