@@ -7,6 +7,39 @@ skill-forge release history. Versions follow semantic versioning per
 
 ---
 
+## 0.2.1 — 2026-04-28
+
+### Fixed
+
+- **Auto-force-full when reviewer version changes between rounds**. The
+  incremental skip-set computed by `run-checkers.sh` previously considered
+  only target-tree drift, missing leaves that pass under the old criteria
+  but would fail under new criteria after a reviewer version bump. Same
+  architecture as the round-6 stale-checker bug, but at the criteria/prompt
+  level instead of script-content level.
+
+  `run-checkers.sh` now reads `reviewer_version_seen` from `<target>/.review/state.yml`,
+  compares to `$SCRIPT_DIR/../SKILL.md` version (the version of the skill that
+  owns this run-checkers.sh — skill-forge for skill-forge, the generated
+  target for any scaffolded skill), and auto-sets `FORCED_FULL=1` on
+  mismatch. After successful skip-set write, state.yml's
+  `reviewer_version_seen` is updated to the current version so the next
+  round has a fresh baseline.
+
+  The fix propagates to all 4 skeleton variants — every skill scaffolded
+  by skill-forge from 0.2.1 onwards will auto-force-full when its own
+  version bumps. Generated target skills can therefore self-detect when
+  their own reviewer logic has changed and re-evaluate all artifacts.
+
+  Regression test: `tests/unit/test-run-checkers-version-drift.sh`
+  (5 sub-tests covering: matching version → no auto-force, drift → auto-force
+  + stderr notice, state.yml update post-run, first-review-empty case,
+  explicit `--full` still works regardless).
+
+  Test suite: 39 unit-test files, all passing.
+
+---
+
 ## 0.2.0 — 2026-04-28
 
 ### Added

@@ -44,6 +44,41 @@ if ! echo "$ROUND" | grep -qE '^round-[0-9]+$'; then
   exit 2
 fi
 
+# Auto-force-full when this skill's reviewer version differs from last-seen.
+#
+# "This skill" = the skill that owns this run-checkers.sh — found at
+# $SCRIPT_DIR/.. — which is skill-forge when skill-forge runs run-checkers.sh
+# on its own artifacts, or the generated target skill (e.g. prd-analysis)
+# when it runs run-checkers.sh on its own artifacts.
+#
+# When the reviewer's SKILL.md version bumps (new criteria, updated prompts,
+# bug fixes in reviewer logic), the incremental skip-set computed from
+# target-tree drift alone misses leaves that pass under old criteria but
+# fail under new criteria. We detect the drift by comparing the reviewer's
+# current SKILL.md version to `reviewer_version_seen` recorded in target's
+# state.yml on the previous round. Mismatch → auto-set FORCED_FULL=1.
+#
+# After successful skip-set write, state.yml is updated with the current
+# version so the next round can compare against this baseline.
+STATE_YML="$TARGET/.review/state.yml"
+LAST_SEEN_VERSION=""
+if [ -f "$STATE_YML" ]; then
+  LAST_SEEN_VERSION=$(grep -E '^reviewer_version_seen:' "$STATE_YML" | head -1 \
+    | sed -E 's/^reviewer_version_seen:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+REVIEWER_ROOT="$SCRIPT_DIR/.."
+CURRENT_REVIEWER_VERSION=""
+if [ -d "$REVIEWER_ROOT" ] && [ -f "$REVIEWER_ROOT/SKILL.md" ]; then
+  CURRENT_REVIEWER_VERSION=$(grep -E '^version:' "$REVIEWER_ROOT/SKILL.md" | head -1 \
+    | sed -E 's/^version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
+fi
+if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -n "$LAST_SEEN_VERSION" ] \
+   && [ "$CURRENT_REVIEWER_VERSION" != "$LAST_SEEN_VERSION" ] \
+   && [ "$FORCED_FULL" = "0" ]; then
+  echo "INFO: reviewer version changed (${LAST_SEEN_VERSION} → ${CURRENT_REVIEWER_VERSION}); auto-forcing full review (incremental skip-set would miss leaves that pass under old criteria but fail under new)" >&2
+  FORCED_FULL=1
+fi
+
 ROUND_NUM="${ROUND#round-}"
 PREV_ROUND_NUM=$((ROUND_NUM - 1))
 ROUND_DIR="${TARGET}/.review/${ROUND}"
@@ -690,4 +725,27 @@ set -e
 if [ $EXIT_CODE -eq 1 ]; then
   echo "INFO: checkers found critical/error issues (exit 1)" >&2
 fi
+
+# Record current reviewer version in state.yml so the NEXT round's
+# version-drift check has a baseline. We do this after the skip-set is
+# written (regardless of has-blocking), so a round that found issues still
+# advances the seen-version pointer — the issues themselves don't invalidate
+# the version comparison for the next round's skip-set computation.
+if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -f "$STATE_YML" ]; then
+  if grep -q '^reviewer_version_seen:' "$STATE_YML"; then
+    python3 - "$STATE_YML" "$CURRENT_REVIEWER_VERSION" <<'PYEOF'
+import sys, re
+path, ver = sys.argv[1], sys.argv[2]
+with open(path, encoding='utf-8') as f:
+    text = f.read()
+text = re.sub(r'^reviewer_version_seen:.*$',
+              f'reviewer_version_seen: "{ver}"', text, count=1, flags=re.MULTILINE)
+with open(path, 'w', encoding='utf-8') as f:
+    f.write(text)
+PYEOF
+  else
+    echo "reviewer_version_seen: \"$CURRENT_REVIEWER_VERSION\"" >> "$STATE_YML"
+  fi
+fi
+
 exit $EXIT_CODE
