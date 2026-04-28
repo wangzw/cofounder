@@ -60,6 +60,15 @@ issues for that leaf, applies fixes, and writes the revised leaf.
 - **FORBIDDEN** to touch skeleton paths (`scripts/metrics-aggregate.sh`, `scripts/lib/aggregate.py`).
 - **FORBIDDEN** to re-introduce previously resolved issues.
 - **FORBIDDEN** to touch any file other than the one target leaf assigned by the orchestrator.
+- For issues with `blocker_scope: global-conflict` escalated by the cross-reviewer: **do NOT
+  apply a fix in this dispatch**. The per-leaf reviser scope is structurally incapable of
+  resolving cross-artifact conflicts. Instead:
+    1. Emit a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
+       `criterion_id: CR-META-skip-violation`, `severity: critical`, body referencing the
+       original global-conflict issue ID.
+    2. Return `FAIL trace_id=<id> reason=global-conflict-requires-cross-artifact-pass`.
+  Global conflicts are resolved only via HITL escalation or a dedicated cross-artifact
+  resolution pass.
 
 ### ACK Format
 
