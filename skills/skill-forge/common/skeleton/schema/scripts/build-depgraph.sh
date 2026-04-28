@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # build-depgraph.sh — §8.5 dependency graph builder
-# Usage: build-depgraph.sh <target-skill-dir> <round-N>
+# Usage: build-depgraph.sh <target-skill-dir> round-<N>
 # Writes <target>/.review/round-<N>/depgraph.yml
 # Exit: 0=success, 2=error
 set -euo pipefail

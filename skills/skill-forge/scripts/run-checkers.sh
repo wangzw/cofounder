@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run-checkers.sh — master checker runner §12.5 Phase A + Phase B
-# Usage: run-checkers.sh [--full] <target-skill-dir> <round-N>
+# Usage: run-checkers.sh [--full] <target-skill-dir> round-<N>
 # Flags:
 #   --full   forced-full review (guide §8.6): skip-set includes every leaf in
 #            single_file_focus AND cross_reviewer_focus; skip lists empty;

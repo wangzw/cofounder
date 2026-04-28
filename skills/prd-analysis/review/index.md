@@ -11,7 +11,7 @@ the Snippet D fingerprint.
 ### Step 1 — Phase A + B Script Checks
 
 ```bash
-scripts/run-checkers.sh <target>/ <round-N>
+scripts/run-checkers.sh <target>/ round-<N>
 ```
 
 - **Phase A**: manifest validation + depgraph consistency + skip-set computation for round N.
