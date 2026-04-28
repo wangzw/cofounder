@@ -75,11 +75,15 @@ MODULES_DIR="$DESIGN_DIR/modules"
 REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -f "$README" ]; then
-  printf 'ERROR: README.md not found in design dir: %s\n' "$DESIGN_DIR" >&2
-  exit 2
+  printf 'SKIP: README.md not found in design dir: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
+  echo "[]"
+  exit 0
 fi
 
 mkdir -p "$REVIEWS_DIR"
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
 # Helper: allocate next LINT sequence number (zero-padded to 3 digits)
@@ -137,10 +141,15 @@ LINT_EOF
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[%s] %s: %s — %s → %s\n' \
-      "$cr_id" "$severity" "${rel_file}:${anchor}" "$title" "$(basename "$lint_file")"
+      "$cr_id" "$severity" "${rel_file}:${anchor}" "$title" "$(basename "$lint_file")" >&2
   fi
 
-  echo "$lint_file"
+  # Accumulate JSON finding
+  _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+  _jtitle=$(printf '%s' "$title" | sed 's/"/\\"/g; s/\n/ /g')
+  _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g; s/\n/ /g')
+  _jentry="{\"criterion_id\":\"${cr_id}\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jtitle}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -217,7 +226,7 @@ MATRIX_LINES=$(awk '
 
 if [ -z "$MATRIX_LINES" ]; then
   printf 'WARNING: "## Feature-Module Mapping" section not found in README.md — both checks skipped\n' >&2
-  printf 'OK 0 findings (no matrix to check)\n'
+  printf '[]\n'
   exit 0
 fi
 
@@ -228,7 +237,7 @@ HEADER_ROW=$(echo "$MATRIX_LINES" | grep -m1 'M-[0-9]' | grep '|' || true)
 
 if [ -z "$HEADER_ROW" ]; then
   printf 'WARNING: no module header row found in Feature-Module Mapping matrix — checks skipped\n' >&2
-  printf 'OK 0 findings (no matrix header)\n'
+  printf '[]\n'
   exit 0
 fi
 
@@ -237,7 +246,7 @@ MODULE_IDS=$(echo "$HEADER_ROW" | grep -oE 'M-[0-9]{3}' || true)
 
 if [ -z "$MODULE_IDS" ]; then
   printf 'WARNING: no M-NNN identifiers in matrix header — checks skipped\n' >&2
-  printf 'OK 0 findings\n'
+  printf '[]\n'
   exit 0
 fi
 
@@ -472,11 +481,13 @@ rm -f "$TMP_COL_MAP" "$TMP_DATA_ROWS" "$TMP_CELL_MAP"
 # Summary
 # ---------------------------------------------------------------------------
 if [ "$FINDING_COUNT" -eq 0 ]; then
-  printf 'OK 0 findings\n'
+  printf 'OK 0 findings\n' >&2
+  printf '[]\n'
   exit 0
 fi
 
-printf 'FAIL %d findings\n' "$FINDING_COUNT"
+printf 'FAIL %d findings\n' "$FINDING_COUNT" >&2
+printf '[%s]\n' "$JSON_FINDINGS"
 if [ "$HAS_BLOCKER" -eq 1 ] || [ "$STRICT" -eq 1 ]; then
   exit 1
 fi

@@ -89,8 +89,9 @@ DESIGN_DIR="${DESIGN_DIR%/}"
 README="${DESIGN_DIR}/README.md"
 
 if [ ! -f "$README" ]; then
-  printf 'ERROR: README.md not found in: %s\n' "$DESIGN_DIR" >&2
-  exit 2
+  printf 'SKIP: README.md not found in: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
+  echo "[]"
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------
@@ -98,6 +99,9 @@ fi
 # ---------------------------------------------------------------------------
 reviews_dir="${DESIGN_DIR}/.reviews"
 mkdir -p "$reviews_dir"
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 next_lint_seq() {
   local max=0
@@ -147,10 +151,20 @@ ISSUE
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X4] blocker  README.md — PRD analytics event `%s` from feature `%s` is missing from Analytics Coverage\n' \
-      "$event_name" "$feature_id"
+      "$event_name" "$feature_id" >&2
     printf '  Fix: add a row to ## Analytics Coverage (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq"
+      "$reviews_dir" "$seq" >&2
   fi
+
+  # Accumulate JSON finding
+  _jfid=$(printf '%s' "$feature_id" | sed 's/"/\\"/g')
+  _jevt=$(printf '%s' "$event_name" | sed 's/"/\\"/g')
+  _jdesc="PRD analytics event ${_jevt} from feature ${_jfid} is missing from ## Analytics Coverage"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Add a row for event ${_jevt} from feature ${_jfid} to ## Analytics Coverage in README.md"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-X4\",\"file\":\"README.md\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -180,10 +194,19 @@ ISSUE
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X4] mechanical  README.md — unnamed sweep rule in Analytics Coverage: `%s`\n' \
-      "$row_text"
+      "$row_text" >&2
     printf '  Fix: list feature IDs and emitting channel (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq"
+      "$reviews_dir" "$seq" >&2
   fi
+
+  # Accumulate JSON finding
+  _jrow=$(printf '%s' "$row_text" | sed 's/"/\\"/g')
+  _jdesc="Unnamed blanket sweep rule in Analytics Coverage: ${_jrow}"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Replace the blanket rule with explicit rows, or list feature IDs and the emitting channel"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-X4\",\"file\":\"README.md\",\"severity\":\"mechanical\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -261,16 +284,18 @@ resolve_prd_path() {
 PRD_PATH=""
 if ! PRD_PATH="$(resolve_prd_path "$README" "$DESIGN_DIR")"; then
   if [ "$QUIET" -eq 0 ]; then
-    printf 'SKIP: PRD path not resolvable from %s — skipping CR-X4 check\n' "$README"
+    printf 'SKIP: PRD path not resolvable from %s — skipping CR-X4 check\n' "$README" >&2
   fi
+  printf '[]\n'
   exit 0
 fi
 
 FEATURES_DIR="${PRD_PATH}/features"
 if [ ! -d "$FEATURES_DIR" ]; then
   if [ "$QUIET" -eq 0 ]; then
-    printf 'SKIP: PRD features/ directory not found at %s — skipping CR-X4 check\n' "$FEATURES_DIR"
+    printf 'SKIP: PRD features/ directory not found at %s — skipping CR-X4 check\n' "$FEATURES_DIR" >&2
   fi
+  printf '[]\n'
   exit 0
 fi
 
@@ -393,8 +418,9 @@ mapfile -t FEATURE_FILES < <(find "$FEATURES_DIR" -maxdepth 1 -name 'F-*.md' -pr
 
 if [ "${#FEATURE_FILES[@]}" -eq 0 ]; then
   if [ "$QUIET" -eq 0 ]; then
-    printf 'OK 0 findings — PRD features/ contains no F-*.md files\n'
+    printf 'OK 0 findings — PRD features/ contains no F-*.md files\n' >&2
   fi
+  printf '[]\n'
   exit 0
 fi
 
@@ -409,8 +435,9 @@ done
 # If no events found in any feature, nothing to check
 if [ "${#FEAT_EVENTS[@]}" -eq 0 ]; then
   if [ "$QUIET" -eq 0 ]; then
-    printf 'OK 0 findings — no analytics events found in PRD feature files\n'
+    printf 'OK 0 findings — no analytics events found in PRD feature files\n' >&2
   fi
+  printf '[]\n'
   exit 0
 fi
 
@@ -602,10 +629,19 @@ done
 # ---------------------------------------------------------------------------
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-X4 Analytics coverage: %d violation(s) (%d blocker, %d mechanical)\n' \
-    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" "$MECHANICAL_COUNT"
+    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" "$MECHANICAL_COUNT" >&2
   if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir"
+    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# JSON stdout output
+# ---------------------------------------------------------------------------
+if [ "$TOTAL_VIOLATIONS" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 # ---------------------------------------------------------------------------

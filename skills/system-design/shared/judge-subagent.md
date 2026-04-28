@@ -172,7 +172,7 @@ notes: <one sentence explaining the verdict choice if non-obvious>
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=judge linked_issues=[]
+OK trace_id=R3-J-001 role=judge linked_issues=[]
 ```
 
 - `linked_issues` is always empty for the judge (it does not file issues).

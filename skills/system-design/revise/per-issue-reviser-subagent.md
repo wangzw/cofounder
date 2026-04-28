@@ -137,7 +137,7 @@ fix prescription (e.g., "add missing column", "replace placeholder JSON"). The r
     1. Emit a meta-issue at `<design-dir>/.reviews/issues/<new-issue-id>.md` with
        `criterion_id: CR-META-skip-violation`, `severity: critical`, and a body that
        references the original global-conflict issue ID.
-    2. Return `FAIL trace_id=<id> reason=global-conflict-requires-cross-artifact-pass`.
+    2. Return `FAIL trace_id=R3-R-002 reason=global-conflict-requires-cross-artifact-pass`.
   Global conflicts are resolved only via HITL escalation or a dedicated cross-artifact
   resolution pass.
 
@@ -162,7 +162,7 @@ fix prescription (e.g., "add missing column", "replace placeholder JSON"). The r
 ## ACK Format
 
 ```
-OK trace_id=<trace_id> role=reviser linked_issues=<the issue ID closed>
+OK trace_id=R3-R-002 role=reviser linked_issues=<the issue ID closed>
 ```
 
 - `linked_issues`: exactly the one issue ID this dispatch addressed.
@@ -192,13 +192,13 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=reviser linked_issues=<issue-id>
+OK trace_id=R3-R-002 role=reviser linked_issues=<issue-id>
 ```
 
 or
 
 ```
-FAIL trace_id=<id> reason=<one-line-reason>
+FAIL trace_id=R3-R-002 reason=<one-line-reason>
 ```
 
 **Any of the following pollutes orchestrator context and violates the IPC contract:**

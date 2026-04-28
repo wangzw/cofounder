@@ -94,7 +94,8 @@ MODULES_DIR="$DESIGN_DIR/modules"
 README_FILE="$DESIGN_DIR/README.md"
 
 if [ ! -d "$MODULES_DIR" ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: no modules/ directory found under %s — nothing to check.\n' "$DESIGN_DIR"
+  [ "$QUIET" -eq 0 ] && printf 'INFO: no modules/ directory found under %s — nothing to check.\n' "$DESIGN_DIR" >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -123,6 +124,9 @@ _next_seq() {
 
 SEQ=$(_next_seq)
 
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
+
 # ---------------------------------------------------------------------------
 # Temp files (cleaned on exit)
 # ---------------------------------------------------------------------------
@@ -138,7 +142,7 @@ trap 'rm -f "$TMP_LAYER_TABLE" "$TMP_LAYER_SECTION"' EXIT
 #   MOD_TO_LAYER[M-NNN]  = integer layer number (1-indexed by row order)
 #   MOD_TO_LABEL[M-NNN]  = layer label (e.g. "Types", "Repository")
 # ---------------------------------------------------------------------------
-[ "$QUIET" -eq 0 ] && printf 'CR-X6 — checking dependency layering in: %s\n' "$DESIGN_DIR"
+[ "$QUIET" -eq 0 ] && printf 'CR-X6 — checking dependency layering in: %s\n' "$DESIGN_DIR" >&2
 
 # Extract the Dependency Layering section (stop at next ## heading or EOF)
 awk '
@@ -148,7 +152,7 @@ awk '
 ' "$README_FILE" > "$TMP_LAYER_SECTION"
 
 if [ ! -s "$TMP_LAYER_SECTION" ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: README.md has no "## Dependency Layering" section — cannot check X6.\n'
+  [ "$QUIET" -eq 0 ] && printf 'INFO: README.md has no "## Dependency Layering" section — cannot check X6.\n' >&2
   # All modules missing from table will be flagged below (set A loop with empty MOD_TO_LAYER)
 fi
 
@@ -198,7 +202,7 @@ while IFS= read -r row; do
 done < "$TMP_LAYER_SECTION"
 
 [ "$QUIET" -eq 0 ] && printf '  Dependency Layering table: %d layer(s), %d module entries\n' \
-  "$_layer_row" "${#MOD_TO_LAYER[@]}"
+  "$_layer_row" "${#MOD_TO_LAYER[@]}" >&2
 
 # ---------------------------------------------------------------------------
 # Helper: check if a cross-cutting exemption is documented for a same-layer pair
@@ -322,18 +326,25 @@ ISSUE
     case "$issue_type" in
       reverse_import)
         printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — reverse-layer import → %s\n' \
-          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md"
+          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md" >&2
         ;;
       same_layer)
         printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — same-layer, no cross-cutting exemption → %s\n' \
-          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md"
+          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md" >&2
         ;;
       missing_from_table)
         printf '  [CR-X6] blocker: %s missing from Dependency Layering table → %s\n' \
-          "$caller_id" "LINT-${seq_str}.md"
+          "$caller_id" "LINT-${seq_str}.md" >&2
         ;;
     esac
   fi
+
+  # Accumulate JSON finding
+  _jfiles=$(printf '%s' "$files_list" | sed 's/"/\\"/g')
+  _jreasoning=$(printf '%s' "$reasoning" | sed 's/"/\\"/g; s/\n/ /g')
+  _jsugfix=$(printf '%s' "$suggested_fix" | sed 's/"/\\"/g; s/\n/ /g')
+  _jentry="{\"criterion_id\":\"CR-X6\",\"file\":\"${_jfiles}\",\"severity\":\"blocker\",\"description\":\"${_jreasoning}\",\"suggested_fix\":\"${_jsugfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -345,17 +356,18 @@ while IFS= read -r -d '' f; do
 done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' -print0 2>/dev/null | sort -z)
 
 if [ "${#MODULE_FILES[@]}" -eq 0 ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: no M-*.md files found in %s — nothing to check.\n' "$MODULES_DIR"
+  [ "$QUIET" -eq 0 ] && printf 'INFO: no M-*.md files found in %s — nothing to check.\n' "$MODULES_DIR" >&2
+  printf '[]\n'
   exit 0
 fi
 
-[ "$QUIET" -eq 0 ] && printf '  modules found: %d\n' "${#MODULE_FILES[@]}"
+[ "$QUIET" -eq 0 ] && printf '  modules found: %d\n' "${#MODULE_FILES[@]}" >&2
 
 # Track modules flagged as missing-from-table so we emit only one issue per module
 declare -A MISSING_FLAGGED
 
 TOTAL_ISSUES=0
-[ "$QUIET" -eq 0 ] && printf '\n'
+[ "$QUIET" -eq 0 ] && printf '\n' >&2
 
 for module_file in "${MODULE_FILES[@]}"; do
   base="$(basename "$module_file")"
@@ -434,15 +446,17 @@ done
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-[ "$QUIET" -eq 0 ] && printf '\n'
+[ "$QUIET" -eq 0 ] && printf '\n' >&2
 
 if [ "$TOTAL_ISSUES" -eq 0 ]; then
   [ "$QUIET" -eq 0 ] && printf 'CR-X6 PASS — all dep edges are forward-only (%d modules checked).\n' \
-    "${#MODULE_FILES[@]}"
+    "${#MODULE_FILES[@]}" >&2
+  printf '[]\n'
   exit 0
 else
-  printf 'CR-X6 FINDINGS — %d violation(s) (all blocker).\n' "$TOTAL_ISSUES"
-  printf '  Issue files written to: %s\n' "$REVIEWS_DIR"
+  printf 'CR-X6 FINDINGS — %d violation(s) (all blocker).\n' "$TOTAL_ISSUES" >&2
+  printf '  Issue files written to: %s\n' "$REVIEWS_DIR" >&2
+  printf '[%s]\n' "$JSON_FINDINGS"
   if [ "$STRICT" -eq 1 ] || [ "$TOTAL_ISSUES" -gt 0 ]; then
     exit 1
   fi

@@ -234,7 +234,7 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
    | 0 | Success | Report output path `.review/metrics/<scope>.metrics.yml`; **do not** expand full content |
    | 1 | Argument error | Relay script stderr verbatim; prompt user to correct CLI |
    | 2 | Input error | Relay script stderr verbatim; prompt user to verify `--review-dir`/`--harness-dir` |
-   | 3 | JOIN coverage < 50% | Report output path; **relay verbatim** every entry under `warnings:` in the output YAML (copy exact text, no rewriting, no interpreting, no summarizing); suggest user verify orchestrator is injecting `trace_id:` markers |
+   | 3 | JOIN coverage < 50% | Report output path; **relay verbatim** every entry under `warnings:` in the output YAML (copy exact text, no rewriting, no interpreting, no summarizing); suggest user verify orchestrator is injecting `trace_id: R3-W-007` (canonical format) as first line of each dispatch prompt |
 
 5. **No LLM post-processing**: do not rewrite, summarize, or embellish script output. The `.review/metrics/<scope>.metrics.yml` file is the machine-readable source of truth.
 

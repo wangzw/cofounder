@@ -90,7 +90,8 @@ REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 # ── skip if no api/ directory (project has no APIs) ───────────────────────────
 if [ ! -d "$API_DIR" ]; then
-  [ "$QUIET" -eq 0 ] && echo "INFO: no api/ directory in $DESIGN_DIR — CR-X2 skipped."
+  [ "$QUIET" -eq 0 ] && echo "INFO: no api/ directory in $DESIGN_DIR — CR-X2 skipped." >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -115,6 +116,7 @@ next_lint_seq() {
 }
 
 VIOLATION_COUNT=0
+JSON_FINDINGS=""
 
 # emit_issue: write a LINT-NNN.md file for one violation.
 # Args: $1=normalised endpoint  $2=direction ("module-missing"|"api-orphan")
@@ -139,7 +141,7 @@ emit_issue() {
     fix="Add a row for \`$endpoint\` in the relevant module's \`## API Surface\` table, or remove the endpoint definition from \`$rel_file\` if it is no longer needed."
   fi
 
-  [ "$QUIET" -eq 0 ] && echo "[CR-X2] blocker  $rel_file:$lineno — $finding"
+  [ "$QUIET" -eq 0 ] && echo "[CR-X2] blocker  $rel_file:$lineno — $finding" >&2
 
   cat > "$issue_file" <<ISSUE
 # LINT-${seq} — CR-X2 endpoint-literal-vs-api
@@ -164,6 +166,14 @@ MUST appear as an endpoint heading in \`api/API-*.md\`, and every endpoint in
 ISSUE
 
   VIOLATION_COUNT=$(( VIOLATION_COUNT + 1 ))
+
+  # Accumulate JSON finding
+  _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+  _jep=$(printf '%s' "$endpoint" | sed 's/"/\\"/g')
+  _jfinding=$(printf '%s' "$finding" | sed 's/"/\\"/g')
+  _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-X2\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jfinding}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ── Step 1: build Set A from modules/M-*.md API Surface tables ────────────────
@@ -362,11 +372,17 @@ api_ep_count="${#B_ENDPOINT[@]}"
 set -u
 
 if [ "$QUIET" -eq 0 ]; then
-  echo ""
-  echo "CR-X2 check complete — ${module_ep_count} endpoint(s) in modules, ${api_ep_count} endpoint(s) in api/, ${VIOLATION_COUNT} violation(s) found."
+  echo "" >&2
+  echo "CR-X2 check complete — ${module_ep_count} endpoint(s) in modules, ${api_ep_count} endpoint(s) in api/, ${VIOLATION_COUNT} violation(s) found." >&2
   if [ "$VIOLATION_COUNT" -gt 0 ]; then
-    echo "Issue files written to: $REVIEWS_DIR/"
+    echo "Issue files written to: $REVIEWS_DIR/" >&2
   fi
+fi
+
+if [ "$VIOLATION_COUNT" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 if [ "$VIOLATION_COUNT" -gt 0 ]; then

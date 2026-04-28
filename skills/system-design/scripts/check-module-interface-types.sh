@@ -136,7 +136,8 @@ DESIGN_DIR="${DESIGN_DIR%/}"
 MODULES_DIR="$DESIGN_DIR/modules"
 
 if [ ! -d "$MODULES_DIR" ]; then
-  [ "$QUIET" = false ] && echo "INFO: no modules/ directory found under $DESIGN_DIR — nothing to check."
+  [ "$QUIET" = false ] && echo "INFO: no modules/ directory found under $DESIGN_DIR — nothing to check." >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -164,6 +165,9 @@ _next_seq() {
 }
 
 SEQ=$(_next_seq)
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
 # Helper: emit one LINT issue file
@@ -224,8 +228,18 @@ ${suggested_fix}
 ISSUE
 
   if [ "$QUIET" = false ]; then
-    echo "  [CR-L5] ${severity}: ${rel_module}:${line_hint} — unresolved type \`${type_name}\` → ${issue_file##*/}"
+    echo "  [CR-L5] ${severity}: ${rel_module}:${line_hint} — unresolved type \`${type_name}\` → ${issue_file##*/}" >&2
   fi
+
+  # Accumulate JSON finding
+  _jfile=$(printf '%s' "$rel_module" | sed 's/"/\\"/g')
+  _jtype=$(printf '%s' "$type_name" | sed 's/"/\\"/g')
+  _jdesc="Unresolved type reference \`${_jtype}\` in interface section at line ${line_hint}"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Define the type inline in the same file or list the owning module in Module Deps"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-L5\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -301,13 +315,14 @@ while IFS= read -r -d '' f; do
 done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' -print0 2>/dev/null | sort -z)
 
 if [ "${#MODULE_FILES[@]}" -eq 0 ]; then
-  [ "$QUIET" = false ] && echo "INFO: no M-*.md files found in $MODULES_DIR — nothing to check."
+  [ "$QUIET" = false ] && echo "INFO: no M-*.md files found in $MODULES_DIR — nothing to check." >&2
+  printf '[]\n'
   exit 0
 fi
 
-[ "$QUIET" = false ] && echo "CR-L5 — checking module interface types in: $DESIGN_DIR"
-[ "$QUIET" = false ] && echo "        modules found: ${#MODULE_FILES[@]}"
-[ "$QUIET" = false ] && echo ""
+[ "$QUIET" = false ] && echo "CR-L5 — checking module interface types in: $DESIGN_DIR" >&2
+[ "$QUIET" = false ] && echo "        modules found: ${#MODULE_FILES[@]}" >&2
+[ "$QUIET" = false ] && echo "" >&2
 
 # Pre-build: map of module ID -> file path for sibling resolution
 declare -A MOD_ID_TO_FILE
@@ -419,13 +434,15 @@ done
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-[ "$QUIET" = false ] && echo ""
+[ "$QUIET" = false ] && echo "" >&2
 if [ "$TOTAL_ISSUES" -eq 0 ]; then
-  [ "$QUIET" = false ] && echo "CR-L5 PASS — all interface type references resolve (${#MODULE_FILES[@]} modules checked)."
+  [ "$QUIET" = false ] && echo "CR-L5 PASS — all interface type references resolve (${#MODULE_FILES[@]} modules checked)." >&2
+  printf '[]\n'
   exit 0
 else
-  [ "$QUIET" = false ] && echo "CR-L5 FINDINGS — ${TOTAL_ISSUES} unresolved type reference(s) across ${#MODULE_FILES[@]} modules."
-  [ "$QUIET" = false ] && echo "  Issue files written to: $REVIEWS_DIR"
+  [ "$QUIET" = false ] && echo "CR-L5 FINDINGS — ${TOTAL_ISSUES} unresolved type reference(s) across ${#MODULE_FILES[@]} modules." >&2
+  [ "$QUIET" = false ] && echo "  Issue files written to: $REVIEWS_DIR" >&2
+  printf '[%s]\n' "$JSON_FINDINGS"
   if [ "$STRICT" = true ]; then
     exit 1
   else

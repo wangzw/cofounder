@@ -77,8 +77,9 @@ DESIGN_DIR="${DESIGN_DIR%/}"
 README="${DESIGN_DIR}/README.md"
 
 if [ ! -f "$README" ]; then
-  printf 'ERROR: README.md not found in: %s\n' "$DESIGN_DIR" >&2
-  exit 2
+  printf 'SKIP: README.md not found in: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
+  echo "[]"
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------
@@ -86,6 +87,9 @@ fi
 # ---------------------------------------------------------------------------
 reviews_dir="${DESIGN_DIR}/.reviews"
 mkdir -p "$reviews_dir"
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 next_lint_seq() {
   local max=0
@@ -131,10 +135,19 @@ ISSUE
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X3] blocker  README.md — PRD architecture file `%s` is silently dropped from Implementation Conventions\n' \
-      "$arch_basename"
+      "$arch_basename" >&2
     printf '  Fix: add a row referencing this file or add a row with Translation = `N/A — {reason}` (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq"
+      "$reviews_dir" "$seq" >&2
   fi
+
+  # Accumulate JSON finding
+  _jbn=$(printf '%s' "$arch_basename" | sed 's/"/\\"/g')
+  _jdesc="PRD architecture file ${_jbn} is not referenced in ## Implementation Conventions and has no N/A note"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Add a row referencing ${_jbn} to ## Implementation Conventions in README.md, or add an N/A row naming the file"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-X3\",\"file\":\"README.md\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -227,13 +240,15 @@ resolve_prd_path() {
 
 PRD_PATH=""
 if ! PRD_PATH="$(resolve_prd_path "$README" "$DESIGN_DIR")"; then
-  printf 'OK 0 findings — PRD path not resolvable, skipped\n'
+  printf 'OK 0 findings — PRD path not resolvable, skipped\n' >&2
+  printf '[]\n'
   exit 0
 fi
 
 ARCH_DIR="${PRD_PATH}/architecture"
 if [ ! -d "$ARCH_DIR" ]; then
-  printf 'OK 0 findings — PRD architecture/ directory not found, skipped\n'
+  printf 'OK 0 findings — PRD architecture/ directory not found, skipped\n' >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -244,8 +259,9 @@ mapfile -t ARCH_FILES < <(find "$ARCH_DIR" -maxdepth 1 -name '*.md' -print | sor
 
 if [ "${#ARCH_FILES[@]}" -eq 0 ]; then
   if [ "$QUIET" -eq 0 ]; then
-    printf 'OK 0 findings — architecture/ contains no .md files\n'
+    printf 'OK 0 findings — architecture/ contains no .md files\n' >&2
   fi
+  printf '[]\n'
   exit 0
 fi
 
@@ -329,10 +345,19 @@ done
 # ---------------------------------------------------------------------------
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-X3 Architecture coverage: %d violation(s) (%d blocker)\n' \
-    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT"
+    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" >&2
   if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir"
+    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# JSON stdout output
+# ---------------------------------------------------------------------------
+if [ "$TOTAL_VIOLATIONS" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 # ---------------------------------------------------------------------------

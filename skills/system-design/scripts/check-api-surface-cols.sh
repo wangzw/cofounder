@@ -63,7 +63,8 @@ MODULES_DIR="$DESIGN_DIR/modules"
 REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -d "$MODULES_DIR" ]; then
-  [ "$QUIET" -eq 0 ] && echo "INFO: no modules/ directory found in $DESIGN_DIR — nothing to check."
+  [ "$QUIET" -eq 0 ] && echo "INFO: no modules/ directory found in $DESIGN_DIR — nothing to check." >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -155,6 +156,7 @@ mkdir -p "$REVIEWS_DIR"
 
 violation_count=0
 total_files=0
+JSON_FINDINGS=""
 
 while IFS= read -r module_file; do
   total_files=$(( total_files + 1 ))
@@ -211,7 +213,7 @@ while IFS= read -r module_file; do
         msg="Header has $col_count column(s) instead of $REQUIRED_COLS in API Surface table."
         fix="Add or remove columns so the header matches: | Method + Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints |"
 
-        [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg"
+        [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
 
         cat > "$issue_file" <<ISSUE
 # LINT-${seq} — CR-L4 API Surface column count
@@ -234,6 +236,11 @@ $fix
 Per \`module-template.md\`: every API Surface row must fill all 7 columns (no blanks, no "see API-XXX" cross-references without anchor links).
 ISSUE
 
+        _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+        _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
+        _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g')
+        _jentry="{\"criterion_id\":\"CR-L4\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+        if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
         violation_count=$(( violation_count + 1 ))
       fi
       continue
@@ -250,7 +257,7 @@ ISSUE
       msg="Data row has $col_count column(s) instead of $expected_cols in API Surface table."
       fix="Ensure all 7 cells are present: Method + Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints"
 
-      [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg"
+      [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
 
       cat > "$issue_file" <<ISSUE
 # LINT-${seq} — CR-L4 API Surface column count (data row)
@@ -274,6 +281,11 @@ $fix
 Per \`module-template.md\` Rules: "every column must be filled (no blanks, no 'see API-XXX' cross-references)".
 ISSUE
 
+      _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+      _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
+      _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g')
+      _jentry="{\"criterion_id\":\"CR-L4\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+      if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
       violation_count=$(( violation_count + 1 ))
       continue
     fi
@@ -294,7 +306,7 @@ ISSUE
         msg="Column $col_idx ($col_name) is empty or forbidden value (\"$trimmed_cell\") at line $lineno."
         fix="Fill column '$col_name' with a concrete value. See module-template.md for the expected content per column."
 
-        [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg"
+        [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
 
         cat > "$issue_file" <<ISSUE
 # LINT-${seq} — CR-L4 API Surface empty cell
@@ -326,6 +338,11 @@ Required column content per \`module-template.md\`:
 - **Constraints**: rate limits, size caps, idempotency; \`—\` only for pure internal endpoints
 ISSUE
 
+        _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+        _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
+        _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g')
+        _jentry="{\"criterion_id\":\"CR-L4\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+        if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
         violation_count=$(( violation_count + 1 ))
       fi
     done < <(split_pipe_row "$line")
@@ -338,11 +355,17 @@ done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' | sort)
 # Summary
 # ---------------------------------------------------------------------------
 if [ "$QUIET" -eq 0 ]; then
-  echo ""
-  echo "CR-L4 check complete — $total_files module(s) scanned, $violation_count violation(s) found."
+  echo "" >&2
+  echo "CR-L4 check complete — $total_files module(s) scanned, $violation_count violation(s) found." >&2
   if [ "$violation_count" -gt 0 ]; then
-    echo "Issue files written to: $REVIEWS_DIR/"
+    echo "Issue files written to: $REVIEWS_DIR/" >&2
   fi
+fi
+
+if [ "$violation_count" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 if [ "$violation_count" -gt 0 ]; then

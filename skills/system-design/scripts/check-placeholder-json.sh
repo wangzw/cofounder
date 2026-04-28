@@ -86,6 +86,9 @@ _next_seq() {
 
 NEXT_SEQ=$(_next_seq)
 
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
+
 # ─── Forbidden token patterns ─────────────────────────────────────────────────
 # Each entry is a grep-compatible extended-regex fragment (case-insensitive).
 # Patterns are tested against the raw line text while inside a ```json fence.
@@ -132,7 +135,8 @@ mapfile -t TARGET_FILES < <(
 )
 
 if [ ${#TARGET_FILES[@]} -eq 0 ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: no api/*.md or modules/*.md files found in %s\n' "$DESIGN_DIR"
+  [ "$QUIET" -eq 0 ] && printf 'INFO: no api/*.md or modules/*.md files found in %s\n' "$DESIGN_DIR" >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -150,11 +154,25 @@ _emit_finding() {
 
   local issue_file="${REVIEWS_DIR}/LINT-${seq_padded}.md"
 
-  # Print to stdout unless --quiet
+  # Print to stderr unless --quiet
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-L2] blocker  %s:%d — placeholder token "%s" inside ```json block\n' \
-      "$rel_file" "$lineno" "$token_label"
-    printf '  Fix: replace placeholder with a realistic example value\n'
+      "$rel_file" "$lineno" "$token_label" >&2
+    printf '  Fix: replace placeholder with a realistic example value\n' >&2
+  fi
+
+  # Accumulate JSON finding
+  _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+  _jtok=$(printf '%s' "$token_label" | sed 's/"/\\"/g')
+  _jdesc="Forbidden placeholder token \"${_jtok}\" inside \`\`\`json block at line ${lineno}"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Replace the placeholder token with a realistic example value derived from the surrounding Request/Response table"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-L2\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then
+    JSON_FINDINGS="$_jentry"
+  else
+    JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"
   fi
 
   # Write the issue file
@@ -280,10 +298,16 @@ done
 if [ "$QUIET" -eq 0 ]; then
   if [ "$FINDING_COUNT" -eq 0 ]; then
     printf 'CR-L2: PASS — no placeholder tokens found in ```json blocks (%d file(s) scanned)\n' \
-      "${#TARGET_FILES[@]}"
+      "${#TARGET_FILES[@]}" >&2
   else
-    printf 'CR-L2: %d finding(s) written to %s\n' "$FINDING_COUNT" "$REVIEWS_DIR"
+    printf 'CR-L2: %d finding(s) written to %s\n' "$FINDING_COUNT" "$REVIEWS_DIR" >&2
   fi
+fi
+
+if [ "$FINDING_COUNT" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 if [ "$FINDING_COUNT" -gt 0 ] && [ "$STRICT" -eq 1 ]; then

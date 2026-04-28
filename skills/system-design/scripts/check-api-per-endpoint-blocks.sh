@@ -60,6 +60,9 @@ REVIEWS_DIR="$DESIGN_DIR/.reviews"
 # ── ensure .reviews/ exists ───────────────────────────────────────────────────
 mkdir -p "$REVIEWS_DIR"
 
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
+
 # ── determine next LINT sequence number ───────────────────────────────────────
 # Scan for existing LINT-NNN.md files; next id = max + 1 (or 1 if none).
 next_lint_id() {
@@ -110,7 +113,8 @@ FINDING_COUNT=0
 
 # Collect API files; if none, exit cleanly.
 if [ ! -d "$API_DIR" ]; then
-  echo "OK 0 findings (no api/ directory)"
+  echo "OK 0 findings (no api/ directory)" >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -122,7 +126,8 @@ for f in "$API_DIR"/API-*.md; do
 done
 
 if [ -z "$API_FILES" ]; then
-  echo "OK 0 findings (no API-*.md files)"
+  echo "OK 0 findings (no API-*.md files)" >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -202,6 +207,21 @@ for api_file in $API_FILES; do
 
         FINDING_COUNT=$((FINDING_COUNT + 1))
 
+        # Accumulate JSON finding
+        _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+        _jheading=$(printf '%s' "$ep_heading" | sed 's/"/\\"/g')
+        _jlabel=$(printf '%s' "$label" | sed 's/"/\\"/g')
+        _jdesc="Endpoint ${_jheading} (line ${ep_lineno}) missing required subsection: ${_jlabel}"
+        _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+        _jfix="Add the missing **${_jlabel}:** subsection to the endpoint block in ${_jfile}"
+        _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+        _jentry="{\"criterion_id\":\"CR-L1\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+        if [ -z "$JSON_FINDINGS" ]; then
+          JSON_FINDINGS="$_jentry"
+        else
+          JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"
+        fi
+
         # Emit LINT-NNN.md
         cat > "$lint_file" << LINT_EOF
 # LINT-${lint_id_padded}
@@ -242,7 +262,7 @@ file-level notes do not substitute for per-endpoint subsections.
 LINT_EOF
 
         if [ "$QUIET" -eq 0 ]; then
-          echo "[CR-L1] ${severity}: ${rel_file}:${ep_lineno} — endpoint '${ep_heading}' missing subsection '${label}' → $(basename "$lint_file")"
+          echo "[CR-L1] ${severity}: ${rel_file}:${ep_lineno} — endpoint '${ep_heading}' missing subsection '${label}' → $(basename "$lint_file")" >&2
         fi
       fi
     done
@@ -254,10 +274,12 @@ done
 
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FINDING_COUNT" -eq 0 ]; then
-  echo "OK 0 findings"
+  echo "OK 0 findings" >&2
+  printf '[]\n'
   exit 0
 else
-  echo "FAIL $FINDING_COUNT findings"
+  echo "FAIL $FINDING_COUNT findings" >&2
+  printf '[%s]\n' "$JSON_FINDINGS"
   if [ "$STRICT" -eq 1 ]; then
     exit 1
   fi

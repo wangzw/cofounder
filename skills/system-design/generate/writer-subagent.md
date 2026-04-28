@@ -445,7 +445,7 @@ Each applicable CR gets exactly one line: `- <CR-ID> <name>: PASS` or
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=writer linked_issues=<comma-separated issue IDs or empty> self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>
+OK trace_id=R3-W-007 role=writer linked_issues=<comma-separated issue IDs or empty> self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>
 ```
 
 - `linked_issues`: comma-separated IDs of any issues this writer believes exist (for pre-filing);
@@ -459,13 +459,13 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
 ```
 
 or
 
 ```
-FAIL trace_id=<id> reason=<one-line-reason>
+FAIL trace_id=R3-W-007 reason=<one-line-reason>
 ```
 
 **Any of the following pollutes orchestrator context and violates the IPC contract:**

@@ -1,5 +1,5 @@
 round: 1
-generated_at: 2026-04-28T10:15:42Z
+generated_at: 2026-04-28T10:34:40Z
 depgraph_available: true
 forced_full: false
 single_file_focus:
@@ -78,7 +78,9 @@ cross_reviewer_focus:
   - "common/domain-glossary.md"
   - "common/review-criteria.md"
   - "common/scaffold-provenance.yml"
+  - "common/snippets.md"
   - "common/templates/api-template.md"
+  - "common/templates/artifact-template.md"
   - "common/templates/design-readme-template.md"
   - "common/templates/module-template.md"
   - "common/templates/revision-entry-template.md"
@@ -105,11 +107,11 @@ cross_reviewer_focus:
   - "scripts/check-placeholder-json.sh"
   - "scripts/check-readme-references.sh"
   - "scripts/check-single-source-of-truth.sh"
+  - "shared/judge-subagent.md"
+  - "shared/summarizer-subagent.md"
 cross_reviewer_skip:
   - "common/config.yml"
   - "common/shared-scripts-manifest.yml"
-  - "common/snippets.md"
-  - "common/templates/artifact-template.md"
   - "common/templates/review-readme-template.md"
   - "common/templates/skill-md-template.md"
   - "generate/in-generate-review.md"
@@ -142,13 +144,9 @@ cross_reviewer_skip:
   - "scripts/prune-traces.sh"
   - "scripts/run-checkers.sh"
   - "scripts/scaffold.sh"
-  - "shared/judge-subagent.md"
-  - "shared/summarizer-subagent.md"
 scaffold_skip:
   - "common/config.yml"
   - "common/shared-scripts-manifest.yml"
-  - "common/snippets.md"
-  - "common/templates/artifact-template.md"
   - "common/templates/review-readme-template.md"
   - "common/templates/skill-md-template.md"
   - "generate/in-generate-review.md"
@@ -181,17 +179,15 @@ scaffold_skip:
   - "scripts/prune-traces.sh"
   - "scripts/run-checkers.sh"
   - "scripts/scaffold.sh"
-  - "shared/judge-subagent.md"
-  - "shared/summarizer-subagent.md"
 coverage_check:
   total_leaves: 69
   single_file_focus_count: 69
   single_file_skip_count: 0
   single_file_union_complete: true
-  cross_reviewer_focus_count: 31
-  cross_reviewer_skip_count: 38
+  cross_reviewer_focus_count: 35
+  cross_reviewer_skip_count: 34
   cross_reviewer_union_complete: true
-  scaffold_skip_count: 38
+  scaffold_skip_count: 34
   effective_coverage_percent: 100
 per_file_skips:
   "CR-D01": []

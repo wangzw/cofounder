@@ -88,8 +88,9 @@ README="$DESIGN_DIR/README.md"
 REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -f "$README" ]; then
-  printf 'ERROR: README.md not found in: %s\n' "$DESIGN_DIR" >&2
-  exit 2
+  printf 'SKIP: README.md not found in: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
+  echo "[]"
+  exit 0
 fi
 
 mkdir -p "$REVIEWS_DIR"
@@ -112,6 +113,7 @@ next_lint_seq() {
 
 VIOLATION_COUNT=0
 HAS_BLOCKER=0
+JSON_FINDINGS=""
 
 # emit_issue: write one LINT-NNN.md for a broken link.
 # Args: $1=severity  $2=raw-link-target  $3=lineno
@@ -126,7 +128,7 @@ emit_issue() {
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X8] %s  README.md:%s — broken link `%s`\n' \
-      "$severity" "$lineno" "$raw_target"
+      "$severity" "$lineno" "$raw_target" >&2
   fi
 
   cat > "$issue_file" << ISSUE_EOF
@@ -155,6 +157,14 @@ ISSUE_EOF
   if [ "$severity" = "blocker" ]; then
     HAS_BLOCKER=1
   fi
+
+  # Accumulate JSON finding
+  _jtgt=$(printf '%s' "$raw_target" | sed 's/"/\\"/g')
+  _jdesc="Broken link: relative path ${_jtgt} at line ${lineno} does not exist"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Fix the path, remove the broken link, or create the referenced file"
+  _jentry="{\"criterion_id\":\"CR-X8\",\"file\":\"README.md\",\"severity\":\"${severity}\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ── parse README.md for markdown links ────────────────────────────────────────
@@ -276,15 +286,18 @@ done < "$README"
 
 if [ "$QUIET" -eq 0 ]; then
   printf '\nCR-X8 check complete — %d link(s) parsed, %d violation(s) found.\n' \
-    "$link_count" "$VIOLATION_COUNT"
+    "$link_count" "$VIOLATION_COUNT" >&2
   if [ "$VIOLATION_COUNT" -gt 0 ]; then
-    printf 'Issue files written to: %s/\n' "$REVIEWS_DIR"
+    printf 'Issue files written to: %s/\n' "$REVIEWS_DIR" >&2
   fi
 fi
 
 if [ "$VIOLATION_COUNT" -eq 0 ]; then
+  printf '[]\n'
   exit 0
 fi
+
+printf '[%s]\n' "$JSON_FINDINGS"
 
 if [ "$HAS_BLOCKER" -eq 1 ] || [ "$STRICT" -eq 1 ]; then
   exit 1

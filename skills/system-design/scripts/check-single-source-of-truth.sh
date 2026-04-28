@@ -130,6 +130,7 @@ next_lint_seq() {
 
 VIOLATION_COUNT=0
 HAS_BLOCKER=0
+JSON_FINDINGS=""
 
 # emit_issue: write a LINT-NNN.md for one violation.
 # Args:
@@ -154,8 +155,15 @@ emit_issue() {
   local issue_file="$REVIEWS_DIR/LINT-${seq}.md"
 
   if [ "$QUIET" -eq 0 ]; then
-    printf '[CR-X7] %s  %s — %s\n' "$severity" "$dup_rel" "$title"
+    printf '[CR-X7] %s  %s — %s\n' "$severity" "$dup_rel" "$title" >&2
   fi
+
+  # Accumulate JSON finding
+  _jfile=$(printf '%s' "$dup_rel" | sed 's/"/\\"/g')
+  _jtitle=$(printf '%s' "$title" | sed 's/"/\\"/g; s/\n/ /g')
+  _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g; s/\n/ /g')
+  _jentry="{\"criterion_id\":\"CR-X7\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jtitle}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 
   cat > "$issue_file" <<ISSUE
 # LINT-${seq} — CR-X7 single-source-of-truth
@@ -561,11 +569,13 @@ rm -rf "$TMP_TYPES_DIR"
 
 # ─── summary ──────────────────────────────────────────────────────────────────
 if [ "$VIOLATION_COUNT" -eq 0 ]; then
-  [ "$QUIET" -eq 0 ] && printf 'OK 0 findings\n'
+  [ "$QUIET" -eq 0 ] && printf 'OK 0 findings\n' >&2
+  printf '[]\n'
   exit 0
 fi
 
-[ "$QUIET" -eq 0 ] && printf 'FAIL %d finding(s)\n' "$VIOLATION_COUNT"
+[ "$QUIET" -eq 0 ] && printf 'FAIL %d finding(s)\n' "$VIOLATION_COUNT" >&2
+printf '[%s]\n' "$JSON_FINDINGS"
 
 if [ "$HAS_BLOCKER" -eq 1 ] || [ "$STRICT" -eq 1 ]; then
   exit 1

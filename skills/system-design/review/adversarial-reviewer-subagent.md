@@ -108,7 +108,7 @@ return immediately (do not file false issues).
 No-op ACK form (when trigger flag absent in `state.yml`):
 
 ```
-OK trace_id=<id> role=reviewer linked_issues=
+OK trace_id=R3-V-003 role=reviewer linked_issues=
 ```
 
 ### Input Contract
@@ -346,7 +346,7 @@ The NFR section is too vague; update M-002.md with a placeholder latency budget 
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=reviewer linked_issues=<comma-separated issue IDs or empty>
+OK trace_id=R3-V-003 role=reviewer linked_issues=<comma-separated issue IDs or empty>
 ```
 
 - `linked_issues`: all issue IDs written this dispatch.
@@ -368,13 +368,13 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>
+OK trace_id=R3-V-003 role=<role> linked_issues=<comma-separated or empty>
 ```
 
 or
 
 ```
-FAIL trace_id=<id> reason=<one-line-reason>
+FAIL trace_id=R3-V-003 reason=<one-line-reason>
 ```
 
 **Any of the following pollutes orchestrator context and violates the IPC contract:**

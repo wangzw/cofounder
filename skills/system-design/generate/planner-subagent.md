@@ -228,7 +228,7 @@ the delta.
 ### ACK Format
 
 ```
-OK trace_id=<trace_id> role=planner linked_issues=
+OK trace_id=R3-P-001 role=planner linked_issues=
 ```
 
 - `linked_issues` is empty for the planner (issues are raised by reviewers, not planners).
@@ -240,13 +240,13 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=<id> role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+OK trace_id=R3-P-001 role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
 ```
 
 or
 
 ```
-FAIL trace_id=<id> reason=<one-line-reason>
+FAIL trace_id=R3-P-001 reason=<one-line-reason>
 ```
 
 **Any of the following pollutes orchestrator context and violates the IPC contract:**

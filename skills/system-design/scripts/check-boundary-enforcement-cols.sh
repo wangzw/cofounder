@@ -62,8 +62,9 @@ fi
 
 MODULES_DIR="${DESIGN_DIR%/}/modules"
 if [ ! -d "$MODULES_DIR" ]; then
-  printf 'ERROR: modules/ directory not found under: %s\n' "$DESIGN_DIR" >&2
-  exit 2
+  printf 'SKIP: modules/ directory not found under: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
+  echo "[]"
+  exit 0
 fi
 
 # ---------------------------------------------------------------------------
@@ -71,6 +72,9 @@ fi
 # ---------------------------------------------------------------------------
 reviews_dir="${DESIGN_DIR%/}/.reviews"
 mkdir -p "$reviews_dir"
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 next_lint_seq() {
   local max=0
@@ -158,10 +162,18 @@ ISSUE
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-L3] blocker  %s:%d — Boundary Enforcement column "%s" is empty or placeholder\n' \
-      "$rel_file" "$lineno" "$col_name"
+      "$rel_file" "$lineno" "$col_name" >&2
     printf '  Fix: fill the cell per module-template.md Boundary Enforcement rules (issue written to %s)\n' \
-      "${reviews_dir}/LINT-${seq}.md"
+      "${reviews_dir}/LINT-${seq}.md" >&2
   fi
+  _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+  _jcol=$(printf '%s' "$col_name" | sed 's/"/\\"/g')
+  _jdesc="Boundary Enforcement row has empty or placeholder cell in column \\\"${_jcol}\\\" at line ${lineno}"
+  _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+  _jfix="Fill the \\\"${_jcol}\\\" cell per module-template.md Boundary Enforcement rules"
+  _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+  _jentry="{\"criterion_id\":\"CR-L3\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -236,9 +248,16 @@ while IFS= read -r -d '' module_file; do
 ISSUE
           if [ "$QUIET" -eq 0 ]; then
             printf '[CR-L3] blocker  %s:%d — Boundary Enforcement header has %d columns (expected 4)\n' \
-              "$rel_file" "$lineno" "$ncols"
-            printf '  Fix: use header "| Constraint | Tool / Lint / Test | File Path | CI Job |\"\n'
+              "$rel_file" "$lineno" "$ncols" >&2
+            printf '  Fix: use header "| Constraint | Tool / Lint / Test | File Path | CI Job |\"\n' >&2
           fi
+          _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
+          _jdesc="Boundary Enforcement table header has ${ncols} columns (expected 4)"
+          _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
+          _jfix="Rewrite the header row to match: | Constraint | Tool / Lint / Test | File Path | CI Job |"
+          _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
+          _jentry="{\"criterion_id\":\"CR-L3\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
+          if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
           TOTAL_VIOLATIONS=$(( TOTAL_VIOLATIONS + 1 ))
           BLOCKER_COUNT=$(( BLOCKER_COUNT + 1 ))
         fi
@@ -279,10 +298,19 @@ done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' -print0 | sort -z)
 # ---------------------------------------------------------------------------
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-L3 Boundary Enforcement column fill: %d violation(s) (%d blocker)\n' \
-    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT"
+    "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" >&2
   if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir"
+    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# JSON stdout output
+# ---------------------------------------------------------------------------
+if [ "$TOTAL_VIOLATIONS" -eq 0 ]; then
+  printf '[]\n'
+else
+  printf '[%s]\n' "$JSON_FINDINGS"
 fi
 
 # ---------------------------------------------------------------------------

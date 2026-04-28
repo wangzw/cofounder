@@ -93,7 +93,8 @@ MODULES_DIR="$DESIGN_DIR/modules"
 README_FILE="$DESIGN_DIR/README.md"
 
 if [ ! -d "$MODULES_DIR" ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: no modules/ directory found under %s — nothing to check.\n' "$DESIGN_DIR"
+  [ "$QUIET" -eq 0 ] && printf 'INFO: no modules/ directory found under %s — nothing to check.\n' "$DESIGN_DIR" >&2
+  printf '[]\n'
   exit 0
 fi
 
@@ -126,6 +127,9 @@ _next_seq() {
 }
 
 SEQ=$(_next_seq)
+
+# ── JSON findings accumulator ─────────────────────────────────────────────────
+JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
 # Helper: emit a LINT issue file for one (caller, callee) pair finding
@@ -186,12 +190,19 @@ ISSUE
   if [ "$QUIET" -eq 0 ]; then
     if [ "$direction" = "A_not_B" ]; then
       printf '  [CR-X1] blocker: %s → %s  in Deps but missing from README Protocols → %s\n' \
-        "$caller_id" "$callee_id" "LINT-${seq_str}.md"
+        "$caller_id" "$callee_id" "LINT-${seq_str}.md" >&2
     else
       printf '  [CR-X1] blocker: %s → %s  in README Protocols but no module declares this dep → %s\n' \
-        "$caller_id" "$callee_id" "LINT-${seq_str}.md"
+        "$caller_id" "$callee_id" "LINT-${seq_str}.md" >&2
     fi
   fi
+
+  # Accumulate JSON finding
+  _jfiles=$(printf '%s' "$files_list" | sed 's/"/\\"/g')
+  _jreasoning=$(printf '%s' "$reasoning" | sed 's/"/\\"/g; s/\n/ /g')
+  _jsugfix=$(printf '%s' "$suggested_fix" | sed 's/"/\\"/g; s/\n/ /g')
+  _jentry="{\"criterion_id\":\"CR-X1\",\"file\":\"${_jfiles}\",\"severity\":\"blocker\",\"description\":\"${_jreasoning}\",\"suggested_fix\":\"${_jsugfix}\"}"
+  if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 }
 
 # ---------------------------------------------------------------------------
@@ -201,7 +212,7 @@ ISSUE
 #   - Determine caller_id from filename (M-NNN portion).
 #   - Find the Deps section heading and collect M-NNN tokens until next ##.
 # ---------------------------------------------------------------------------
-[ "$QUIET" -eq 0 ] && printf 'CR-X1 — checking module deps vs README protocols in: %s\n' "$DESIGN_DIR"
+[ "$QUIET" -eq 0 ] && printf 'CR-X1 — checking module deps vs README protocols in: %s\n' "$DESIGN_DIR" >&2
 
 # Associative array: key = "caller_id:callee_id", value = caller_relative_file
 declare -A SET_A
@@ -215,11 +226,12 @@ while IFS= read -r -d '' f; do
 done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' -print0 2>/dev/null | sort -z)
 
 if [ "${#MODULE_FILES[@]}" -eq 0 ]; then
-  [ "$QUIET" -eq 0 ] && printf 'INFO: no M-*.md files found in %s — nothing to check.\n' "$MODULES_DIR"
+  [ "$QUIET" -eq 0 ] && printf 'INFO: no M-*.md files found in %s — nothing to check.\n' "$MODULES_DIR" >&2
+  printf '[]\n'
   exit 0
 fi
 
-[ "$QUIET" -eq 0 ] && printf '  modules found: %d\n' "${#MODULE_FILES[@]}"
+[ "$QUIET" -eq 0 ] && printf '  modules found: %d\n' "${#MODULE_FILES[@]}" >&2
 
 # Build MOD_ID_TO_FILE map
 for f in "${MODULE_FILES[@]}"; do
@@ -265,7 +277,7 @@ for module_file in "${MODULE_FILES[@]}"; do
   done < <(printf '%s\n' "$deps_section" | grep -Eo '\bM-[0-9]+\b' | sort -u || true)
 done
 
-[ "$QUIET" -eq 0 ] && printf '  set A (module deps pairs): %d\n' "${#SET_A[@]}"
+[ "$QUIET" -eq 0 ] && printf '  set A (module deps pairs): %d\n' "${#SET_A[@]}" >&2
 
 # ---------------------------------------------------------------------------
 # Step 3+4: Parse README.md "## Module Interaction Protocols" table
@@ -292,7 +304,7 @@ protocols_section=$(awk '
 ' "$README_FILE")
 
 if [ -z "$protocols_section" ]; then
-  [ "$QUIET" -eq 0 ] && printf '  INFO: README.md has no "## Module Interaction Protocols" section — set B is empty.\n'
+  [ "$QUIET" -eq 0 ] && printf '  INFO: README.md has no "## Module Interaction Protocols" section — set B is empty.\n' >&2
 else
   # Parse table rows: lines starting with |, skip header and separator rows
   while IFS= read -r row; do
@@ -333,14 +345,14 @@ else
   done < <(printf '%s\n' "$protocols_section")
 fi
 
-[ "$QUIET" -eq 0 ] && printf '  set B (README protocol rows): %d\n' "${#SET_B[@]}"
+[ "$QUIET" -eq 0 ] && printf '  set B (README protocol rows): %d\n' "${#SET_B[@]}" >&2
 
 # ---------------------------------------------------------------------------
 # Step 5: Compute findings = (A − B) ∪ (B − A)
 # ---------------------------------------------------------------------------
 TOTAL_ISSUES=0
 
-[ "$QUIET" -eq 0 ] && printf '\n'
+[ "$QUIET" -eq 0 ] && printf '\n' >&2
 
 # A − B: pairs in module Deps but missing from README Protocols
 for key in "${!SET_A[@]}"; do
@@ -373,10 +385,12 @@ done
 
 if [ "$TOTAL_ISSUES" -eq 0 ]; then
   [ "$QUIET" -eq 0 ] && printf 'CR-X1 PASS — module deps and README Module Interaction Protocols are in sync (%d modules, %d protocol rows).\n' \
-    "${#MODULE_FILES[@]}" "${#SET_B[@]}"
+    "${#MODULE_FILES[@]}" "${#SET_B[@]}" >&2
+  printf '[]\n'
   exit 0
 else
-  printf 'CR-X1 FINDINGS — %d bidirectional sync violation(s) (all blocker).\n' "$TOTAL_ISSUES"
-  printf '  Issue files written to: %s\n' "$REVIEWS_DIR"
+  printf 'CR-X1 FINDINGS — %d bidirectional sync violation(s) (all blocker).\n' "$TOTAL_ISSUES" >&2
+  printf '  Issue files written to: %s\n' "$REVIEWS_DIR" >&2
+  printf '[%s]\n' "$JSON_FINDINGS"
   exit 1
 fi
