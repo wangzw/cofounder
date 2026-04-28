@@ -1,0 +1,17 @@
+round: 1
+delivery_id: 1
+verdict: progressing
+next_action: revise
+evidence:
+  open_issues: 30
+  blocker: 6
+  important: 20
+  suggestion: 4
+  critical_count: 0
+  error_count: 0
+  regressed_count: 0
+  coverage_percent: 0
+  writer_fail_count_sum: 0
+  rounds_elapsed: 1
+oscillating_pairs: []
+notes: Round 1 delivered 30 writer artifacts; all pass internal self-review. Cross-reviewer and adversarial-reviewer surface 30 unaddressed issues (6 blockers, 20 important, 4 suggestions). No oscillation/divergence yet (round 1 baseline). Recommend reviser dispatch on blocker+important issues, then round 2 reviewers.
