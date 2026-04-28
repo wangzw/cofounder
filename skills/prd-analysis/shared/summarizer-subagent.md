@@ -231,8 +231,12 @@ exist):
 **Step — Commit-delivery script call**: after all Writes complete, call:
 
 ```bash
-../scripts/commit-delivery.sh <target> <delivery-id> <change-summary-slug>
+../scripts/commit-delivery.sh <target> <delivery-id> <change-summary>
 ```
+
+Pass a human-readable change summary (e.g. `"E2E regen via skill-forge — final delivery"`);
+`commit-delivery.sh` slugifies the third argument internally for the git tag, and uses the
+raw value as the commit message body — do not pre-slugify the input.
 
 Where `<skill-root>` is the absolute path to the skill-forge plugin directory (from
 `state.yml` (skill root resolves to `..` from `.review/`)). This script creates an annotated git tag and commits the

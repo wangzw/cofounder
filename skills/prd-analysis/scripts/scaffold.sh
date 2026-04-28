@@ -22,10 +22,10 @@ Arguments:
   clarification-yml-path YAML file with placeholder values from domain-consultant
 
 Supported placeholders in skeleton files:
-  prd-analysis        The name of the skill
-  docs/raw/prd/<YYYY-MM-DD>-<product-slug>/     The artifact output root directory
-  0.1.0     The skill version (e.g. 1.0.0)
-  Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'. The skill description (must start with "Use when")
+  {{SKILL_NAME}}        The name of the skill
+  {{ARTIFACT_ROOT}}     The artifact output root directory
+  {{SKILL_VERSION}}     The skill version (e.g. 1.0.0)
+  {{SKILL_DESCRIPTION}} The skill description (must start with "Use when")
 
 Notes:
   - Skeletons live at <generator-skill-root>/common/skeleton/<variant>/
@@ -85,10 +85,11 @@ skeleton_dir = sys.argv[1]
 target_path = sys.argv[2]
 clarification_yml = sys.argv[3]
 
-# No-substitute files (sha-pinned)
+# No-substitute files (sha-pinned or self-referential)
 NO_SUBSTITUTE = {
     os.path.join('scripts', 'metrics-aggregate.sh'),
     os.path.join('scripts', 'lib', 'aggregate.py'),
+    os.path.join('scripts', 'scaffold.sh'),
 }
 
 SUPPORTED_PLACEHOLDERS = {

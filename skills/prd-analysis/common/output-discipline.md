@@ -1,7 +1,7 @@
 # Output Discipline — prd-analysis
 
 Applies to the main agent in ALL prd-analysis modes. Subagents follow their dispatch prompt's own
-output rules (see `parallel-dispatch.md`).
+output rules (see `common/parallel-dispatch.md`).
 
 ---
 

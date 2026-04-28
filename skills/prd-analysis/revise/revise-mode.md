@@ -2,7 +2,7 @@
 
 This file contains instructions for interactively modifying an existing PRD — whether it's still a draft or already finalized. Auto-detects PRD state, confirms intent with the user, then guides a structured change process with impact analysis and conflict detection.
 
-Review Checklist dimensions are defined in `review-checklist.md` — load it on demand (Step 6 specifies when).
+Review Checklist dimensions are defined in `common/templates/review-checklist.md` — load it on demand (Step 6 specifies when).
 
 ---
 
@@ -77,7 +77,7 @@ Absolute paths only (resolve PRD-relative `file:` paths by prepending the PRD di
 
 The main agent consumes the returned YAML as the cluster plan. Fix-subagent dispatches in Step 5 use `cluster.target_files` and `cluster.issue_files` directly; Step 6 delta-review scope uses `dimensions_tagged_union`.
 
-**Dispatch execution (MANDATORY — see `parallel-dispatch.md` Rule 1):**
+**Dispatch execution (MANDATORY — see `common/parallel-dispatch.md` Rule 1):**
 
 Once the manifest is consumed, emit ALL Fix subagent dispatches in a **single assistant response** containing N `Agent` tool_use blocks (one per cluster). Sequential dispatch is **FORBIDDEN** — it replays ~280k cache_read per cluster, costing roughly $1.30 per cluster on a typical PRD. A 10-cluster revision dispatched in parallel costs ~$1.30; dispatched serially costs ~$13.
 
@@ -255,7 +255,7 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 ### Fix-Subagent Dispatch Rules
 
-**Read `parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, model tier, cluster sizing ≤3 files, MultiEdit for >1 edit, forbidden post-edit re-reads, dispatch prompt contract).
+**Read `common/parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, model tier, cluster sizing ≤3 files, MultiEdit for >1 edit, forbidden post-edit re-reads, dispatch prompt contract).
 
 **Revise-mode-specific rules:**
 
@@ -330,7 +330,7 @@ Read each file exactly once (in parallel). Apply all edits in a single pass. Wri
 
 ### Handling Subagent Returns
 
-Follow `output-discipline.md` Rule 2 (no inter-dispatch commentary) and Rule 3 (TaskUpdate parsimony):
+Follow `common/output-discipline.md` Rule 2 (no inter-dispatch commentary) and Rule 3 (TaskUpdate parsimony):
 
 - When Fix subagent returns arrive, the main agent's NEXT action is the next tool call (cross-reference sweep, REVISIONS.md append, or user-facing summary) — NOT a standalone ack response.
 - `TaskUpdate` fires once when all clusters dispatched, once when all returned. Do NOT update per-cluster.
@@ -349,7 +349,7 @@ Based on the downstream state confirmed in Step 1:
 
 **Modify directly (no design, or design exists but not implemented):**
 - Update affected files in place (using batch-by-file procedure above)
-- If design exists: append an entry to `REVISIONS.md` summarizing what changed and why (create the file using the template in `prd-template.md` if this is the first revision, and add a link to it from README.md's References section) — this record helps the design update process (`/system-design --revise`) identify what PRD changes need to propagate
+- If design exists: append an entry to `REVISIONS.md` summarizing what changed and why (create the file using the template in `common/templates/prd-template.md` if this is the first revision, and add a link to it from README.md's References section) — this record helps the design update process (`/system-design --revise`) identify what PRD changes need to propagate
 
 **Create new version (implementation exists):**
 - Create new dated directory (e.g. `docs/raw/prd/YYYY-MM-DD-{product-name}/`)
@@ -364,7 +364,7 @@ In both cases:
 
 ### REVISIONS.md Entry Format (Required for Convergence Tracking)
 
-`REVISIONS.md` is the version-controlled source of truth used by `review-mode.md` Step 0.5 to count prior passes and detect oscillations. Review-driven fix-pass entries MUST use a stable heading format and include a `**Themes:**` section detailed enough for oscillation detection.
+`REVISIONS.md` is the version-controlled source of truth used by `review/index.md` Step 0.5 to count prior passes and detect oscillations. Review-driven fix-pass entries MUST use a stable heading format and include a `**Themes:**` section detailed enough for oscillation detection.
 
 **Heading format for Pre-Answered Mode (review-driven fix passes) — MANDATORY:**
 
@@ -372,7 +372,7 @@ In both cases:
 ## {YYYY-MM-DD} — {Nth}-pass review-finding fixes (round-{N})
 ```
 
-The word `review-finding` MUST appear in the heading — `review-mode.md` Step 0.5 greps `^## .*review-finding` to count passes. Do not rephrase this anchor.
+The word `review-finding` MUST appear in the heading — `review/index.md` Step 0.5 greps `^## .*review-finding` to count passes. Do not rephrase this anchor.
 
 **Required sections in each review-driven entry:**
 
@@ -404,14 +404,14 @@ For non-review-driven revisions (interactive feature add/modify/deprecate), use 
 **Invariants preserved by this procedure:**
 
 - **Pass count stays exact.** `Grep` of `^## .*review-finding` still matches every compacted entry — only bodies change, not headings.
-- **Oscillation detection stays accurate.** The 3-entry detailed window matches `review-mode.md` Step 2's "read most recent 2–3 entries" — all the signal it needs is still in full form.
+- **Oscillation detection stays accurate.** The 3-entry detailed window matches `review/index.md` Step 2's "read most recent 2–3 entries" — all the signal it needs is still in full form.
 - **No audit loss.** Full body of every compacted entry is recoverable via `git log -p REVISIONS.md` — the compaction commit is itself the pointer.
 
 **When NOT to apply compaction:** first 3 review-driven passes (nothing to compact); entry being compacted is already in summary form (idempotent — skip). Never compact the entry you are currently appending.
 
 ## Revise Step 6 — Post-Change Review (Delta-Focused)
 
-**Do NOT run the full 52-dimension review checklist.** Run only the checklist dimensions relevant to what actually changed. Load `review-checklist.md` only if you need to reference a dimension's exact definition.
+**Do NOT run the full 52-dimension review checklist.** Run only the checklist dimensions relevant to what actually changed. Load `common/templates/review-checklist.md` only if you need to reference a dimension's exact definition.
 
 **Review-driven fix pass scope:** If this revision consumed a `.review/round-N/issues/` directory (Pre-Answered Mode), the delta review scope is:
 

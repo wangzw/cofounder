@@ -19,7 +19,7 @@ TARGET="${TARGET%/}"
 if [ -z "$RETENTION" ]; then
   CONFIG_FILE="${TARGET}/common/config.yml"
   if [ -f "$CONFIG_FILE" ]; then
-    RETENTION=$(grep -E '^\s*retention_rounds\s*:' "$CONFIG_FILE" | head -1 | sed 's/.*:\s*//' | tr -d ' "' || echo "")
+    RETENTION=$(grep -E '^\s*traces_retention_rounds\s*:' "$CONFIG_FILE" | head -1 | sed 's/.*:\s*//' | tr -d ' "' || echo "")
   fi
   RETENTION="${RETENTION:-20}"
 fi

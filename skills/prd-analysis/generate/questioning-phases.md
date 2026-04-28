@@ -64,7 +64,7 @@ User journeys are the bridge between "who the users are" and "what features to b
 
 For **each persona**, explore:
 
-1. **Journey inventory** — what are the key journeys this persona takes? (use the checklist in `journey-template.md`: first-time use, core happy path, core unhappy path, return visit, power user, admin, migration)
+1. **Journey inventory** — what are the key journeys this persona takes? (use the checklist in `common/templates/journey-template.md`: first-time use, core happy path, core unhappy path, return visit, power user, admin, migration)
 2. **For each journey:**
    - **Trigger** — what event or need initiates this journey?
    - **Goal** — what is the user trying to accomplish?
@@ -105,7 +105,7 @@ Define the visual design foundation. Present sensible defaults based on the sele
 
 - If using an existing component library (Shadcn, Ant Design, etc.), extract its default tokens as the baseline; user confirms or overrides
 - If building custom, propose a sensible default set (inspired by Tailwind defaults) and iterate
-- Tokens must be expressed in the structured format defined in feature-template.md (tables with Token / Value / Usage columns) that AI agents can parse into code
+- Tokens must be expressed in the structured format defined in common/templates/feature-template.md (tables with Token / Value / Usage columns) that AI agents can parse into code
 - Every token must have a semantic name — AI agents reference `color.primary.500`, not `#3b82f6`
 
 Record in architecture.md's Design Token System section.

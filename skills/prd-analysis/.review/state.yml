@@ -1,9 +1,32 @@
-skill_forge_dir: /Users/wangzw/workspace/cofounder/skills/skill-forge
-delivery_id: 2
-current_round: 3
+skill_forge_dir: /Users/wangzw/.claude/skills/skill-forge
+delivery_id: 3
+current_round: 6
 mode: review
 target: /Users/wangzw/workspace/cofounder/skills/prd-analysis
 forced_full_cross_review: true
-no_consultant: true
-input_compression: selective
-prior_delivery: 1
+prior_delivery: 2
+prior_delivery_tag: delivery-2-llm-cross-review-fan-out
+last_verdict: progressing
+last_verdict_round: 7
+last_verdict_phase: review
+current_round: 7
+round_7_notes: |
+  CR-S16 violations resolved by manual bash mv/rm of 14 stray root-level
+  files (operator override of pure-dispatch principle for structural-only
+  ops). Phase B clean post-move. Single-shot cross-reviewer: 21 round-6
+  resolved + 3 new. Adversarial fired on critical: +3. Total 6 open issues
+  vs 21 in round 6 (71% reduction). Verdict progressing.
+revise_skipped_skeleton_protected:
+  - issue: R6-V003-004
+    file: scripts/lib/aggregate.py
+    severity: warning
+    rationale: |
+      Listed in common/shared-scripts-manifest.yml as sha256-pinned skeleton-owned
+      script. Per revise/index.md Step 2, skeleton-protected paths MUST NOT be
+      revised in-target. Issue stays open with status `new` and will surface again
+      in round-7 re-review until skeleton is fixed upstream and re-scaffolded.
+notes: |
+  Round 6 starts delivery-3, triggered by drift in skill-forge (CR-S15 +
+  CR-S16 added to review-criteria.md, plus check-skill-structure.sh updates).
+  Forced-full cross-review is in effect for the first cross-reviewer dispatch
+  of this delivery. 3-way fan-out across 66 focus leaves, mirroring delivery-2.

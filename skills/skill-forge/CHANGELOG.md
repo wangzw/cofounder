@@ -1,0 +1,113 @@
+# Changelog
+
+skill-forge release history. Versions follow semantic versioning per
+[semver.org](https://semver.org/) and skill-forge's domain-glossary entry on
+`version` (which lists the full alias set including `version`, `semver`,
+`bump major`, `bump minor`, `release`, etc.).
+
+---
+
+## 0.2.0 — 2026-04-28
+
+### Added
+
+- **`CR-L11 cross-reference-consistency`** (LLM-tier, severity error). Formalizes
+  the broader cross-artifact-contract scope that round-6 cross-reviewers were
+  squeezing into CR-L04. CR-L04 stays narrowly scoped to `conflicts_with` pairs
+  inside `review-criteria.md`; CR-L11 covers the rest (script_path mismatches,
+  dual-spec drift between mode files and their canonical counterparts, header
+  comments contradicting execution paths, ID/count drift across files).
+  Definition propagated to main + 4 skeleton variants. SKILL.md count bumped
+  to 27 CR (16 script + 11 LLM).
+
+- **`CR-S17 checker-implements-declared-cr`** (script-tier, severity error).
+  For every `script_path:` declared in review-criteria.md, the target's script
+  at that path MUST grep-contain the literal CR-ID string. Catches the silent
+  stale-checker drift case — when skill-forge updates a checker upstream but
+  the target's older copy doesn't pick up the change. Implemented by new
+  `scripts/check-checker-implementations.sh` (5 copies). Auto-derived inventory
+  inclusion via `check-scripts-inventory.sh` parsing of review-criteria.md.
+  SKILL.md count bumped to 28 CR (17 script + 11 LLM).
+
+- **`scripts/check-checker-implementations.sh`** (new, ~80 lines, 5 copies).
+  Parses review-criteria.md for `script_path:` values, groups CR-IDs by script,
+  and verifies each script grep-contains the CR-IDs it's declared for.
+
+- **Reviewer-drift detection in `scripts/check-drift.sh`**. Reads
+  `skill_forge_dir` from `<target>/.review/state.yml` and diffs the skill-forge
+  tree against the same baseline tag. Same-repo: full diff; cross-repo: stderr
+  warning + target-only fallback. Closes the bug where `--review` would
+  short-circuit on a target whose reviewer logic (skill-forge itself) had
+  changed since baseline.
+
+- **Auto-derive CR-bound scripts in `check-scripts-inventory.sh`**.
+  `REQUIRED_SCRIPTS` previously hardcoded; CR-S15's `script_path` was silently
+  omitted causing the inventory check to disagree with `run-checkers.sh`'s
+  missing-checker meta-issue. Now `INFRA_SCRIPTS` is hardcoded for plumbing
+  scripts (12 of them) and CR-bound scripts come from parsing review-criteria.md
+  `script_path:` values. Synced across main + 4 skeletons.
+
+- **5 new regression tests** (~38 sub-tests total):
+  - `tests/unit/test-criteria-references.sh` (5 sub-tests) — guards count-line
+    consistency between SKILL.md, cross-reviewer-subagent.md, and
+    review-criteria.md; catches stale `CR-L01..CR-L10` references.
+  - `tests/unit/test-aggregate-trace-id-regex.sh` (4 sub-tests) — behavioural
+    test of `lib/aggregate.py` `TRACE_ID_RE` canonical pattern.
+  - `tests/unit/test-check-checker-implementations.sh` (7 sub-tests) — covers
+    CR-S17 detection, false-positive guards, defer-to-CR-S05/CR-S07 cases.
+  - `tests/unit/test-reviser-global-conflict.sh` (6 sub-tests) — anti-pattern
+    phrase guard + required-phrase guard + adversarial-reviewer self-consistency.
+  - `tests/unit/test-skeleton-identity.sh` extended to cover
+    `common/review-criteria.md` and `scripts/check-checker-implementations.sh`
+    in `VERBATIM_FILES`.
+
+### Fixed
+
+- **Skeleton `git-precheck.sh` bootstrap quoting bug**. All 4 skeleton variants
+  shipped with `git -c user.name=this skill -c user.email=this skill@local`
+  unquoted; bash word-split the embedded space, git aborted with
+  `'skill' is not a git command`, and any freshly scaffolded skill landing in
+  a non-git directory could never pass precheck. Fixed with single-token
+  identity `skill-bootstrap`.
+
+- **`lib/aggregate.py TRACE_ID_RE` canonical alphabet (R6-V003-004)**. Old
+  regex `R\d+-[A-Za-z]-\d+` accepted invalid role letters (e.g. `R3-X-007`,
+  lowercase `R3-w-007`) and unpadded sequences (`R3-W-7`, `R3-W-1234`),
+  diverging from the canonical CR-S10 contract enforced by
+  `check-trace-id-format.sh`. Tightened to `R\d+-[CPWVRSJ]-\d{3}(?!\d)`
+  applied to all 5 copies; sha256 pin in `common/shared-scripts-manifest.yml`
+  updated.
+
+- **Reviser must NOT force-fix `global-conflict` in single-leaf scope (R7-V002-002)**.
+  `revise/per-issue-reviser-subagent.md` instructed the reviser to "apply the
+  fix as scoped to this leaf only" for `blocker_scope: global-conflict`
+  issues — exactly the anti-pattern that
+  `review/adversarial-reviewer-subagent.md` attack angle #6 was written to
+  catch. Replaced with the canonical refuse + meta-issue + `FAIL ACK` pattern
+  across main + 4 skeletons. Internal CR-L11 contradiction within skill-forge
+  is now resolved.
+
+### Changed
+
+- **Drop `"硬修"` Chinese annotation from English contract text**. The phrase
+  appeared in 26 files mixed into otherwise-English contracts where it added
+  no semantic value. Replaced with bare English (`force-fix in-place`).
+  Chinese aliases in `common/domain-glossary.md` are intentionally preserved —
+  they map user-facing colloquial terms (生成式 skill, 工作流 skill, 叶子,
+  制品, etc.) to canonical English so the domain-consultant can disambiguate.
+
+### Notes
+
+- Test suite: 38 unit-test files, all passing.
+- prd-analysis (the first skill scaffolded by skill-forge) has been brought
+  to delivery-3 round-7 post-revise convergence using these improvements;
+  end-to-end review/revise cycle validated.
+
+---
+
+## 0.1.1 — earlier
+
+Previous baseline. Includes the original 24 CR set (14 script + 10 LLM),
+3-way LLM cross-review fan-out, dispatch-log v1, metrics-aggregate
+`--diagnose` mode, 4 skeleton variants (code/document/hybrid/schema), and
+prd-analysis as the bootstrap skill.

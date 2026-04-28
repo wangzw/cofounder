@@ -163,6 +163,61 @@ each section; that would require an LLM check.
     every new generation.
 ```
 
+## CR-S16 skeleton-conformance
+
+The skill root MUST conform to the canonical skeleton: only `SKILL.md`,
+`CHANGELOG.md`, and (optionally) `README.md` may exist as loose files. The
+only permitted top-level subdirectories are `common/`, `generate/`, `review/`,
+`revise/`, `shared/`, `scripts/`, and `.review/`. All templates, mode files,
+sub-agent prompts, and discipline files MUST live under their prescribed
+skeleton subdirectory. Skills accumulate stray root-level `.md` files over
+their lifetime if no script-tier check enforces the whitelist.
+
+```yaml
+- id: CR-S16
+  name: "skeleton-conformance"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-skill-structure.sh
+  severity: error
+  applies_to: ["**"]
+  carryover_note: "Infrastructure carryover from skill-forge. Phase B will surface stray root-level files in prd-analysis (review/index.md, common/templates/prd-template.md, etc.) as CR-S16 errors."
+  conflicts_with: []
+  priority: 1
+  incremental_skip: full_scan
+  rationale: |
+    CR-S03 verifies that canonical skeleton directories EXIST; CR-S16
+    verifies that no stray files or directories live OUTSIDE the canonical
+    skeleton. Without the strict whitelist, skill scaffolds drift over their
+    lifetime as templates / mode files / checklists are added at the root.
+```
+
+## CR-S17 checker-implements-declared-cr
+
+For every script-tier criterion in `review-criteria.md` that declares a
+`script_path:`, the target's script at that path MUST grep-contain the literal
+CR-ID string. Catches the silent stale-checker drift case — when skill-forge
+updates a checker but target's copy is older.
+
+```yaml
+- id: CR-S17
+  name: "checker-implements-declared-cr"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-checker-implementations.sh
+  severity: error
+  applies_to: ["common/review-criteria.md", "scripts/check-*.sh"]
+  carryover_note: "Infrastructure carryover from skill-forge. Catches stale checker scripts whose internal logic predates a CR they're declared to implement."
+  conflicts_with: []
+  priority: 2
+  incremental_skip: full_scan
+  rationale: |
+    Round-6 audit on prd-analysis found that skill-forge's canonical
+    check-skill-structure.sh had CR-S16 logic but the target's stale copy
+    did not. Phase B reported [] even though violations existed. CR-S17
+    detects this stale-implementation drift at the script tier.
+```
+
 ---
 
 ## Semantic Criteria (LLM-Type)

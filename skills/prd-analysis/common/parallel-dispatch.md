@@ -131,5 +131,5 @@ After all writer ACKs for a batch are collected, the orchestrator runs a reduce 
 5. Writers with `self_review_status: PARTIAL` are flagged for the cross-reviewer in the next
    review round — do not re-dispatch them now.
 
-See `review-mode.md` Step 2 and `revise-mode.md` Step 5 for the full templates that bake
+See `review/index.md` Step 2 and `revise/revise-mode.md` Step 5 for the full templates that bake
 these rules in.

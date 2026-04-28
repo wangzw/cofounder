@@ -2,7 +2,7 @@
 
 ## Execution Scope — Per-File vs Cross-File
 
-When review is run via parallel subagents (see `review-mode.md` Steps 2–3), each subagent runs only **per-file** dimensions on its assigned files. **Cross-file** dimensions need a whole-PRD view and must be run once by the orchestrating (main) agent after subagents return.
+When review is run via parallel subagents (see `review/index.md` Steps 2–3), each subagent runs only **per-file** dimensions on its assigned files. **Cross-file** dimensions need a whole-PRD view and must be run once by the orchestrating (main) agent after subagents return.
 
 | Scope | Dimensions |
 |-------|-----------|

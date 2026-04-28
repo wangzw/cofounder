@@ -1,23 +1,35 @@
 # In-Generate Self-Review Checklist — prd-analysis
 
-<!-- DOMAIN_FILL: populated by writer-subagent during round 1 -->
-
 This file is referenced by `generate/writer-subagent.md`. It defines which CRs apply to which
-file types and the PASS/FAIL format for writer self-reviews.
+PRD-bundle leaf types and the PASS/FAIL format for writer self-reviews. All criteria are from
+prd-analysis's own `common/review-criteria.md` (CR-PP01..CR-PP51, CR-S15).
 
 ---
 
 ## CR Applicability Table
 
-<!-- Writer: populate with the CR-to-file-type mapping for this skill's domain -->
-
-| File type | Applies CRs | Severity floor |
-|-----------|------------|----------------|
-| `SKILL.md` | CR-S01, CR-S02, CR-S09, CR-L01 | critical for CR-S01/S02/S09 |
-| `*-subagent.md` | CR-S08, CR-L01, CR-L02 | critical for CR-S08 |
-| `common/review-criteria.md` | CR-S05, CR-L03 | error |
-| `common/config.yml` | CR-S06 | error |
-| Any artifact leaf | CR-L02 | error |
+| Leaf type | Applicable CRs |
+|-----------|----------------|
+| `README.md` | CR-PP01, CR-PP03, CR-PP06, CR-PP07, CR-PP08, CR-PP09, CR-PP10, CR-PP11, CR-PP12, CR-PP13 |
+| `journeys/J-NNN.md` | CR-PP02, CR-PP16, CR-PP21, CR-PP34, CR-PP14 |
+| `features/F-NNN.md` | CR-PP02, CR-PP07, CR-PP12, CR-PP14, CR-PP15, CR-PP17, CR-PP18, CR-PP19, CR-PP20, CR-PP24, CR-PP25, CR-PP26, CR-PP29, CR-PP31, CR-PP32, CR-PP38, CR-PP39 |
+| `architecture.md` (index) | CR-PP01, CR-PP14 |
+| `architecture/design-tokens.md` | CR-PP23 |
+| `architecture/coding-conventions.md` | CR-PP40 |
+| `architecture/test-isolation.md` | CR-PP41 |
+| `architecture/security.md` | CR-PP43 |
+| `architecture/dev-workflow.md` | CR-PP42 |
+| `architecture/observability.md` | CR-PP47 |
+| `architecture/performance.md` | CR-PP48 |
+| `architecture/navigation.md` | CR-PP33 |
+| `architecture/accessibility.md` | CR-PP28 |
+| `architecture/i18n.md` | CR-PP30 |
+| `architecture/deployment.md` | CR-PP50 |
+| `architecture/ai-agent-config.md` | CR-PP51 |
+| `architecture/backward-compat.md` | CR-PP44 |
+| `architecture/git-strategy.md` | CR-PP45 |
+| `architecture/code-review.md` | CR-PP46 |
+| Any leaf | CR-PP04 (no TBD/TODO/FIXME) |
 
 ---
 

@@ -1,0 +1,26 @@
+round: 6
+delivery_id: 3
+verdict: progressing
+next_action: revise
+phase: post-revise
+evidence:
+  open_issues: 21
+  critical_count: 5
+  error_count: 14
+  regressed_count: 0
+  coverage_percent: 100
+  writer_fail_count_sum: 0
+  rounds_elapsed: 1
+  oscillating_pairs: []
+reasoning: |
+  Round 6 review detected 21 new issues across skill-forge drift (CR-S15, CR-S16 additions).
+  All 21 were processed by 15 parallel revisers with OK status; revisions applied to 20 issues,
+  with 1 skeleton-protected issue (R6-V003-004) deferred per shared-scripts-manifest.yml pinning.
+  All issues retain status `new` per revise/index.md Step 4 (status transitions set by
+  cross-review in the next round, not by revise). No hard converged conditions met (critical_count=5,
+  error_count=14). No oscillation detected (delivery-3 round 1). Next action: round-7
+  cross-review to confirm revision quality and status transitions.
+notes: |
+  First round of delivery-3 (triggered by skill-forge CR-S15/CR-S16 drift). Forced-full
+  cross-review executed 3-way fan-out + adversarial-reviewer. Revise phase succeeded.
+  Expected verdict: progressing. Rounds_elapsed = 1 (well below max_iterations: 5).

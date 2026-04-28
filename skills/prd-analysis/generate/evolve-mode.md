@@ -4,10 +4,10 @@ This file contains instructions for generating an incremental PRD for a new soft
 using an existing PRD as baseline. The new PRD contains only delta (new/modified/deprecated items)
 and references the predecessor for unchanged content.
 
-For evolve mode, also read `questioning-phases.md` — the per-phase questioning guide is reused
+For evolve mode, also read `generate/questioning-phases.md` — the per-phase questioning guide is reused
 with a "review existing → ask delta → deep-dive" pattern.
 
-Review checklist dimensions are defined in `review-checklist.md` — load it on demand (Evolve
+Review checklist dimensions are defined in `common/templates/review-checklist.md` — load it on demand (Evolve
 Step 4 specifies when).
 
 ---
@@ -87,7 +87,7 @@ informally"), adjust the baseline accordingly before proceeding.
 
 ## Evolve Step 2 — Per-Phase Incremental Analysis
 
-Reuse the Phase 1–8 definitions from `questioning-phases.md`. Each phase runs in the pattern:
+Reuse the Phase 1–8 definitions from `generate/questioning-phases.md`. Each phase runs in the pattern:
 **review existing → ask if changes → deep-dive changes**. Requirements sources are identical to
 initial analysis (interactive questioning, or parsed from a user-provided document).
 
@@ -104,7 +104,7 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 - **Deep-dive:**
   - New persona → standard persona definition flow.
   - New journey → standard journey deep-dive (happy path, error paths, alternative paths,
-    metrics) using `journey-template.md`.
+    metrics) using `common/templates/journey-template.md`.
   - Modified journey → display current journey details, walk through touchpoints to confirm
     what changes. **Cascade check:** if a journey change removes or re-scopes a touchpoint,
     identify all features that map to that touchpoint and queue them for Phase 4 review.
@@ -130,7 +130,7 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 - **Ask:** "New features? Feature changes? Features to deprecate?"
 - **Deep-dive:**
   - New feature → standard flow: user story extraction from journey touchpoints → grouping →
-    interaction design using `feature-template.md`.
+    interaction design using `common/templates/feature-template.md`.
   - Modified feature → display current feature details, walk through sections to confirm
     changes (requirements, AC, API contract, interaction design).
   - Deprecated feature → confirm reason and replacement. Generate a tombstone file. Verify no
@@ -152,7 +152,7 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 - **Ask:** "Any technical architecture changes? (new conventions, policy changes, security
   updates, etc.)"
 - **Deep-dive:** discuss each changed topic individually. Changed topic files are fully rewritten
-  into the new PRD's `architecture/` directory using `architecture-template.md` structure.
+  into the new PRD's `architecture/` directory using `common/templates/architecture-template.md` structure.
 
 **Phase 7 — NFRs & Priority**
 - **Review:** display baseline's impact/effort matrix and roadmap.
@@ -176,20 +176,20 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 
 Generate files using the standard templates, with the following evolve-specific rules:
 
-1. **README.md** — use `evolve-readme-template.md` instead of `prd-template.md`. Populate the
+1. **README.md** — use `common/templates/evolve-readme-template.md` instead of `common/templates/prd-template.md`. Populate the
    Baseline section, Change Summary, deprecated-item tombstone index, and complete indexes that
    mix local files with baseline cross-references.
-2. **New features** — use `feature-template.md` as normal. Add evolve metadata header with
+2. **New features** — use `common/templates/feature-template.md` as normal. Add evolve metadata header with
    `Status = Added`, `Baseline = N/A`.
-3. **Modified features** — use `feature-template.md` for a full rewrite. Add evolve metadata
+3. **Modified features** — use `common/templates/feature-template.md` for a full rewrite. Add evolve metadata
    header with `Status = Modified`, `Baseline = {link to predecessor's version}`, and a concise
    Change summary. Add inline change markers (`[ADDED]`, `[MODIFIED]`, `[REMOVED]`) at relevant
    points in the body.
 4. **Deprecated features** — create a tombstone file per the format in
-   `evolve-readme-template.md`.
-5. **New/modified journeys** — same rules as features: full rewrite using `journey-template.md`
+   `common/templates/evolve-readme-template.md`.
+5. **New/modified journeys** — same rules as features: full rewrite using `common/templates/journey-template.md`
    plus evolve metadata header and inline markers.
-6. **New/modified architecture topics** — same rules: full rewrite using `architecture-template.md`
+6. **New/modified architecture topics** — same rules: full rewrite using `common/templates/architecture-template.md`
    topic structure, plus evolve metadata header and inline markers.
 7. **`architecture/` index** — incremental index listing all topics. Changed topics link to
    local files; unchanged topics link to baseline.
@@ -213,7 +213,7 @@ final sweep.
 
 ## Evolve Step 4 — Review Checklist
 
-Run a two-layer review. Load `review-checklist.md` only when you need to reference a dimension's
+Run a two-layer review. Load `common/templates/review-checklist.md` only when you need to reference a dimension's
 exact definition.
 
 **Layer 1 — Delta review (new and modified files only):** Do NOT re-check baseline files that
@@ -333,7 +333,7 @@ is evolve-mode only — initial PRD files and revise-mode files do not use it.
 | Status | **Added** |
 | Baseline | N/A |
 
-**Deprecated file (tombstone):** see tombstone format in `evolve-readme-template.md`.
+**Deprecated file (tombstone):** see tombstone format in `common/templates/evolve-readme-template.md`.
 
 ### Inline Change Markers
 

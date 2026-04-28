@@ -5,7 +5,7 @@ supplies an existing brainstorming document, requirements draft, or partial spec
 of going through the interactive questioning phases. Document-mode parses the supplied file into
 the structured PRD artifact set (`README.md` + `journeys/` + `features/` + `architecture/`)
 without running the questioning phases end-to-end; gaps trigger targeted fallback questioning
-against the relevant phase in `questioning-phases.md`.
+against the relevant phase in `generate/questioning-phases.md`.
 
 ---
 
@@ -145,7 +145,7 @@ Present the gap summary to the user before generating any artifacts:
 1. List ABSENT and PARTIAL dimensions grouped by topic area.
 2. For dimensions marked ABSENT or PARTIAL, ask whether to:
    - **Fill via targeted questioning** — run the relevant phase/deep-dive from
-     `questioning-phases.md` for that dimension.
+     `generate/questioning-phases.md` for that dimension.
    - **Leave as assumption** — the writer will note the assumption inline and flag it for
      future validation.
    - **Mark out of scope** — the product genuinely does not need that dimension (e.g. a CLI tool
@@ -160,7 +160,7 @@ on. Present at most 3–4 groups per round.
 ## Step 5 — Fallback to Targeted Questioning
 
 For each gap dimension where the user chose "Fill via targeted questioning", route to the
-corresponding phase and deep-dive in `questioning-phases.md`:
+corresponding phase and deep-dive in `generate/questioning-phases.md`:
 
 | Gap Area | Questioning Phase | Deep-Dive |
 |----------|------------------|-----------|
@@ -184,15 +184,15 @@ entire phase. Merge the answers with the parsed document content before proceedi
 ## Step 6 — Artifact Generation
 
 Once gaps are resolved (either by targeted questioning or accepted as assumptions), proceed to
-generate the full PRD artifact set following `output-discipline.md`:
+generate the full PRD artifact set following `common/output-discipline.md`:
 
-1. **README.md** — index-only, using `prd-template.md` structure.
-2. **`journeys/J-NNN.md`** — one file per journey, using `journey-template.md`.
-3. **`features/F-NNN-slug.md`** — one file per feature, using `feature-template.md`.
+1. **README.md** — index-only, using `common/templates/prd-template.md` structure.
+2. **`journeys/J-NNN.md`** — one file per journey, using `common/templates/journey-template.md`.
+3. **`features/F-NNN-slug.md`** — one file per feature, using `common/templates/feature-template.md`.
 4. **`architecture/*.md`** — topic files (design tokens, conventions, deployment, etc.) using
-   `architecture-template.md`.
+   `common/templates/architecture-template.md`.
 
-Apply the parallel-dispatch protocol from `parallel-dispatch.md` for fan-out generation of
+Apply the parallel-dispatch protocol from `common/parallel-dispatch.md` for fan-out generation of
 journey and feature leaves.
 
 Each leaf file MUST be self-contained: copy relevant journey context, data models, and applicable

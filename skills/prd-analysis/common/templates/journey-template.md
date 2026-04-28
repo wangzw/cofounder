@@ -13,7 +13,7 @@ journeys/
 └── ...
 ```
 
-The Journey Index lives in the top-level README.md (see `prd-template.md`), not in a separate
+The Journey Index lives in the top-level README.md (see `common/templates/prd-template.md`), not in a separate
 file — consistent with how Feature Index works.
 
 ---

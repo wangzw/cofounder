@@ -97,11 +97,11 @@ parallel by the orchestrator for each file listed in `round-N/plan.md`. Target f
 
 | Class | Path pattern | Template |
 |-------|-------------|---------|
-| Journey spec | `journeys/J-NNN-{slug}.md` | `journey-template.md` |
-| Feature spec | `features/F-NNN-{slug}.md` | `feature-template.md` |
-| Architecture index | `architecture.md` | `architecture-template.md` (index section) |
-| Architecture topic | `architecture/{topic}.md` | `architecture-template.md` (topic section) |
-| PRD README | `README.md` | `prd-template.md` |
+| Journey spec | `journeys/J-NNN-{slug}.md` | `common/templates/journey-template.md` |
+| Feature spec | `features/F-NNN-{slug}.md` | `common/templates/feature-template.md` |
+| Architecture index | `architecture.md` | `common/templates/architecture-template.md` (index section) |
+| Architecture topic | `architecture/{topic}.md` | `common/templates/architecture-template.md` (topic section) |
+| PRD README | `README.md` | `common/templates/prd-template.md` |
 
 Each writer instance is assigned exactly one leaf. The `trace_id` injected by the orchestrator
 identifies the assigned file.
@@ -139,13 +139,13 @@ Path: `<prd-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path
 - Self-contained: all context a coding agent needs to implement or review this leaf MUST be
   copied inline. NEVER say "see architecture.md" or "see J-001" — copy the relevant excerpt.
 - Use exactly ONE `Write` tool call for the artifact. Sequential Write or Edit calls on the same
-  file are FORBIDDEN (each triggers a cache_read replay per `parallel-dispatch.md` Rule 6).
+  file are FORBIDDEN (each triggers a cache_read replay per `common/parallel-dispatch.md` Rule 6).
 
 **ID stability rules (MUST enforce):**
 
 - Feature IDs: `F-001`, `F-002`, ... — zero-padded, sequential, never renumbered.
 - Journey IDs: `J-001`, `J-002`, ... — zero-padded, sequential, never renumbered.
-- Architecture topic filenames: fixed per `architecture-template.md`; do not invent new names.
+- Architecture topic filenames: fixed per `common/templates/architecture-template.md`; do not invent new names.
 - In evolve-mode (modify): preserve the existing ID. If a feature is deprecated, write a
   tombstone with `status: deprecated` — do not delete the file or reassign the ID.
 
@@ -407,7 +407,7 @@ All errors must include context. Infrastructure errors must be translated at lay
 ### Leaf Class: Architecture Topic (`architecture/{topic}.md`)
 
 Each topic file is standalone. Rules:
-- Follow the exact section structure defined in `architecture-template.md` for this topic.
+- Follow the exact section structure defined in `common/templates/architecture-template.md` for this topic.
 - Express **policies**, not implementation patterns (implementation patterns go in system-design).
 - All fields MUST be filled with concrete values from `clarification.yml` — FORBIDDEN to leave
   placeholder text like `{e.g. ...}` or `{TBD}` in the output.

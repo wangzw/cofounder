@@ -21,7 +21,7 @@ import sys, json, os, re, hashlib
 target = sys.argv[1]
 issues = []
 
-manifest_path = os.path.join(target, "common", "skeleton", "shared-scripts-manifest.yml")
+manifest_path = os.path.join(target, "common", "shared-scripts-manifest.yml")
 if not os.path.isfile(manifest_path):
     # No manifest — no-op for generated skills
     print("[]")
@@ -32,7 +32,7 @@ try:
 except OSError as e:
     issues.append({
         "criterion_id": "CR-S12",
-        "file": "common/skeleton/shared-scripts-manifest.yml",
+        "file": "common/shared-scripts-manifest.yml",
         "severity": "critical",
         "description": f"Cannot read shared-scripts-manifest.yml: {e}",
         "suggested_fix": "Ensure manifest file is readable"

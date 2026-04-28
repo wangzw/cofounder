@@ -8,60 +8,70 @@ produced critical/error issues). It defines the revise loop the orchestrator fol
 
 ## Revise Loop — Step by Step
 
-### Step 1 — Read Open Issue List
+### Step 1 — Build Issue-Group Manifest (script)
 
-The orchestrator reads the issue manifest for the current round:
-`<target>/.review/round-<N>/issues/`
+The orchestrator invokes the grouping script — no LLM-tier analysis permitted here:
 
-- Read frontmatter only (status, severity, file, criterion_id). Do NOT read issue bodies.
-- Collect all issues where `status` ∈ {`new`, `persistent`, `regressed`} — these are open.
-- Issues with `status: resolved` are already closed; skip them.
-
-### Step 2 — Group Issues by Target File
-
-Group all open issues by their `file` field (the `<target-relative-path>` of the artifact leaf
-they point at). Each group becomes one reviser dispatch — one reviser handles all issues
-targeting the same leaf.
-
-Example grouping:
-```
-generate/writer-subagent.md      → [issue-001, issue-005, issue-009]
-review/cross-reviewer-subagent.md → [issue-002]
-SKILL.md                          → [issue-003, issue-007]
+```bash
+bash scripts/group-revise-issues.sh <target> <N>
 ```
 
-If an issue points at a skeleton-owned path (e.g., `scripts/metrics-aggregate.sh`,
-`scripts/lib/aggregate.py`, or any path matching skeleton manifest at
-`common/skeleton/shared-scripts-manifest.yml`): do NOT dispatch a reviser for that file.
-Instead, create a meta-issue with `criterion_id: CR-META-skeleton-protected` in
-`round-<N>/issues/` and log it in `state.yml`.
+The script reads `<target>/.review/round-<N>/issues/` (frontmatter only), filters to open
+statuses (`new`, `persistent`, `regressed`), skips skeleton-owned paths, and emits a YAML
+manifest at:
 
-### Step 3 — Fan-out Per-Issue-Reviser (parallel)
+```
+<target>/.review/round-<N>/revise-plan.yml
+```
 
-Fan-out one `per-issue-reviser-subagent.md` per file-group. All dispatches are parallel (guide
-§14.1 — each reviser is scoped to one leaf and reads resolved-issues history as negative
-constraints, so they do not conflict).
+Manifest format:
 
-- **Dispatches**: `revise/per-issue-reviser-subagent.md` (N instances, one per file-group)
+```yaml
+groups:
+  - leaf: generate/writer-subagent.md
+    issues: [R6-V001-001, R6-V001-005]
+  - leaf: review/cross-reviewer-subagent.md
+    issues: [R6-V002-002]
+skeleton_skipped:
+  - leaf: scripts/metrics-aggregate.sh
+    issues: [R6-V003-001]
+    meta_issue: R6-META-001
+```
+
+For any skeleton-owned path the script finds, it writes a meta-issue with
+`criterion_id: CR-META-skeleton-protected` into `round-<N>/issues/` and records it under
+`skeleton_skipped` in the manifest. The orchestrator does **not** evaluate skeleton ownership —
+the script handles it fully.
+
+The orchestrator reads `revise-plan.yml` **verbatim** after the script exits. It does not
+re-interpret, filter, or reorder the groups — the manifest is the dispatch plan.
+
+### Step 2 — Fan-out Per-Issue-Reviser (parallel)
+
+Fan-out one `per-issue-reviser-subagent.md` per `groups` entry in `revise-plan.yml`. All
+dispatches are parallel (guide §14.1 — each reviser is scoped to one leaf and reads
+resolved-issues history as negative constraints, so they do not conflict).
+
+- **Dispatches**: `revise/per-issue-reviser-subagent.md` (N instances, one per group in manifest)
 - **Inputs consumed by each sub-agent**:
-  - All open issue files for that leaf group
+  - All open issue files for that leaf group (issue IDs taken verbatim from manifest)
   - The current content of the target leaf
   - Resolved-issues history injected up to `config.yml regression_gate.max_injected_resolved`
     (default: 20) — regression-protection rail
 - **Outputs written by each sub-agent**: the revised artifact leaf at `<target>/<leaf-path>`
 - **Orchestrator action on all ACKs**: collect `linked_issues` from each ACK; update
-  `state.yml`; proceed to Step 4.
+  `state.yml`; proceed to Step 3.
 
-### Step 4 — Summarizer: Update Issue Status
+### Step 3 — Summarizer: Update Issue Status
 
 - **Dispatches**: `shared/summarizer-subagent.md` (update-status phase)
 - The summarizer aggregates from `round-N/issues/*.md` frontmatter (status field on each issue)
   and writes `round-N/index.md` with the issue-count summary. Status transitions
   (new → resolved, resolved → regressed, etc.) are set by the cross-reviewer in the next review
   round — NOT by summarizer. Summarizer does NOT read artifact leaves.
-- **Orchestrator action on ACK**: proceed to Step 5.
+- **Orchestrator action on ACK**: proceed to Step 4.
 
-### Step 5 — Judge: Evaluate New Round Verdict
+### Step 4 — Judge: Evaluate New Round Verdict
 
 - **Dispatches**: `shared/judge-subagent.md`
 - **Outputs written by sub-agent**: `<target>/.review/round-<N>/verdict.yml` (overwrites
@@ -82,11 +92,15 @@ constraints, so they do not conflict).
 
 - The orchestrator MUST NOT read the revised artifact leaf content — route on ACK fields and
   verdict only (§5.1 pure-dispatch principle).
+- The orchestrator MUST NOT evaluate issue status, group issues, or decide fan-out shape — all
+  of this is delegated to `scripts/group-revise-issues.sh`. The orchestrator only invokes the
+  script and consumes its YAML output verbatim (§5.1 pure-dispatch principle).
 - Round numbers are monotonically increasing. If the revise pass produces a clean round, the
   next review pass increments N before dispatching the cross-reviewer.
-- Skeleton-protected files are never revised by the reviser. If a checker fires on a
-  skeleton file, this indicates a skeleton defect — surface it as a HITL issue, not a
-  reviser task.
+- Skeleton-protected files are never revised by the reviser. The grouping script handles
+  skeleton detection and meta-issue creation automatically. If a checker fires on a skeleton
+  file, this indicates a skeleton defect — the script surfaces it under `skeleton_skipped`
+  in the manifest so the orchestrator can escalate as a HITL issue.
 - Reference `common/snippets.md` Snippet C (orchestrator dispatch contract) for `trace_id`
   format and `launched`/`completed` event schema.
 

@@ -5,7 +5,7 @@ references a predecessor PRD as baseline, summarizes changes, and provides a com
 mixes local files (changed items) with baseline references (unchanged items).
 
 All change annotations (file-level metadata headers, inline `[MODIFIED]`/`[ADDED]`/`[REMOVED]`/
-`[UNCHANGED]` tags) follow the **Change Annotation Convention** defined in `evolve-mode.md`. Refer
+`[UNCHANGED]` tags) follow the **Change Annotation Convention** defined in `generate/evolve-mode.md`. Refer
 to that file for the complete format specification, tag syntax, and examples.
 
 ---

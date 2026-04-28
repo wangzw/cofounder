@@ -14,10 +14,10 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `questioning-phases.md`, `output-discipline.md` (+ `document-mode.md` if document arg present; `scope-reference.md` + `review-checklist.md` on demand) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
-| generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `evolve-mode.md`, `questioning-phases.md`, `output-discipline.md` (+ `scope-reference.md` + `review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
-| review | `/cofounder:prd-analysis --review <prd-dir>` | `review-mode.md`, `review-checklist.md`, `parallel-dispatch.md`, `output-discipline.md` | Script-first + dimension-by-dimension LLM review; issues filed under `.review/round-N/issues/` |
-| revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise-mode.md`, `parallel-dispatch.md`, `output-discipline.md` (+ `scope-reference.md` + `review-checklist.md` on demand) | Per-issue revise loop driven by open issues from last review round; cascade re-review when scope changes |
+| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; `common/scope-reference.md` + `common/templates/review-checklist.md` on demand) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
+| generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
+| review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/templates/review-checklist.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Script-first + dimension-by-dimension LLM review; issues filed under `.review/round-N/issues/` |
+| revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/revise-mode.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand) | Per-issue revise loop driven by open issues from last review round; cascade re-review when scope changes |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -87,7 +87,7 @@ docs/raw/prd/YYYY-MM-DD-{product-slug}/
     └── versions/
 ```
 
-Use templates: `prd-template.md` (README), `journey-template.md` (individual journeys), `architecture-template.md` (architecture index + topic files), `feature-template.md` (feature specs). Evolve mode uses `evolve-readme-template.md` instead of `prd-template.md`.
+Use templates: `common/templates/prd-template.md` (README), `common/templates/journey-template.md` (individual journeys), `common/templates/architecture-template.md` (architecture index + topic files), `common/templates/feature-template.md` (feature specs). Evolve mode uses `common/templates/evolve-readme-template.md` instead of `common/templates/prd-template.md`.
 
 ## Output Path
 
@@ -114,7 +114,7 @@ Use templates: `prd-template.md` (README), `journey-template.md` (individual jou
 - **README is stable navigation** — revision history lives in `REVISIONS.md`, not README
 - **No ambiguity** — if a requirement can be interpreted two ways, clarify now
 - **Omit empty sections** — if a section has nothing useful, skip it
-- **Discipline files are non-optional** — `parallel-dispatch.md` and `output-discipline.md` rules take precedence over per-mode wording that conflicts
+- **Discipline files are non-optional** — `common/parallel-dispatch.md` and `common/output-discipline.md` rules take precedence over per-mode wording that conflicts
 
 ## Orchestrator Dispatch Contract
 
@@ -305,8 +305,11 @@ Next steps:
 - **Review criteria**: `common/review-criteria.md`
 - **Domain glossary**: `common/domain-glossary.md`
 - **Sub-agent prompts**:
+  - `generate/domain-consultant-subagent.md`
+  - `generate/planner-subagent.md`
   - `generate/writer-subagent.md`
   - `review/cross-reviewer-subagent.md`
+  - `review/adversarial-reviewer-subagent.md`
   - `revise/per-issue-reviser-subagent.md`
   - `shared/summarizer-subagent.md`
   - `shared/judge-subagent.md`

@@ -238,7 +238,7 @@ class UsageEvent:
 
 # ---------- loaders ----------
 
-TRACE_ID_RE = re.compile(r"\btrace_id:\s*(R\d+-[A-Za-z]-\d+)")
+TRACE_ID_RE = re.compile(r"\btrace_id:\s*(R\d+-[CPWVRSJ]-\d{3})(?!\d)")
 
 def load_dispatch_log(review_dir: str, round_n: int) -> List[DispatchRecord]:
     """Parse dispatch-log.jsonl supporting both formats per guide §3.8:
