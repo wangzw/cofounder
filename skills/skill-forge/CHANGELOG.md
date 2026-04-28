@@ -7,6 +7,77 @@ skill-forge release history. Versions follow semantic versioning per
 
 ---
 
+## 0.3.0 — 2026-04-28
+
+### Changed (behaviour, mode-boundary)
+
+- **`--review` and `--revise` no longer auto-chain.** Prior to 0.3.0,
+  three auto-chain entry points caused the orchestrator to silently
+  cascade dispatches inside one `/skill-forge` invocation:
+
+  1. `review/index.md` Step 7 verdict-routing: `progressing → Revise
+     phase: load revise/index.md, increment round`.
+  2. `review/index.md` Step 1 Phase-A exit-1: `Exit 1 with critical or
+     error issues → skip Steps 2–4; jump directly to Revise Phase
+     (load revise/index.md)`.
+  3. `revise/index.md` Step 5 verdict-routing: `progressing → Increment
+     round N; loop back to review/index.md Step 3 (cross-reviewer)`.
+
+  Together these three meant a single `--review` could end up running
+  review → revise → review → revise … until convergence, paying for
+  opus-tier cross-reviewers and sonnet-tier revisers without operator
+  visibility. The chain also produced an inconsistent post-state —
+  revisers fix files but issue frontmatter still says `status: new`
+  because only cross-reviewer transitions status — making any subsequent
+  `--revise` re-invocation re-dispatch revisers for already-fixed issues
+  (non-idempotent).
+
+  As of 0.3.0, each top-level `/cofounder:skill-forge --<mode>` invocation
+  runs exactly the phase named by its flag and exits at the verdict.
+  The orchestrator updates `state.yml.mode_phase` to one of
+  `idle-awaiting-review-round-<N+1>` or `idle-awaiting-revise-round-<N>`
+  to signal the next step the operator should invoke. The operator
+  decides whether to continue, inspect, override, or abort.
+
+  In-generate review (dispatched by `generate/from-scratch.md` Phase 22
+  and `generate/new-version.md` Step 11) is unaffected — that flow has
+  its own internal review→revise iteration scoped to the generate
+  invocation's lifecycle.
+
+  The boundary fix lets `--review`/`--revise` remain idempotent across
+  re-invocations: re-running a phase that already completed is a clean
+  no-op (the orchestrator reads `mode_phase` and refuses to re-dispatch
+  what's already been done in the current round).
+
+  Propagated to all 4 skeleton variants (`code/`, `document/`, `hybrid/`,
+  `schema/`) under `review/index.md` and `revise/index.md`.
+
+### Tests
+
+- New `tests/unit/test-mode-boundary-no-auto-chain.sh` greps the canonical
+  + 4 skeleton variants of `review/index.md` Step 7 and `revise/index.md`
+  Step 5, asserting that the new `MUST NOT auto-load` directive and
+  `idle-awaiting-*` mode_phase signal are present, and that the legacy
+  auto-chain wording is absent. 10 files checked total.
+
+### Operator note
+
+Targets currently in flight under 0.2.x (e.g. prd-analysis at delivery-3
+round-8 with `mode_phase: idle-awaiting-review-round-9`) were already
+operated against the auto-chain semantics — that's how the round-7 and
+round-8 review→revise cascades happened. Going forward, the operator
+must invoke `--review` and `--revise` separately. Existing in-flight
+state is compatible: the `mode_phase` field already exists and the
+orchestrator was already updating it correctly; 0.3.0 just removes the
+auto-chain that was bypassing the boundary.
+
+Re-scaffolding existing targets is required to propagate the updated
+`review/index.md` and `revise/index.md` into their skeleton-owned
+copies — `scripts/scaffold.sh` will detect the `scaffolder_version`
+drift (0.2.2 → 0.3.0) and trigger auto-force-full on the next `--review`.
+
+---
+
 ## 0.2.2 — 2026-04-28
 
 ### Fixed

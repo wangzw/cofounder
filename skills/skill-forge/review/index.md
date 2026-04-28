@@ -21,8 +21,12 @@ scripts/run-checkers.sh <target>/ round-<N>
   aggregates all script-detected issues to
   `<target>/.review/round-<N>/issues/round-checker-output.json`.
 
-**Exit 1 with critical or error issues** → skip Steps 2–4; jump directly to Revise Phase
-(load `revise/index.md`). Do not dispatch cross-reviewer until script-type errors are resolved.
+**Exit 1 with critical or error issues** → skip Steps 2–6 entirely; the script-tier issues
+are already on disk at `<target>/.review/round-<N>/issues/`. Do NOT dispatch cross-reviewer
+until script-type errors are resolved. Update `state.yml` `mode_phase:
+idle-awaiting-revise-round-<N>` and exit cleanly. Operator runs `/cofounder:skill-forge
+--revise --target <skill>` to fix the script-tier issues. MUST NOT auto-load `revise/index.md`
+in this invocation.
 
 **Exit 0 OR only warnings** → continue to Step 2.
 
@@ -100,10 +104,12 @@ severity (default: `critical`).
 
 ### Step 7 — Verdict Routing
 
+User-triggered `--review` MUST exit at the verdict — it MUST NOT auto-chain into the revise phase. Each top-level `/cofounder:skill-forge --<mode>` invocation runs exactly the phase named by its flag and stops; the operator advances the lifecycle by invoking the next flag. This separation gives the operator a checkpoint to inspect issues, override, or abort before any reviser dispatch is paid for. (In-generate review, dispatched inside `generate/from-scratch.md` Phase 22 / `generate/new-version.md` Step 11, has its own routing inside the generate flow and is not subject to this exit rule.)
+
 | Verdict | Next Action |
 |---------|------------|
 | `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, skill-forge exits cleanly |
-| `progressing` | Revise phase: load `revise/index.md`, increment round |
+| `progressing` | Update `state.yml` `mode_phase: idle-awaiting-revise-round-<N>` and exit cleanly. Operator runs `/cofounder:skill-forge --revise --target <skill>` to enter the revise phase. MUST NOT auto-load `revise/index.md` in this invocation. |
 | `oscillating` | HITL gate: surface to user with oscillating-issue list; wait for `/continue`, `/override`, or `/abort` |
 | `diverging` | HITL gate: surface to user with regression report; same options |
 | `stalled` | HITL gate: report stall (max iterations reached without convergence); same options |

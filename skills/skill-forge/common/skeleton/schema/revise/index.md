@@ -64,14 +64,18 @@ constraints, so they do not conflict).
 ### Step 5 — Judge: Evaluate New Round Verdict
 
 - **Dispatches**: `shared/judge-subagent.md`
-- **Outputs written by sub-agent**: `<target>/.review/round-<N>/verdict.yml` (overwrites
-  previous verdict for this round, or uses incremented round number if orchestrator bumps N).
+- **Outputs written by sub-agent**: `<target>/.review/round-<N>/verdict.yml` with `phase: post-revise`
+  (overwrites the same round's pre-revise verdict written in `review/index.md` Step 6 — the
+  round number does NOT advance inside `--revise`; a fresh round starts when the operator
+  next invokes `--review`).
 - **Orchestrator action on ACK**: read verdict and route:
+
+User-triggered `--revise` MUST exit at the verdict — it MUST NOT auto-loop back into a fresh review round. The round number advances only at the start of the next `--review` invocation, after the operator has had a chance to inspect the in-flight reviser writes. This boundary is what lets `--review`/`--revise` remain idempotent across re-invocations.
 
 | Verdict | Next Action |
 |---------|------------|
 | `converged` | Delivery phase: summarizer writes CHANGELOG + version summary; `scripts/commit-delivery.sh` |
-| `progressing` | Increment round N; loop back to `review/index.md` Step 3 (cross-reviewer) |
+| `progressing` | Update `state.yml` `mode_phase: idle-awaiting-review-round-<N+1>` and exit cleanly. Operator runs `/cofounder:skill-forge --review --target <skill>` to verify the in-flight fixes — that invocation increments the round at the start of `review/index.md` Step 1 (Phase A). MUST NOT auto-load `review/index.md` in this invocation. |
 | `oscillating` | HITL gate: surface oscillating-issue list; wait for user decision |
 | `diverging` | HITL gate: surface regression report; wait for user decision |
 | `stalled` | HITL gate: report stall; wait for user decision |
