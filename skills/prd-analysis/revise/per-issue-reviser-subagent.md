@@ -181,13 +181,17 @@ belt-and-suspenders and ensures the FAIL ACK and meta-issue are emitted correctl
 - Read every issue body before applying any fix.
 - Preserve unrelated content exactly (formatting, whitespace, other sections not touching the
   issue's target area).
-- Reference the `revise/index.md` Step 5 batch-by-file procedure as binding for orchestration
-  context — each reviser dispatch is scoped to ONE leaf, and all open issues for that leaf
-  are processed in the same write.
-- For issues with `blocker_scope: global-conflict` escalated by the cross-reviewer: apply the
-  fix scoped to this leaf only. If fixing this leaf creates a new conflict in another leaf,
-  create a companion issue for that leaf — do NOT attempt to fix the other leaf in this
-  dispatch.
+- For issues with `blocker_scope: global-conflict` escalated by the cross-reviewer: **do NOT
+  apply a fix in this dispatch**. The per-leaf reviser scope is structurally incapable of
+  resolving cross-artifact conflicts — the reviser has the same single-leaf scope as the
+  writer that originally punted with `blocker_scope: global-conflict`. Instead:
+    1. Emit a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
+       `criterion_id: CR-META-skip-violation`, `severity: critical`, and a body that
+       references the original global-conflict issue ID.
+    2. Return `FAIL trace_id=<id> reason=global-conflict-requires-cross-artifact-pass`.
+  Global conflicts are resolved only via HITL escalation or a dedicated cross-artifact
+  resolution pass. Adversarial-reviewer attack angle #6 (CR-L07 reviser-scope-discipline)
+  flags any reviser language that encourages "fixing it anyway" in single-leaf scope.
 
 ---
 

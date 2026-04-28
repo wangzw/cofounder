@@ -249,8 +249,8 @@ noted as optional):
 4. **Touchpoints table** — columns: `#`, `Stage`, `User Action`, `System Response`, `Screen/View`,
    `Interaction Mode`, `Emotion`, `Pain Point`, `Mapped Feature`. During initial generation
    (Round 1), `Mapped Feature` column MUST be `—` (backfilled during cross-linking step, not by
-   this writer). Interaction Mode MUST be one of: `click`, `form`, `drag`, `swipe`, `long-press`,
-   `keyboard`, `scroll`, `hover`, `voice`, `scan`.
+   this writer). Interaction Mode MUST be one of: `click`, `form`, `drag`, `swipe`, `keyboard`,
+   `scroll`, `hover`, `voice`, `scan`.
 5. **Success Outcome** — observable end state (what is on screen, what changed in the system).
 6. **Alternative Paths** — at least one alternative or error branch.
 7. **Page Transitions** — for journeys with multiple screens; omit for single-screen journeys.

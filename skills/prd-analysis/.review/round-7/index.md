@@ -18,6 +18,8 @@ Round 7, delivery-3, post-fix verification phase. Cross-reviewer R7-V-001 (37-le
 
 **Strong progress signal**: Round-6 started delivery-3 with 21 open issues (5 critical, 14 error, 2 warning); round-7 post-fix verification shows 71% reduction in open issues (from 21 to 6), indicating effective remediation. The new issues are narrowly scoped to missing script references and inconsistent path notation — both addressable within the per-issue-reviser model.
 
+Five revisers (R7-R-001 through R7-R-005) executed post-fix in parallel, targeting the 6 open issues. All revisers completed successfully. Per revise/index.md Step 4, status transitions for all 6 issues remain `status: new` and will be set by the cross-reviewer in round 8.
+
 ## Severity Breakdown (Open Issues Only)
 
 - **Critical**: 1 issue
@@ -59,9 +61,20 @@ Round 7, delivery-3, post-fix verification phase. Cross-reviewer R7-V-001 (37-le
 
 ## Dispatch Summary
 
-| Reviewer | Dispatch ID | Focus | Issues Found |
-|----------|-------------|-------|--------------|
-| Cross (incremental) | R7-V-001 | 37 leaves | 3 (all CR-L11) |
-| Adversarial (critical) | R7-V-002 | Critical/error paths | 3 (2× CR-L11, 1× CR-L07) |
-| **Total**            | —       | 37 unique leaves | 6 new |
+| Dispatch ID | Role | Variant | Tier | Focus | Status |
+|------------|------|---------|------|-------|--------|
+| R7-V-001 | reviewer | cross | heavy | 37 leaves (incremental) | completed |
+| R7-V-002 | reviewer | adversarial | heavy | critical/error paths | completed |
+| R7-S-001 | summarizer | — | light | per-round summary | completed |
+| R7-J-001 | judge | — | light | verdict evaluation | completed |
+| R7-R-001 | reviser | — | balanced | R7-V001-002 | completed |
+| R7-R-002 | reviser | — | balanced | R7-V001-001 | completed |
+| R7-R-003 | reviser | — | balanced | R7-V001-003 | completed |
+| R7-R-004 | reviser | — | balanced | R7-V002-001 | completed |
+| R7-R-005 | reviser | — | balanced | R7-V002-002, R7-V002-003 | completed |
+| R7-S-002 | summarizer | — | light | update-status phase | completed |
+| **Total** | — | — | — | 12 dispatches | — |
 
+## Next Steps
+
+Round 8 will dispatch a cross-reviewer to evaluate the revised artifacts. Status transitions for the 6 open issues will be set during that round's review phase. No oscillation or regression detected; continued iteration is the favored path.

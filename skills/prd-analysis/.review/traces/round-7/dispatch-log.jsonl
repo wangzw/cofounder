@@ -6,3 +6,17 @@
 {"event": "completed", "trace_id": "R7-S-001", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-28T03:29:51Z"}
 {"event": "launched", "trace_id": "R7-J-001", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:29:51Z", "prompt_hash": "sha256:1af4fcf2267fd80064d018b506b620d4b016a4d96054c470105d5b55ef6b4df0", "linked_issues": []}
 {"event": "completed", "trace_id": "R7-J-001", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-28T03:30:56Z"}
+{"event": "launched", "trace_id": "R7-R-001", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:51:06Z", "prompt_hash": "sha256:r7r-001", "linked_issues": ["R7-V001-002"]}
+{"event": "launched", "trace_id": "R7-R-002", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:51:06Z", "prompt_hash": "sha256:r7r-002", "linked_issues": ["R7-V001-001"]}
+{"event": "launched", "trace_id": "R7-R-003", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:51:06Z", "prompt_hash": "sha256:r7r-003", "linked_issues": ["R7-V001-003"]}
+{"event": "launched", "trace_id": "R7-R-004", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:51:06Z", "prompt_hash": "sha256:r7r-004", "linked_issues": ["R7-V002-001"]}
+{"event": "launched", "trace_id": "R7-R-005", "role": "reviser", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:51:06Z", "prompt_hash": "sha256:r7r-005", "linked_issues": ["R7-V002-002","R7-V002-003"]}
+{"event": "completed", "trace_id": "R7-R-001", "role": "reviser", "ack_status": "OK", "linked_issues": ["R7-V001-002"], "returned_at": "2026-04-28T03:53:27Z"}
+{"event": "completed", "trace_id": "R7-R-002", "role": "reviser", "ack_status": "OK", "linked_issues": ["R7-V001-001"], "returned_at": "2026-04-28T03:53:27Z"}
+{"event": "completed", "trace_id": "R7-R-003", "role": "reviser", "ack_status": "OK", "linked_issues": ["R7-V001-003"], "returned_at": "2026-04-28T03:53:27Z"}
+{"event": "completed", "trace_id": "R7-R-004", "role": "reviser", "ack_status": "OK", "linked_issues": ["R7-V002-001"], "returned_at": "2026-04-28T03:53:27Z"}
+{"event": "completed", "trace_id": "R7-R-005", "role": "reviser", "ack_status": "OK", "linked_issues": ["R7-V002-002","R7-V002-003"], "returned_at": "2026-04-28T03:53:27Z"}
+{"event": "launched", "trace_id": "R7-S-002", "role": "summarizer", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:53:27Z", "prompt_hash": "sha256:r7s-002", "linked_issues": []}
+{"event": "completed", "trace_id": "R7-S-002", "role": "summarizer", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-28T03:54:26Z"}
+{"event": "launched", "trace_id": "R7-J-002", "role": "judge", "reviewer_variant": null, "tier": "light", "model": "claude-haiku-4-5", "delivery_id": 3, "dispatched_at": "2026-04-28T03:54:26Z", "prompt_hash": "sha256:r7j-002", "linked_issues": []}
+{"event": "completed", "trace_id": "R7-J-002", "role": "judge", "ack_status": "OK", "linked_issues": [], "returned_at": "2026-04-28T03:55:41Z"}

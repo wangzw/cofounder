@@ -8,14 +8,15 @@ prior_delivery: 2
 prior_delivery_tag: delivery-2-llm-cross-review-fan-out
 last_verdict: progressing
 last_verdict_round: 7
-last_verdict_phase: review
+last_verdict_phase: post-revise
 current_round: 7
 round_7_notes: |
   CR-S16 violations resolved by manual bash mv/rm of 14 stray root-level
-  files (operator override of pure-dispatch principle for structural-only
-  ops). Phase B clean post-move. Single-shot cross-reviewer: 21 round-6
-  resolved + 3 new. Adversarial fired on critical: +3. Total 6 open issues
-  vs 21 in round 6 (71% reduction). Verdict progressing.
+  files. Phase B clean post-move. Single-shot cross-reviewer: 21 round-6
+  resolved + 3 new. Adversarial: +3. 6 open issues. Revise: 5 parallel
+  sonnet revisers, all OK ACKs. Post-revise verdict: progressing. Status
+  transitions deferred to round-8 cross-review per spec.
+mode_phase: idle-awaiting-review-round-8
 revise_skipped_skeleton_protected:
   - issue: R6-V003-004
     file: scripts/lib/aggregate.py

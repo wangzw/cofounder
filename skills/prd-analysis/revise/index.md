@@ -10,15 +10,10 @@ produced critical/error issues). It defines the revise loop the orchestrator fol
 
 ### Step 1 — Build Issue-Group Manifest (script)
 
-The orchestrator invokes the grouping script — no LLM-tier analysis permitted here:
-
-```bash
-bash scripts/group-revise-issues.sh <target> <N>
-```
-
-The script reads `<target>/.review/round-<N>/issues/` (frontmatter only), filters to open
-statuses (`new`, `persistent`, `regressed`), skips skeleton-owned paths, and emits a YAML
-manifest at:
+The orchestrator delegates issue grouping to a deterministic grouping script — no LLM-tier
+analysis permitted here (§5.1 pure-dispatch). The grouping script reads
+`<target>/.review/round-<N>/issues/` (frontmatter only), filters to open statuses
+(`new`, `persistent`, `regressed`), skips skeleton-owned paths, and emits a YAML manifest at:
 
 ```
 <target>/.review/round-<N>/revise-plan.yml
@@ -45,6 +40,11 @@ the script handles it fully.
 
 The orchestrator reads `revise-plan.yml` **verbatim** after the script exits. It does not
 re-interpret, filter, or reorder the groups — the manifest is the dispatch plan.
+
+> **Infrastructure note**: the grouping script is a required infrastructure component. If it is
+> not yet present in `scripts/`, this step cannot execute and must be escalated as a HITL
+> blocker. The orchestrator MUST NOT fall back to inline grouping (§5.1 pure-dispatch forbids
+> the orchestrator from filtering issues by status or grouping by file field).
 
 ### Step 2 — Fan-out Per-Issue-Reviser (parallel)
 
@@ -93,8 +93,8 @@ resolved-issues history as negative constraints, so they do not conflict).
 - The orchestrator MUST NOT read the revised artifact leaf content — route on ACK fields and
   verdict only (§5.1 pure-dispatch principle).
 - The orchestrator MUST NOT evaluate issue status, group issues, or decide fan-out shape — all
-  of this is delegated to `scripts/group-revise-issues.sh`. The orchestrator only invokes the
-  script and consumes its YAML output verbatim (§5.1 pure-dispatch principle).
+  of this is delegated to the grouping script. The orchestrator only invokes the script and
+  consumes its YAML output verbatim (§5.1 pure-dispatch principle).
 - Round numbers are monotonically increasing. If the revise pass produces a clean round, the
   next review pass increments N before dispatching the cross-reviewer.
 - Skeleton-protected files are never revised by the reviser. The grouping script handles
