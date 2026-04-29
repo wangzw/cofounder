@@ -80,7 +80,7 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
   - `<target>/CHANGELOG.md`
   - `<target>/.review/versions/<N-1>.md` (last converged version summary)
 - All four lists are used: `delete`, `modify`, `add`, `keep`
-- `keep` = files that are unchanged; `check-scaffold-sha.sh` has already verified these
+- `keep` = files in the prior delivery that the planner certifies are unaffected by this change. The review pipeline (`review/index.md`) will re-confirm via formal review and substantive cross-reviewer.
 
 ### Output Contract
 
@@ -104,7 +104,7 @@ plan:
       template: "common/templates/writer-subagent-template.md"
       description: "Writer sub-agent prompt for <target-skill-name>"
     # ... one entry per file
-  keep: []             # new-version only; scaffold-verified unchanged files
+  keep: []             # new-version only; planner-certified unchanged files
 rationale: |
   <1–3 sentences explaining the plan shape and any non-obvious choices>
 ```
@@ -117,12 +117,13 @@ Each entry in `add` and `modify` MUST include:
 ### Reasoning Guidelines
 
 - For FromScratch: derive the file list from `clarification.yml` R-001 through R-007. The
-  artifact type (R-002) determines which skeleton variant was used; domain-specific files are the
-  ones writers must fill.
+  artifact type (R-002) determines the canonical PRD bundle layout — `README.md` + `journeys/J-NNN-*.md` +
+  `features/F-NNN-*.md` + `architecture.md` + topic files under `architecture/`. Pick a feature
+  count consistent with the user's MVP scope (typically 5–9 features for a first delivery).
 - For NewVersion: compare `input.md` change description against `versions/<N-1>.md` to determine
   which existing files are affected. Files not mentioned in the change scope go to `keep`.
-- Do not add files not listed in any skeleton variant. If the user's requirement implies a novel
-  file, note it in `rationale` and add it to `add` with `template: null`.
+- For novel files outside the canonical bundle (e.g. a glossary, a migration plan), add them to
+  `add` with `template: null` and explain in `rationale` why the standard PRD shape is insufficient.
 
 ### ACK Format
 

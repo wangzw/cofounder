@@ -1,15 +1,16 @@
 # generate/from-scratch.md — FromScratch Mode Entry
 
-This file is loaded by the orchestrator when mode = Generate and no `--target` is provided. It is
-**not** a sub-agent prompt. It defines the Round 0 dispatch sequence the orchestrator follows.
+Loaded by the orchestrator when mode = generate and no `--evolve` is
+provided. Defines Round 0 + Round 1 setup. After Step 7 (writer fan-out)
+the orchestrator loads `review/index.md` and runs the review pipeline —
+this file does not duplicate the review-loop orchestration.
+
+This file is **orchestration**, not a sub-agent prompt. It does not
+carry the Snippet D fingerprint.
 
 ---
 
-## Round 0 Sequence
-
-The orchestrator executes these steps in order. Steps 4 and 8 may be skipped per conditions below.
-All script calls are deterministic (no LLM dispatch). Only steps 4, 5, 8, 10, 11, 12 involve
-sub-agent dispatch.
+## Round 0 — Bootstrap
 
 ### Step 1 — Git Precheck (script)
 
@@ -17,139 +18,113 @@ sub-agent dispatch.
 scripts/git-precheck.sh
 ```
 
-- **Inputs**: cwd
-- **Outputs**: exits 0 (repo ready) or non-zero (exits the skill)
-- **Orchestrator**: if exit non-zero → stop, report error to user. Do not enter generate mode.
+Exit non-zero → stop the skill; do not enter generate mode.
 
 ### Step 2 — Prepare Input (script)
 
 ```bash
-scripts/prepare-input.sh "<user-prompt>" <target>/.review
+scripts/prepare-input.sh "<user-prompt>" <prd-dir>/.review
 ```
 
-- **Inputs**: raw user prompt string, optional `@refs` / URLs
-- **Outputs**: `<target>/.review/round-0/input.md` (normalized text), `<target>/.review/round-0/input-meta.yml` (sparse_input flag, source list). Also drops `<target>/.review/README.md` from `common/templates/review-readme-template.md` on first bootstrap (idempotent — skipped if the file already exists so user edits survive delivery-N re-bootstrap).
-- **Orchestrator**: read exit code only; do not read the written files.
+Outputs `<prd-dir>/.review/round-0/input.md` (normalized), `input-meta.yml`,
+and (idempotently, on first bootstrap) `.review/README.md` from
+`common/templates/review-readme-template.md`.
+
+Orchestrator: read exit code only; never read the written files.
 
 ### Step 3 — Glossary Probe (script)
 
 ```bash
-scripts/glossary-probe.sh <target>/.review common/domain-glossary.md
+scripts/glossary-probe.sh <prd-dir>/.review common/domain-glossary.md
 ```
 
-- **Inputs**: `input.md`, `input-meta.yml`, `domain-glossary.md`
-- **Outputs**: `<target>/.review/round-0/trigger-flags.yml` (boolean flags: `glossary_hit`, `sparse_input`, `ambiguous_artifact_type`)
-- **Orchestrator**: read exit code only; do not read the written file.
-- **Note**: first arg is the `.review/` root, not `.review/round-0/` — the script appends `round-0/` itself (or `--bootstrap-subdir` override).
+Outputs `<prd-dir>/.review/round-0/trigger-flags.yml` (`glossary_hit`,
+`sparse_input`, `ambiguous_artifact_type`).
 
-### Step 4 — Domain Consultant (conditional sub-agent dispatch)
+### Step 4 — Domain Consultant (conditional)
 
-**Condition**: dispatch if `trigger-flags.yml` reports `glossary_hit: true` OR `sparse_input: true`
-OR user passed `--interactive`. Skip otherwise.
+**Trigger**: `glossary_hit: true` OR `sparse_input: true` OR user passed
+`--interactive`. Skip otherwise.
 
-**`--no-consultant` override**: when the user passes this flag, skip the consultant dispatch
-unconditionally — even when triggers fire. The orchestrator synthesizes a minimal
-`<target>/.review/round-0/clarification/<ISO-ts>.yml` locally, setting the four flat
-placeholder keys (`SKILL_NAME`, `SKILL_VERSION`, `SKILL_DESCRIPTION`, `ARTIFACT_ROOT`)
-from the user prompt and `input.md`'s expanded refs (look for `SKILL.md` in any
-`@`-referenced directory for name/version/description; fall back to slug-from-prompt
-and the default `docs/raw/<slug>/` artifact root). Mark R-001..R-007 as `status: deferred`.
-Saves the consultant's opus-tier dispatch cost (~$4 on a 231 KB backup reference).
+`--no-consultant` override: skip unconditionally; orchestrator
+synthesizes a minimal `clarification/<ts>.yml` locally with R-001..R-007
+marked `status: deferred`.
 
-- **Dispatches**: `generate/domain-consultant-subagent.md`
-- **Inputs consumed by sub-agent**: `round-0/input.md`, `round-0/input-meta.yml`, `round-0/trigger-flags.yml`, `common/domain-glossary.md`
-- **Outputs written by sub-agent**: `<target>/.review/round-0/clarification/<ISO-timestamp>.yml`
-- **Orchestrator action on ACK**: record `trace_id` in `state.yml`; if ACK is `FAIL` → apply §16 retry policy; if user wrote `/abort` during dialogue → exit this skill.
+- Dispatches: `generate/domain-consultant-subagent.md`
+- Inputs: `round-0/input.md`, `input-meta.yml`, `trigger-flags.yml`,
+  `common/domain-glossary.md`
+- Outputs: `<prd-dir>/.review/round-0/clarification/<ISO-ts>.yml`
 
 ### Step 5 — Planner (sub-agent dispatch)
 
-- **Dispatches**: `generate/planner-subagent.md`
-- **Inputs consumed by sub-agent**:
-  - If consultant ran: `round-0/clarification/<ts>.yml`
-  - If consultant skipped: `round-0/input.md` directly
-- **Outputs written by sub-agent**: `<target>/.review/round-1/plan.md`
-- **Orchestrator action on ACK**: record `trace_id`; proceed to Step 6.
+- Dispatches: `generate/planner-subagent.md`
+- Inputs: `round-0/clarification/<ts>.yml` (or `round-0/input.md` directly
+  when consultant skipped)
+- Outputs: `<prd-dir>/.review/round-1/plan.md`
+
+The planner produces an `add:` list of PRD leaves to author (typically
+README.md, journeys/J-NNN-*.md, features/F-NNN-*.md, architecture.md,
+architecture/*.md). PRDs have no skeleton — every leaf is an `add`.
 
 ### Step 6 — HITL: Plan Approval Gate
 
-The orchestrator presents the plan to the user (read `round-1/plan.md` — **this is the ONLY
-artifact the orchestrator is permitted to read**; it is a planning document, not a generated
-artifact leaf).
+Orchestrator reads `round-1/plan.md` (the only artifact it is permitted
+to read). Wait for user response:
 
-Wait for user response:
-- **approve** (or `/approve`) → continue to Step 7
-- **revise** (or `/revise <feedback>`) → re-dispatch planner with feedback appended; loop Step 5–6
-- **abort** (or `/abort`) → exit this skill
+- approve / `/approve` → continue to Step 7
+- revise / `/revise <feedback>` → re-dispatch planner with feedback;
+  loop Steps 5–6
+- abort / `/abort` → exit the skill
 
-### Step 7 — Scaffold (script)
+---
 
-```bash
-scripts/scaffold.sh <variant> <target>/ <target>/.review/round-0/clarification/<ts>.yml
-```
+## Round 1 — Writer fan-out
 
-- **Inputs**: variant name (from clarification.yml), target directory, clarification.yml
-- **Outputs**: full skeleton tree at `<target>/` (copied from `common/skeleton/<variant>/`)
-- **Orchestrator**: if exit non-zero → report error; halt.
+### Step 7 — Writer Fan-out (parallel)
 
-### Step 8 — Writer Fan-out (parallel sub-agent dispatch)
+Fan-out one writer per entry in `plan.add`. Each writer:
 
-Fan-out one writer sub-agent per file listed in `round-1/plan.md` `add:` list (typically 7–9 files).
-All dispatched in parallel.
+- Receives: `round-0/clarification/<ts>.yml` (most recent),
+  `round-1/plan.md`, the relevant template from `common/templates/`
+  (`feature-template.md` / `journey-template.md` /
+  `architecture-template.md` / `prd-template.md`).
+- Writes the leaf at `<prd-dir>/<relative-path>`.
+- Runs `scripts/run-checkers.sh <prd-dir>` as a self-audit hard gate
+  (guide §4); fixes any formal failures in place and re-runs until
+  PASS. Formal failures here do NOT create issue files (guide §4.1).
+- Writes the self-review at
+  `<prd-dir>/.review/round-1/self-reviews/<trace_id>.md` covering only
+  **substantive** CRs (formal CRs are already enforced by run-checkers).
+- Returns single-line ACK.
 
-- **Dispatches**: `generate/writer-subagent.md` (N instances, one per file)
-- **Inputs consumed by each sub-agent**:
-  - `round-0/clarification/<ts>.yml` (most recent)
-  - `round-1/plan.md`
-  - Corresponding template from `common/templates/` (determined by target file type)
-- **Outputs written by each sub-agent**:
-  1. Target artifact file at `<target>/<relative-path>`
-  2. `<target>/.review/round-1/self-reviews/<trace_id>.md`
-- **Orchestrator action on all ACKs received**: collect `self_review_status` and `fail_count` per ACK. Proceed to Step 9.
+Orchestrator: collect `self_review_status` and `fail_count` from each
+ACK. Proceed to Step 8.
 
-### Step 9 — Script-Type Checks (script)
+### Step 8 — Enter Review Loop
 
-```bash
-scripts/run-checkers.sh <target>/ round-1
-```
+Load `review/index.md` and execute the review-mode steps with
+`round=1`. The review pipeline handles formal hard gate (already-passed
+since writers' self-audit just ran, but the gate runs again as belt
+and suspenders — `check-issue-schema.sh` may surface issues from any
+prior `.review/` state), cross-reviewer dispatch, summarizer, judge.
 
-- **Inputs**: all files in `<target>/` (script-accessible)
-- **Outputs**: issue files under `<target>/.review/round-1/issues/` for any script-detected failures
-- **Orchestrator**: if critical/error issues found → go to revise phase (Phase 22 / `revise/index.md`). Else → Step 10.
+Verdict routing (per `review/index.md` Step 8):
 
-### Step 10 — Cross-Reviewer (sub-agent dispatch)
-
-- **Dispatches**: `review/cross-reviewer-subagent.md`
-- **Inputs consumed by sub-agent**: all target artifact leaves + issue files from Step 9
-- **Outputs written by sub-agent**: additional issue files under `round-1/issues/`
-- **Orchestrator action on ACK**: proceed to Step 11.
-
-### Step 11 — Summarizer (sub-agent dispatch)
-
-- **Dispatches**: `shared/summarizer-subagent.md`
-- **Outputs written by sub-agent**: `round-1/index.md`, `CHANGELOG.md` entry, `.review/versions/<N>.md`
-- **Orchestrator action on ACK**: proceed to Step 12.
-
-### Step 12 — Judge (sub-agent dispatch)
-
-- **Dispatches**: `shared/judge-subagent.md`
-- **Outputs written by sub-agent**: `round-1/verdict.yml`
-- **Orchestrator action on ACK**:
-  - `verdict: converged` → proceed to delivery commit (`scripts/commit-delivery.sh`)
-  - `verdict: progressing` → increment round, loop from Step 8 (writer fan-out on modified files only)
-  - `verdict: stalled` → surface to user; request human intervention
-
-### Delivery Commit
-
-```bash
-scripts/commit-delivery.sh <target>/ <delivery-id> <slug>
-```
-
-Creates annotated git tag `delivery-<N>-<slug>`. Skill-forge exits cleanly.
+| Verdict | Next |
+|---------|------|
+| `converged` | Delivery: `scripts/commit-delivery.sh <prd-dir> <delivery-id> <slug>` creates annotated tag `delivery-<N>-<slug>`; skill exits cleanly |
+| `progressing` | Load `revise/index.md`; increment round; loop back to review |
+| `oscillating` / `diverging` / `stalled` | HITL gate; surface to user |
 
 ---
 
 ## Notes
 
-- Round numbers are cross-delivery monotonic. Round 1 in delivery 1 is round 1 globally.
-- The orchestrator MUST NOT read any artifact leaf other than `plan.md` (Step 6) and `verdict.yml` (Step 12 — exit-code equivalent). For all other routing decisions, rely on ACK fields alone.
-- `from-scratch.md` is not a sub-agent prompt; it does not carry the Snippet D fingerprint.
+- Round numbers are cross-delivery monotonic. Round 1 in delivery 1 is
+  round 1 globally; delivery 2 starts at round-(K+1) where K is the
+  last delivery 1 round.
+- The orchestrator MUST NOT read any artifact leaf except `plan.md`
+  (Step 6). All other routing decisions ride on ACK fields and verdict
+  files.
+- PRD generation has no scaffold step — there is no skeleton to copy
+  from. Each leaf is authored fresh by a writer based on the template.

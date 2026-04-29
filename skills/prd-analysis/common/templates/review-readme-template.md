@@ -44,11 +44,10 @@ Single source of truth for the orchestrator's own bookkeeping. Keys:
 
 | Key | Purpose |
 |---|---|
-| `current_round` | Monotonically incremented; read by run-checkers / skip-set / cross-reviewer. |
+| `current_round` | Monotonically incremented across rounds and deliveries. Read by run-checkers, the cross-reviewer (for trace_id assignment), and the phase-gate scripts. |
 | `current_delivery` | Bumped when a verdict=converged triggers the delivery commit. |
 | `mode` | One of `generate-from-scratch`, `generate-new-version`, `review`, `revise`. |
 | `phase` (optional) | Set to `on-converge` just before the summarizer's on-converge phase is dispatched. |
-| `forced_full_cross_review` (optional) | `true` during the first `--review` dispatch of a delivery. |
 | `git_sha` (optional) | Current HEAD sha, injected by orchestrator before on-converge summarizer dispatch. |
 
 Orchestrator is the **only** writer to this file. Sub-agents read it but never modify

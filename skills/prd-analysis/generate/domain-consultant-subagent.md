@@ -67,9 +67,9 @@ file-read tools):
 - **One question per turn.** Never ask multiple questions simultaneously.
 - **Resolution order**: resolve R-001 (product name / scope) first, then R-002 (output scope —
   full PRD vs. targeted expansion), then R-003 (artifact structure depth), then R-004..R-007 in
-  order. R-002 determines whether the `document` skeleton variant applies (it always does for
-  prd-analysis, but confirm scope boundaries before generating).
-- **Variant anchoring**: once R-002 is confirmed, describe the expected output to the user in
+  order. R-002 confirms the user wants the canonical PRD bundle shape rather than a single-
+  document brief; this is the default for prd-analysis but worth checking when input is sparse.
+- **Output anchoring**: once R-002 is confirmed, describe the expected output to the user in
   one paragraph: "Your PRD will consist of a README index, `journeys/J-NNN.md` files (one per
   user persona journey), `features/F-NNN-slug.md` files (one per derived feature), and an
   `architecture/` directory with design-token and coding-convention files. Does this scope
@@ -97,8 +97,8 @@ Write exactly ONE file at:
 Example path: `.review/round-0/clarification/2026-04-28T09-30-00Z.yml`
 
 The file MUST follow this exact shape. The four flat placeholder keys MUST appear first
-(before any nested block) — `scripts/scaffold.sh` parses them with a simple line scanner
-and halts if any are missing or indented.
+(before any nested block) so a downstream line-scanner can read them without a YAML
+library.
 
 ```yaml
 SKILL_NAME: "prd-analysis"               # always "prd-analysis" for this skill
@@ -229,11 +229,11 @@ normalized_requirements:
 domain_terms_aligned: []
 ```
 
-**Why this is GOOD**: The planner reads R-001 (product slug → `ARTIFACT_ROOT`), R-002 (full-prd
-→ all skeleton files needed), and R-007 (first-generation → `delete: []`, `keep: []` lists empty).
-`SKILL_DESCRIPTION` is concrete and distinct, satisfying the `description: "Use when …"` field
-the SKILL.md writer populates. All four flat keys are present before any nested block —
-`scripts/scaffold.sh` will parse them without error.
+**Why this is GOOD**: The planner reads R-001 (product slug → `ARTIFACT_ROOT`), R-002
+(full-prd → canonical PRD bundle shape), and R-007 (first-generation → `delete: []`, `keep: []`
+lists empty). `SKILL_DESCRIPTION` is concrete and distinct, satisfying the
+`description: "Use when …"` field the planner uses to seed the README. All four flat keys
+appear before any nested block — downstream line-scanners parse them without a YAML library.
 
 ---
 

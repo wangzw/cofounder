@@ -1,9 +1,10 @@
 # common/snippets.md — Pinned Snippet C and Snippet D
 
 Single source of truth for the orchestrator dispatch contract (Snippet C) and the sub-agent IPC
-contract (Snippet D). Downstream check scripts (`check-dispatch-log-snippet.sh`,
-`check-ipc-footer.sh`) grep for the fingerprint lines defined here. Do not rename or reformat
-those lines.
+contract (Snippet D). The fingerprint comment lines (`<!-- snippet-c-fingerprint: ... -->` and
+`<!-- snippet-d-fingerprint: ... -->`) are documented here so future automation has a stable
+target; they currently have no automated enforcement script (the prior `check-dispatch-log-snippet.sh`
+and `check-ipc-footer.sh` checks were removed when skill-forge was deprecated).
 
 ---
 

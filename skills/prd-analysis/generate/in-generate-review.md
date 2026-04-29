@@ -1,19 +1,26 @@
 # In-Generate Self-Review Checklist — prd-analysis
 
-This file is referenced by `generate/writer-subagent.md`. It defines which CRs apply to which
-PRD-bundle leaf types and the PASS/FAIL format for writer self-reviews. All criteria are from
-prd-analysis's own `common/review-criteria.md` (CR-PP01..CR-PP51, CR-S15).
+Referenced by `generate/writer-subagent.md`. Defines which **substantive**
+CRs apply to which PRD-bundle leaf types and the PASS/FAIL format for
+the writer's self-review archive.
+
+> **Formal CRs are NOT in this table.** CR-PP01–CR-PP05, CR-PP04 (no
+> TBD), and CR-FM01 (frontmatter) are enforced by
+> `scripts/run-checkers.sh` as a hard gate before the writer ACKs (guide
+> §4 + §4.1). Failures there are auto-fixed in place by the writer
+> without creating issue files. The table below covers only the
+> substantive CRs the writer self-reviews after formal PASS.
 
 ---
 
-## CR Applicability Table
+## CR Applicability Table (substantive only)
 
 | Leaf type | Applicable CRs |
 |-----------|----------------|
-| `README.md` | CR-PP01, CR-PP03, CR-PP06, CR-PP07, CR-PP08, CR-PP09, CR-PP10, CR-PP11, CR-PP12, CR-PP13 |
-| `journeys/J-NNN.md` | CR-PP02, CR-PP16, CR-PP21, CR-PP34, CR-PP14 |
-| `features/F-NNN.md` | CR-PP02, CR-PP07, CR-PP12, CR-PP14, CR-PP15, CR-PP17, CR-PP18, CR-PP19, CR-PP20, CR-PP24, CR-PP25, CR-PP26, CR-PP29, CR-PP31, CR-PP32, CR-PP38, CR-PP39 |
-| `architecture.md` (index) | CR-PP01, CR-PP14 |
+| `README.md` | CR-PP06, CR-PP07, CR-PP08, CR-PP09, CR-PP10, CR-PP11, CR-PP12, CR-PP13 |
+| `journeys/J-NNN.md` | CR-PP16, CR-PP21, CR-PP34, CR-PP14 |
+| `features/F-NNN.md` | CR-PP07, CR-PP12, CR-PP14, CR-PP15, CR-PP17, CR-PP18, CR-PP19, CR-PP20, CR-PP24, CR-PP25, CR-PP26, CR-PP29, CR-PP31, CR-PP32, CR-PP38, CR-PP39 |
+| `architecture.md` (index) | CR-PP14 |
 | `architecture/design-tokens.md` | CR-PP23 |
 | `architecture/coding-conventions.md` | CR-PP40 |
 | `architecture/test-isolation.md` | CR-PP41 |
@@ -29,7 +36,6 @@ prd-analysis's own `common/review-criteria.md` (CR-PP01..CR-PP51, CR-S15).
 | `architecture/backward-compat.md` | CR-PP44 |
 | `architecture/git-strategy.md` | CR-PP45 |
 | `architecture/code-review.md` | CR-PP46 |
-| Any leaf | CR-PP04 (no TBD/TODO/FIXME) |
 
 ---
 
