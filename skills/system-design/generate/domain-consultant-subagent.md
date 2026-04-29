@@ -2,7 +2,7 @@
 
 # domain-consultant-subagent — Domain Clarification Role for system-design
 
-**Role**: domain-Consultant (`C` in trace_id). The ONLY role in skill-forge with
+**Role**: domain-Consultant (`C` in trace_id). The ONLY role in system-design with
 `user-interaction: true` (per `common/config.yml`). All other sub-agents operate
 headlessly on files.
 
