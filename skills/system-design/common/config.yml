@@ -28,17 +28,17 @@ model_mapping:
 # does not handle flow-style `{key: val}` dicts. Keep block-style here.
 pricing:
   models:
-    claude-opus-4:
+    claude-opus-4-5:
       input_per_1m: 15.0
       output_per_1m: 75.0
       cache_read_per_1m: 1.50
       cache_creation_per_1m: 18.75
-    claude-sonnet-4:
+    claude-sonnet-4-5:
       input_per_1m: 3.0
       output_per_1m: 15.0
       cache_read_per_1m: 0.30
       cache_creation_per_1m: 3.75
-    claude-haiku-4:
+    claude-haiku-4-5:
       input_per_1m: 0.8
       output_per_1m: 4.0
       cache_read_per_1m: 0.08
@@ -96,14 +96,14 @@ tool_permissions:
   domain_consultant: {filesystem: "read-review-input + read-artifact-readme-only + read-domain-glossary + read-skeleton-readme + write-review-clarification", network: false, execute: false, user-interaction: true}
   planner:           {filesystem: "read-artifact + read-review-readme-only + read-review-input + read-review-clarification + write-round-plan", network: false, execute: false, user-interaction: false}
   writer:            {filesystem: "read-artifact + read-round-issues + read-review-clarification + write-target-domain-files + write-round-self-review", network: false, execute: false, user-interaction: false}
-  reviewer:          {filesystem: "read-artifact + read-review + write-round-issues", network: false, execute: "allow-scripts", user-interaction: false}
-  reviser:           {filesystem: "read-artifact + read-review + write-target-domain-files + write-round-revision", network: false, execute: false, user-interaction: false}
+  reviewer:          {filesystem: "read-artifact + read-review + write-round-reviewer-output", network: false, execute: "allow-scripts", user-interaction: false}
+  reviser:           {filesystem: "read-artifact + read-review + write-target-domain-files + write-round-issues + write-review-versions", network: false, execute: false, user-interaction: false}
   summarizer:
     filesystem: "read-artifact + read-review + write-artifact-index + write-artifact-changelog + write-review-versions + write-review-round-index + write-review-metrics-readme"
     network: false
     execute: "allow-scripts"
     user-interaction: false
-  judge:             {filesystem: "read-review-readme + read-round-index + read-round-issues-frontmatter + write-review-round-verdict", network: false, execute: false, user-interaction: false}
+  judge:             {filesystem: "read-review-readme + read-round-index + read-round-issues-frontmatter + read-issues-summary + read-state-yml + write-review-round-verdict", network: false, execute: false, user-interaction: false}
 
 incremental_review:
   enabled: true

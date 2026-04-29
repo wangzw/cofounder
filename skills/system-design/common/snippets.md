@@ -1,9 +1,8 @@
 # common/snippets.md — Pinned Snippet C and Snippet D
 
 Single source of truth for the orchestrator dispatch contract (Snippet C) and the sub-agent IPC
-contract (Snippet D). Downstream check scripts (`check-dispatch-log-snippet.sh`,
-`check-ipc-footer.sh`) grep for the fingerprint lines defined here. Do not rename or reformat
-those lines.
+contract (Snippet D). The fingerprint lines defined here are the stable fingerprints that any
+future verification tooling should grep for; do not rename or reformat those lines.
 
 ---
 
