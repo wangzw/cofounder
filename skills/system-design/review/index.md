@@ -1,184 +1,221 @@
-# Review Mode — Orchestration (`--review`)
+# Review Mode — Orchestration
 
-Entry doc for `/cofounder:system-design --review <design-dir>`. **This mode is strictly
-read-only** — it reports findings but NEVER modifies any artifact file. All output goes to
-`<design-dir>/.review/round-<N>/issues/`.
+Loaded by the orchestrator when `--review` is invoked. Defines the review
+loop the orchestrator follows for round N. Implements
+[~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md):
 
-This file is loaded by the orchestrator when mode = `--review`. It is **not** a sub-agent prompt
-and does not carry the Snippet D fingerprint.
+- §5 — convergence is `formal_PASS ∧ substantive_PASS`. Formal failure
+  short-circuits LLM dispatch (no point reviewing content of a malformed
+  artifact).
+- §7 — review-revise iteration with phase gates around `state: new` issues.
+- §10 — review artifacts are themselves artifacts and pass formal checks.
 
----
+Review mode is the **read phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". This file enforces both:
 
-## Step Sequence
+- **Read-phase entry gate** (Step 1): no `state: new` from
+  prior rounds AND bundle passes formal review. If either fails, the
+  read phase does not start — control returns to a write (revise) phase.
+- **Read-phase exit**: judge verdict in Step 7. The read phase produces
+  issues in `state: new`; dispositioning them is the next write
+  (revise) phase's job, gated by `check-revise-completeness.sh`.
 
-### Step 1 — Git Precheck
-
-```bash
-scripts/git-precheck.sh
-```
-
-On failure (non-zero exit): skill exits immediately. Do NOT enter any review phase.
-
-### Step 2 — Bootstrap: Determine Round Number
-
-Read `<design-dir>/.review/state.yml`:
-
-- If the file exists, read `last_round` → N = last_round + 1.
-- If the file does not exist, create it with `last_round: 0` → N = 1.
-
-Create directory: `<design-dir>/.review/round-<N>/issues/`
-
-During Bootstrap, orchestrator MUST write `skill-root: <absolute path to this skill's root directory>` to `<design-dir>/.review/state.yml` so downstream sub-agents can locate this skill's own scripts. Also write `last_round: <N>`.
-
-### Step 3 — Inventory Pre-Scan
-
-Read only:
-
-- `<design-dir>/README.md`
-- `<design-dir>/REVISIONS.md` (if present)
-
-Then enumerate via `Glob`:
-
-- `<design-dir>/modules/M-*.md`
-- `<design-dir>/api/API-*.md` (if `api/` directory exists)
-
-Record file lists for lint fan-out and reviewer dispatch. Also scan the parent directory for
-sibling design directories with the same product slug (the portion after `YYYY-MM-DD-`). If
-multiple versions exist, record version context (position, latest path, REVISIONS.md chain
-integrity) for presentation in Step 7.
-
-### Step 4 — Structural-Lint Pre-Pass
-
-```bash
-scripts/run-checkers.sh <design-dir>/ round-<N>
-```
-
-The script runs all per-file structural checks (CR-L1..CR-L5) and all cross-file structural
-checks (CR-X1..CR-X8). For each failure it writes an issue file to:
-
-```
-<design-dir>/.review/round-<N>/issues/R<N>-<seq>.md
-```
-
-**Exit on critical/error findings:** if `run-checkers.sh` exits non-zero and any issue has
-`severity: blocker` or `severity: error`, stop here. Print the lint findings to the user and
-recommend fixing them with `--revise` before re-running `--review`. Do NOT proceed to Step 5.
-
-**Semantic dimensions** (Implementability, Risk awareness, Self-containment, Testability,
-Frontend performance, Backend i18n coverage, Form implementation consistency) are always run
-regardless of lint results — they require judgment that scripts cannot perform. Once lint is
-clean, proceed to Step 5.
-
-### Step 5 — Reviewer Dispatch (Parallel LLM Review)
-
-Dispatch **cross-reviewer** and **adversarial-reviewer** in parallel. Both perform a **forced
-full review** — do NOT apply any skip-set. Every leaf in the design directory is in scope.
-
-#### 5a — Cross-Reviewer
-
-- **Dispatches**: `review/cross-reviewer-subagent.md`
-- **Sub-agent type**: `general-purpose`; **model**: `opus`
-- **Sub-agent inputs**:
-  - Absolute paths to all `modules/M-*.md` and `api/API-*.md` files (no globs)
-  - `<design-dir>/README.md`
-  - Lint issue paths from Step 4 (if any non-blocker lint issues remain)
-  - `common/review-criteria.md` (CR-L01..CR-L11 and CR-X1..CR-X8 semantic sides)
-  - Round number N and target issue directory: `<design-dir>/.review/round-<N>/issues/`
-- **Sub-agent outputs**: issue files written to `<design-dir>/.review/round-<N>/issues/<issue-id>.md`
-  Issue IDs: `R<N>-V-<seq>` (zero-padded 3 digits, continuing from highest existing seq in `round-<N>/issues/`)
-- **Filter rule**: sub-agent MUST NOT report findings already declared by lint (mechanical/script-type). Semantic findings only.
-
-#### 5b — Adversarial-Reviewer
-
-- **Dispatches**: `review/adversarial-reviewer-subagent.md`
-- **Sub-agent type**: `general-purpose`; **model**: `opus`
-- **Sub-agent inputs**: same as 5a
-- **Sub-agent outputs**: issue files written to `<design-dir>/.review/round-<N>/issues/<issue-id>.md`
-  Issue IDs: `R<N>-V-<seq>-ADV` (continuing sequence from cross-reviewer output)
-- **Filter rule**: same — no re-reporting of lint-declared mechanical findings
-
-### Step 6 — Summarizer
-
-After both reviewers return, dispatch `shared/summarizer-subagent.md` (if present) or
-synthesize counts directly:
-
-- Count issues by severity: `blocker`, `error`, `warning`, `suggestion`
-- Count by source: `script` (from run-checkers.sh), `cross` (cross-reviewer), `adversarial`
-- Write `<design-dir>/.review/round-<N>/verdict.yml`:
-
-```yaml
-round: <N>
-status: reviewed        # always "reviewed" for --review mode (no judge convergence loop)
-reviewed_at: <ISO-8601>
-counts:
-  total: N
-  by_severity:
-    blocker: N
-    error: N
-    warning: N
-    suggestion: N
-  by_source:
-    script: N
-    cross: N
-    adversarial: N
-issues_dir: .review/round-<N>/issues/
-```
-
-### Step 7 — Recommend Next Step
-
-Evaluate findings and determine the recommendation:
-
-- **Blocker/error findings present** — recommend `--revise <design-dir>`.
-- **Only suggestion/warning findings** — note them; `--revise` is optional.
-- **Reviewing an older version** (detected in Step 3) — note that the latest version should be reviewed instead, unless the user explicitly requested this version.
-
-### Step 8 — Print to User
-
-```
-Version context (if multiple versions detected):
-  Reviewing: {path} ({position, e.g. v1 of 2})
-  Latest:    {path of latest}
-  Chain:     {REVISIONS.md chain integrity}
-  ⚠ You are reviewing an older version.    ← only if not latest
-
-Round <N>: {blocker} blocker · {error} error · {warning} warning · {suggestion} suggestion
-
-Issue files: <design-dir>/.review/round-<N>/issues/
-Verdict:     <design-dir>/.review/round-<N>/verdict.yml
-
-Top findings:
-{inline table of top ~10 by severity — group by theme: completeness, consistency,
-implementability, risk, testability. Lead with blockers/errors, then warnings, then suggestions.
-Do not dump the full findings table inline for large designs — the issue files are the source of truth.}
-
-Next step:  {recommendation from Step 7}
-Run `/cofounder:system-design --revise <design-dir>` to apply fixes.
-```
-
-**Hard rule:** `--review` MUST NOT auto-chain into `--revise`. Exit after printing to user. The
-operator advances the lifecycle by invoking the next flag.
+This file is **orchestration**, not a sub-agent prompt. It does not carry
+the Snippet D fingerprint.
 
 ---
 
-## Output Path Reference
+## Review Loop — Step by Step
 
-| Artifact | Path |
-|----------|------|
-| Mechanical findings | `<design-dir>/.review/round-<N>/issues/R<N>-<seq>.md` |
-| Cross-reviewer findings | `<design-dir>/.review/round-<N>/issues/R<N>-V-<seq>.md` |
-| Adversarial findings | `<design-dir>/.review/round-<N>/issues/R<N>-V-<seq>-ADV.md` |
-| Round verdict | `<design-dir>/.review/round-<N>/verdict.yml` |
-| Harness state | `<design-dir>/.review/state.yml` |
+### Step 1 — MANDATORY: Phase Entry Verification (script-enforced)
 
-`.review/` is transient and not version-controlled. Add `docs/raw/design/*/.review/` to
-`.gitignore`. Durable audit history belongs in `REVISIONS.md` (appended by `--revise`
-post-change), not in raw review files.
+**This MUST be the first action of the read phase. The orchestrator
+MUST NOT proceed past this script on a non-zero exit.**
+
+```bash
+scripts/verify-phase-entry.sh read <design-dir>
+```
+
+Consolidates both read-phase entry preconditions into a single gate:
+
+- `check-review-readiness.sh` — no `state: new` issue from any prior
+  round (i.e. the previous revise wrote completely; guide §7.3)
+- `run-checkers.sh` — bundle is formally clean (i.e. the previous
+  write phase produced a valid bundle; guide §6 fast-failure)
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | Both preconditions PASS | continue to Step 2 (LLM substantive dispatch) |
+| 1    | At least one precondition FAIL | **short-circuit to revise**: re-run `run-checkers.sh <design-dir>` to capture the JSON formal-failure document, pipe to `create-issues.sh <design-dir> <round>` to materialize per-issue files, then load `revise/index.md` |
+| 2    | Script-level error in a sub-checker | HITL — do not modify the artifact (guide §9.1) |
+
+Why this is the first step: the prose contract in `SKILL.md` "Phase
+Contract" is enforcement-by-LLM, which is unreliable. This script is
+enforcement-by-process: even if subsequent steps are skipped or
+reordered, control cannot reach LLM dispatch without
+`verify-phase-entry` having exited 0. Per guide §6, a formal problem
+caught here costs zero LLM tokens and saves an entire LLM round.
+
+### Step 2 — Cross-Reviewer Dispatch (substantive only)
+
+Pre-conditions: Step 1 exit 0 (entry verification PASS) **and** there is meaningful
+work for the reviewer (artifact changed since last delivery, or prior-round
+issues are still open).
+
+```
+Dispatch: review/cross-reviewer-subagent.md
+```
+
+**Sub-agent inputs**:
+
+- The design bundle leaves (`README.md`, every `modules/M-NNN-*.md`,
+  every `api/API-NNN-*.md`)
+- Writer self-review files at `<design-dir>/.review/round-<N>/self-reviews/` (if any)
+- `<design-dir>/.review/issues/summary.yml` — for fingerprint matching against
+  prior issues (guide §7.6). The reviewer MUST check each new finding
+  against this list before emitting it; matched findings get
+  `recurrence_of: <prior-id>` in the output.
+- `common/review-criteria.md` — every entry whose `checker_type: llm`
+
+**Sub-agent output (one disk write)**: writes a JSON document to
+`<design-dir>/.review/round-<N>/reviewer-output/<trace_id>.json`, conforming
+to the LLM raw-output schema in `common/issue-schema.md`. The reviewer
+NEVER writes issue files directly (guide §7.1) — `create-issues.sh`
+walks the `reviewer-output/` directory and materializes per-issue files
+in a later step.
+
+**Orchestrator action on ACK**: record the trace_id in `state.yml`. Do
+not yet materialize issues; that happens after Step 3 (so cross +
+adversarial reviewer outputs are merged in one create-issues pass).
+
+### Step 3 — Adversarial-Reviewer Dispatch (conditional)
+
+Fire only if cross-reviewer's output contained at least one
+`severity: critical` finding (configurable via `config.yml
+adversarial_review.triggered_by`).
+
+```
+Dispatch: review/adversarial-reviewer-subagent.md
+```
+
+Same input contract as cross-reviewer; writes a separate
+`reviewer-output/<trace_id>.json` file.
+
+### Step 4 — Materialize Issue Files
+
+After both reviewer dispatches have ACKed:
+
+```bash
+scripts/create-issues.sh <design-dir> <round>
+```
+
+Default mode (no `--stdin`) walks every
+`<design-dir>/.review/round-<N>/reviewer-output/*.json`, merges their
+`issues` lists, and writes one schema-conformant `.md` file per accepted
+finding to `<design-dir>/.review/round-<N>/issues/`. If `create-issues.sh`
+exits 1, at least one reviewer's output violated the schema — surface
+the specific error to the user; do NOT silently drop findings.
+
+### Step 5 — Update Summary
+
+```bash
+scripts/update-summary.sh <design-dir>
+```
+
+Refreshes `<design-dir>/.review/issues/summary.yml` so the next round's
+fingerprint matching sees this round's issues. Per guide §7.5, this is
+where recurrence detection happens for the next iteration.
+
+### Step 6 — Summarizer Dispatch
+
+```
+Dispatch: shared/summarizer-subagent.md (per-round phase)
+```
+
+Sub-agent writes `<design-dir>/.review/round-<N>/index.md` with issue counts
+(by state and severity), `false_positive_ratio`, `deferred_ratio`, and
+recurrence statistics (guide §7.7).
+
+### Step 7 — Judge Dispatch
+
+```
+Dispatch: shared/judge-subagent.md
+```
+
+Sub-agent writes `<design-dir>/.review/round-<N>/verdict.yml`.
+
+The verdict is computed against the rule from guide §5:
+
+```
+converged ⟺ formal_PASS ∧ substantive_PASS
+formal_PASS    : Step 1 exited 0 in this round
+substantive_PASS: 0 issues with severity ∈ {error, critical} and state ∈ {new}
+```
+
+Verdicts other than `converged` mean further work; specifically the judge
+considers:
+
+- `progressing`  — issues exist but were refined this round (count or
+  severity decreased vs prior round)
+- `oscillating`  — the same issues keep returning between fixed and new
+  (guide §7.5.1 recurrence count ≥ 2 on the same issue id)
+- `diverging`    — error/critical count rose vs prior round
+- `stalled`      — `max_iterations` reached without convergence
+
+### Step 8 — Verdict Routing
+
+| Verdict        | Next Action |
+|----------------|-------------|
+| `converged`    | Delivery sequence (Step 9 below) |
+| `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
+| `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
+| `diverging`    | HITL gate: surface regression report; same options |
+| `stalled`      | HITL gate: report stall; same options |
+
+### Step 9 — Delivery Sequence (only on `converged`)
+
+1. Set `state.yml phase: on-converge` and inject `git_sha: <HEAD sha>`.
+2. Re-dispatch `shared/summarizer-subagent.md` with `phase: on-converge`. The
+   summarizer writes:
+   - `<design-dir>/.review/versions/<N>.md` — quality_at_delivery snapshot
+   - `<design-dir>/CHANGELOG.md` — prepend a delivery entry
+   - (conditional) `<design-dir>/README.md` — append a Revisions row
+3. Run `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` to create
+   the annotated git tag `delivery-<N>-<slug>`.
+4. Orchestrator exits cleanly.
+
+Steps 1 and 3 are orchestrator-side (no LLM); Step 2 is the only Phase 2
+sub-agent dispatch in the entire delivery sequence.
 
 ---
 
 ## Files in This Directory
 
-- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt
-  (per-file + cross-file semantic dimensions from `common/review-criteria.md`)
-- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer
-  sub-agent prompt (attack-angle review: interface gaps, dependency leaks, coverage blind spots)
+- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — substantive
+  reviewer (every `checker_type: llm` criterion)
+- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) —
+  adversarial substantive reviewer (conditional, on critical findings)
+
+---
+
+## What Changed vs the Prior Design
+
+The prior orchestration mixed three things into one pipeline: (a) Phase
+A manifest + depgraph + skip-set machinery inherited from skill-forge,
+(b) drift short-circuit, and (c) the actual review loop. Per the audit
+guide, formal review and substantive review have asymmetric roles in
+convergence (§5) — formal is a necessary gate, substantive is the
+sufficient condition. Treating them as one continuous pipeline made the
+formal gate too easy to skip. The new design enforces:
+
+1. Formal hard gate **before** any LLM dispatch (§5, §6).
+2. Issues are created by **script** from the reviewer's JSON output, not
+   hand-written by the reviewer (§7.1, §10 self-closure).
+3. Cross-round recurrence detection lives in `summary.yml` and is read
+   by the reviewer on every dispatch (§7.6).
+4. Phase gates around `state: new` issues prevent skipping a revise pass
+   (§7.3).
+
+Skill-forge-specific machinery (Phase A skip-set, scaffolder version
+drift, force-full override) is removed — those were features of a
+generator-driven skill, not the review-revise loop.

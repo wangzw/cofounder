@@ -1,150 +1,203 @@
-# Revise Mode — Orchestration (`--revise`)
+# Revise Mode — Orchestration
 
-Entry doc for `/cofounder:system-design --revise <design-dir>`. Reads open issues from
-`<design-dir>/.review/round-<N>/issues/`, dispatches per-issue revisers, re-runs structural
-lint, summarizer updates issue status and appends REVISIONS.md.
+Loaded by the orchestrator when `--revise` is invoked, or when review-mode
+Step 1 (verify-phase-entry) short-circuits with formal failures. Defines
+the revise loop. Per
+[~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md):
 
-This file is loaded by the orchestrator when mode = `--revise`. It is **not** a sub-agent prompt
-and does not carry the Snippet D fingerprint.
+- §7.2 — issue state machine: `new` → {fixed | false-positive | deferred | superseded}
+- §7.3 — `check-revise-completeness.sh` is the exit gate
+- §7.4 — revise can run repeatedly within the same round until the gate
+  passes
+- §7.5 — recurrence handling per state
+- §7.7 — quality-at-delivery ratio signals
 
----
+Revise mode is a **write phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". This file enforces the
+write-phase exit gate's two clauses:
 
-## Step Sequence
+1. **State-machine PASS** (Step 5) — no issue is left in `state: new`
+   in the current round; every issue has been dispositioned.
+2. **Formal PASS** (Step 4 self-loop, plus the next read phase's
+   Step 1 verify-phase-entry) — the bundle passes `run-checkers.sh`.
 
-### Step 1 — Git Precheck
+If either clause fails, the revise phase loops; it MUST NOT ACK as
+done with violations outstanding. Only when both clauses PASS does
+control pass back to the read phase (review mode) for the next round.
 
-```bash
-scripts/git-precheck.sh
-```
-
-On failure (non-zero exit): skill exits immediately. Do NOT enter the revise phase.
-
-### Step 2 — Determine Latest Round and Read Open Issues
-
-Read `<design-dir>/.review/state.yml` to get `last_round` → N.
-
-If `state.yml` does not exist or `.review/round-<N>/issues/` is empty or does not exist: print
-`No open issues found. Run --review first.` and exit.
-
-Enumerate `<design-dir>/.review/round-<N>/issues/` via `Glob`:
-
-- Collect all `*.md` issue files whose frontmatter `status` field is one of: `new`, `persistent`,
-  `regressed`. Skip issues with `status: resolved` or `status: wont_fix`.
-
-If no open issues after filtering: print `All issues in round <N> are resolved.` and exit.
-
-### Step 3 — Structural-Lint Gate
-
-Re-run structural lint unconditionally before dispatching any LLM reviser:
-
-```bash
-scripts/run-checkers.sh <design-dir>/ round-<N>
-```
-
-New script-tier issues are written to `<design-dir>/.review/round-<N>/issues/` and added to the
-open issue list from Step 2. **Do NOT dispatch LLM revisers until every blocker-severity lint
-finding has been triaged.** Blocker findings must be resolved first — dispatch a Fix subagent
-(per-issue reviser) for each blocker, confirm fix, then re-run lint before proceeding with
-semantic issues.
-
-Non-blocker mechanical findings may be batched with the LLM reviser fan-out.
-
-### Step 4 — Per-Issue Reviser Fan-Out (parallel)
-
-Group all open issues by their `file` frontmatter field. Each unique target file gets one reviser
-dispatch. Revisers run in parallel (scoped to non-overlapping leaf files).
-
-**Hard rule — scope containment:** each reviser opens ONLY the files named in its issue. It MUST
-NOT widen scope to adjacent modules or unrelated sections. Lateral edits are a reviser protocol
-violation.
-
-Dispatch `revise/per-issue-reviser-subagent.md` for each group:
-
-Per-reviser inputs:
-- The issue file path (from `<design-dir>/.review/round-<N>/issues/<issue-id>.md`)
-- The current artifact leaf path(s) named in the issue's `file` field
-- Resolved-issues history (up to 20 most recent resolved issues from this round for regression context)
-
-Per-reviser outputs:
-- Revised artifact leaf written in-place at `<design-dir>/<leaf-path>`
-- ACK with `linked_issues` list
-
-**Orchestrator action on all ACKs:** collect `linked_issues` fields from every reviser ACK; proceed to Step 5.
-
-### Step 5 — Structural-Lint Post-Pass
-
-After all revisers return, re-run structural lint:
-
-```bash
-scripts/run-checkers.sh <design-dir>/ round-<N>
-```
-
-Any new issue that was NOT present before revisers ran = regression. Write a new issue file to
-`<design-dir>/.review/round-<N>/issues/` and loop back to Step 4 for the new findings only.
-Cap the loop at `config.yml convergence.max_iterations` (default: 3) to avoid infinite cycling.
-
-If post-pass is clean: proceed to Step 6.
-
-### Step 6 — Summarizer: Update Issue Status and Finalize REVISIONS.md
-
-Dispatch `shared/summarizer-subagent.md` (update-status phase):
-
-- For each issue whose `linked_issues` appears in a reviser ACK: update its frontmatter
-  `status: resolved` in `<design-dir>/.review/round-<N>/issues/<issue-id>.md`.
-- Count modules and API files touched across all reviser ACKs.
-- Write or append `<design-dir>/REVISIONS.md` (create if absent, using
-  `common/templates/revision-entry-template.md`). Record: date, source issue IDs (all resolved
-  issue IDs from this `--revise` run), modules touched, summary of changes, change type
-  (`In-place edit`).
-
-Summarizer MUST NOT read artifact leaf content — consume only reviser ACK fields and issue
-frontmatter.
-
-**Orchestrator action on ACK:** update `.review/state.yml` with `last_revise_round: <N>`;
-proceed to Step 7.
-
-### Step 7 — Print to User
-
-```
-<N> issues resolved, <M> modules touched.
-REVISIONS.md updated: <design-dir>/REVISIONS.md
-
-Run `/cofounder:system-design --review <design-dir>` to verify.
-```
-
-Where `<N>` = count of issues whose status was updated to `resolved` this invocation,
-and `<M>` = count of distinct module/API leaf files written by revisers.
+This file is **orchestration**, not a sub-agent prompt.
 
 ---
 
-## Hard Rules
+## Revise Loop — Step by Step
 
-- `--revise` MUST NOT widen issue scope. A reviser for one issue file opens only the files named
-  in that issue. Cross-file blast radius is prohibited.
-- `--revise` MUST NOT auto-chain into `--review`. Exit after Step 7. The operator advances the
-  lifecycle by invoking `/cofounder:system-design --review <design-dir>` explicitly.
-- Issue status updates (`status: resolved`) happen in the summarizer step — NOT in individual
-  revisers. Revisers only fix artifacts; the orchestrator/summarizer marks issues done.
-- All revisers run on `model: sonnet` (balanced tier). Do not escalate to opus unless an issue
-  is explicitly tagged as requiring cross-module design judgment.
+### Step 1 — MANDATORY: Phase Entry Verification (script-enforced)
+
+**This MUST be the first action of the revise (write) phase. The
+orchestrator MUST NOT proceed past this script on a non-zero exit.**
+
+```bash
+scripts/verify-phase-entry.sh revise <design-dir> <round>
+```
+
+Verifies the revise-phase entry precondition: round-N's issues
+directory exists AND contains at least one `state: new` issue.
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | At least one `state: new` issue in round-N — revise has work to do | continue to Step 2 (build issue-group manifest) |
+| 1    | Round dir missing OR no `state: new` issues | revise phase has nothing to do; return control to caller (typically a no-op handoff back to read phase). The orchestrator MUST NOT fan out per-issue revisers. |
+| 2    | Script-level error | HITL — do not modify the artifact |
+
+Why this is the first step: prevents the revise phase from being
+invoked on an empty or mis-numbered round. The script makes the
+precondition unskippable — control cannot reach reviser dispatch
+without `verify-phase-entry` having exited 0.
+
+### Step 2 — Build Issue-Group Manifest (script)
+
+The orchestrator reads `<design-dir>/.review/round-<N>/issues/*.md` and groups
+them by `file:` field. Issues whose `state` is already in
+{fixed, false-positive, deferred, superseded} are skipped — only `state: new`
+needs work.
+
+The grouping logic is mechanical (frontmatter-only inspection); the
+orchestrator does it inline rather than via a separate script. Output is
+held in `state.yml` as:
+
+```yaml
+revise_groups:
+  - leaf: modules/M-001-auth.md
+    issues: [I-007, I-012]
+  - leaf: api/API-002-checkout.md
+    issues: [I-008]
+  - leaf: README.md
+    issues: [I-014]
+  - leaf: ""    # repo-wide issues (no specific file)
+    issues: [I-019]
+```
+
+(Step 1's `verify-phase-entry revise` already guarantees at least one
+`state: new` issue exists in the round, so the manifest is always
+non-empty when we reach Step 2.)
+
+### Step 3 — Fan-out Per-Issue-Reviser (parallel)
+
+For each entry in `revise_groups`, dispatch one
+`revise/per-issue-reviser-subagent.md` with:
+
+- The leaf path
+- The full text of every issue in that group (from
+  `<design-dir>/.review/round-<N>/issues/<id>.md`)
+- The current content of the leaf
+- `<design-dir>/.review/issues/summary.yml` — for any `recurrence_of`
+  reference, the reviser reads `fix_history` to see how the prior
+  attempt(s) failed (guide §7.5.1)
+
+**Reviser is allowed to** edit the leaf, then transition each issue's
+`state:` field. Permitted state transitions (guide §7.2):
+
+| from | to | required metadata |
+|------|----|-------------------|
+| new | fixed | (verify formal pass; see Step 4) |
+| new | false-positive | `dismissed_reason` non-empty |
+| new | deferred | `defer_until` + `defer_reason` non-empty |
+| new | superseded | `superseded_by` referencing another issue id |
+
+The reviser MUST NOT silently leave an issue at `state: new` while
+claiming to have addressed it. Any such issue is caught by the gate in
+Step 5.
+
+**Reviser MUST append** to `history` (one row per state transition) and
+**MAY append** to `fix_history` (one row per non-trivial fix per guide
+§7.5.1). Reviser MUST NOT rewrite or delete prior history entries —
+append-only. `update-summary.sh` (Step 6) reads but does not modify
+these blocks; it propagates them verbatim into `summary.yml`.
+
+### Step 4 — Self-Verify Formal Pass (writer self-loop, no issues created)
+
+After each reviser finishes, the orchestrator re-runs
+
+```bash
+scripts/run-checkers.sh <design-dir>
+```
+
+Per guide §4 + §4.1, formal failures discovered here are NOT filed as new
+issues — the reviser is dispatched again on the affected leaf with the
+formal-checker's JSON output and is expected to fix the structural problem
+in place. This loop continues until either:
+
+- formal pass (exit 0) — proceed to Step 5
+- 3 consecutive formal failures on the same leaf — escalate to HITL with
+  the leaf path and the failing CR-IDs (per guide §4.1 last paragraph,
+  this is the only time a self-audit failure becomes a real issue)
+
+### Step 5 — Phase Gate: revise completeness
+
+```bash
+scripts/check-revise-completeness.sh <design-dir> <round-number>
+```
+
+Exit 0 → all issues this round have left `state: new`; proceed.
+Exit 1 → at least one issue still in `state: new`; loop back to Step 3 for
+the affected groups (guide §7.4 allows revise to repeat until the gate
+passes). After 3 such iterations, escalate to HITL.
+Exit 2 → script error; HITL.
+
+### Step 6 — Update Summary
+
+```bash
+scripts/update-summary.sh <design-dir>
+```
+
+Refreshes `summary.yml` with the new issue states. Cross-reviewer in the
+next review round will read this for fingerprint matching.
+
+### Step 7 — Summarizer (update-state phase)
+
+Dispatch `shared/summarizer-subagent.md` to write the updated round-N
+index with state transitions and ratio signals (guide §7.7):
+
+- `false_positive_ratio` = (false-positive count) / (total this round)
+- `deferred_ratio` = (deferred count) / (total this round)
+- `regression_count` = issues whose state went `fixed` → `new` between
+  rounds (caught via `recurrence_count`)
+
+Default thresholds (overridable in `config.yml`):
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| `false_positive_ratio` | > 0.5 | warn — reviewer prompt or criteria likely off |
+| `deferred_ratio` | > 0.7 | warn — writer is deferring instead of fixing |
+| critical/error issue with `defer_until: never` | any | error — must be in `versions/<N>.md.justified_regressions` |
+
+These are quality-at-delivery signals. The judge consumes them in Step 8.
+
+### Step 8 — Judge Dispatch
+
+Dispatch `shared/judge-subagent.md`. Verdict considers:
+
+- The Step 7 per-round index (issue counts, severities, state distribution); `summary.yml` from Step 6 is also read for cross-round oscillation history
+- Ratio signals from Step 7
+- Recurrence counts for any `recurrence_of` matches
+
+Verdict routing is identical to review/index.md Step 8.
 
 ---
 
-## Output Path Reference
+## Notes
 
-| Artifact | Path |
-|----------|------|
-| Revised module/API leaves | `<design-dir>/modules/M-NNN-{slug}.md` or `<design-dir>/api/API-NNN.md` |
-| Revised README | `<design-dir>/README.md` (only if issue targets it) |
-| Revision history | `<design-dir>/REVISIONS.md` (appended each `--revise` run) |
-| Issue status updates | `<design-dir>/.review/round-<N>/issues/<issue-id>.md` (frontmatter `status: resolved`) |
-
-`.review/` is transient and not version-controlled. Add `docs/raw/design/*/.review/` to
-`.gitignore`. Durable history belongs in `REVISIONS.md`, not in raw review files.
+- The orchestrator does NOT read leaf content — it routes on ACKs and
+  scripts only (orchestrator dispatch contract).
+- Round numbers are monotonic. If Step 5 passes, the round closes; the
+  next review pass increments N.
+- Skeleton-protected files: removed concept. With `skill-forge` deleted,
+  the artifact is the system-design bundle which has no skeleton. Every
+  leaf (`README.md`, `modules/*`, `api/*`) is authored.
 
 ---
 
 ## Files in This Directory
 
-- [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) — Per-issue reviser sub-agent
-  prompt (one dispatch per target artifact leaf; reads ONE issue, applies minimal fix in-place)
+- [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) —
+  per-leaf reviser sub-agent prompt
