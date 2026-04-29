@@ -51,7 +51,7 @@ Use this when you genuinely fix the problem.
    - For non-trivial fixes, append a one-line summary to `fix_history:` describing
      what you changed (e.g. `- {round: 4, summary: "added Given/When/Then block to AC#2"}`).
 
-The orchestrator runs `scripts/check-prd-formal.sh` on the leaf after
+The orchestrator runs `scripts/run-checkers.sh` on the bundle after
 your dispatch. If your "fix" introduces a new formal violation, the
 orchestrator dispatches you again with the formal-checker output (guide
 §4 self-audit hard gate). Repeated failure escalates to HITL — do not

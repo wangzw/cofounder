@@ -6,10 +6,12 @@ the writer's self-review archive.
 
 > **Formal CRs are NOT in this table.** CR-PP01–CR-PP05, CR-PP15F
 > (acceptance-criteria BDD format), and CR-FM01 (frontmatter) are
-> enforced by `scripts/run-checkers.sh` as a hard gate before the writer
-> ACKs (guide §4 + §4.1). Failures there are auto-fixed in place by the
-> writer without creating issue files. The table below covers only the
-> substantive CRs the writer self-reviews after formal PASS.
+> enforced by the per-artifact `scripts/check-*.sh` for the writer's
+> leaf type (see `generate/writer-subagent.md` "Formal pre-check"
+> table) as a hard gate before the writer ACKs (guide §4 + §4.1).
+> Failures there are auto-fixed in place by the writer without
+> creating issue files. The table below covers only the substantive
+> CRs the writer self-reviews after formal PASS.
 
 ---
 

@@ -72,9 +72,9 @@ review pipeline will re-confirm).
 - Dispatches: `generate/writer-subagent.md`
 - Inputs for `modify`: existing `<prd-dir>/<file>` content as context
 - Inputs for `add`: same as FromScratch Step 7
-- Self-audit: each writer runs `scripts/run-checkers.sh <prd-dir>` as a
-  formal hard gate (guide §4); fixes failures in place; substantive
-  CRs go into the self-review
+- Self-audit: each writer runs the per-artifact check-*.sh for its
+  leaf type (per `generate/writer-subagent.md`); fixes failures on its
+  own leaf in place; substantive CRs go into the self-review
 
 ### Step 8 — Enter Review Loop
 

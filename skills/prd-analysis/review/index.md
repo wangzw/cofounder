@@ -36,8 +36,8 @@ This gate enforces guide §7.3: "上一轮 revise 没做完就要进下一轮 re
 scripts/run-checkers.sh <prd-dir>
 ```
 
-Aggregates `check-prd-formal.sh` (PRD-shape) and `check-issue-schema.sh`
-(audit self-closure).
+Auto-discovers every `scripts/check-*.sh` (PRD bundle + audit self-closure)
+except phase gates and aggregates findings.
 
 | Exit | Meaning | Next |
 |------|---------|------|

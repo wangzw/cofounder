@@ -89,9 +89,12 @@ Fan-out one writer per entry in `plan.add`. Each writer:
   (`feature-template.md` / `journey-template.md` /
   `architecture-template.md` / `prd-template.md`).
 - Writes the leaf at `<prd-dir>/<relative-path>`.
-- Runs `scripts/run-checkers.sh <prd-dir>` as a self-audit hard gate
-  (guide §4); fixes any formal failures in place and re-runs until
-  PASS. Formal failures here do NOT create issue files (guide §4.1).
+- Runs the per-artifact check-*.sh script for its assigned leaf type
+  (see `generate/writer-subagent.md` "Formal pre-check" table) as a
+  self-audit hard gate (guide §4); fixes formal failures on its own
+  leaf in place and re-runs until PASS. Findings on other leaves are
+  ignored (other writers handle their own scope). Formal failures here
+  do NOT create issue files (guide §4.1).
 - Writes the self-review at
   `<prd-dir>/.review/round-1/self-reviews/<trace_id>.md` covering only
   **substantive** CRs (formal CRs are already enforced by run-checkers).
@@ -103,10 +106,10 @@ ACK. Proceed to Step 8.
 ### Step 8 — Enter Review Loop
 
 Load `review/index.md` and execute the review-mode steps with
-`round=1`. The review pipeline handles formal hard gate (already-passed
-since writers' self-audit just ran, but the gate runs again as belt
-and suspenders — `check-issue-schema.sh` may surface issues from any
-prior `.review/` state), cross-reviewer dispatch, summarizer, judge.
+`round=1`. The review pipeline handles formal hard gate (re-runs
+`scripts/run-checkers.sh` over the full bundle as a belt-and-suspenders
+check on top of each writer's per-leaf self-audit), cross-reviewer
+dispatch, summarizer, judge.
 
 Verdict routing (per `review/index.md` Step 8):
 

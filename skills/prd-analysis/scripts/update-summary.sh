@@ -139,12 +139,13 @@ if errors:
 
 # ─── Apply retention policy ───────────────────────────────────────────
 # Keep all `deferred` (any age) + `new` + recent fixed/false-positive.
-delivery_dir = os.path.join(os.path.dirname(review_dir), '.review', 'versions')
-delivery_dir = os.path.join(review_dir, 'versions')
+# We don't have explicit delivery boundaries here, so use rounds-per-delivery
+# as a proxy: assume ~5 rounds per delivery and prune fixed/fp records older
+# than (latest_round - retention * 5).
 all_round_nums = sorted({r['last_seen_in_round'] for r in records.values()})
 cutoff_round = all_round_nums[-1] if all_round_nums else 0
-# Pragmatic proxy: drop fixed/fp records older than (latest_round - 2*retention).
-prune_before = max(0, cutoff_round - max(retention, 1) * 5)
+ROUNDS_PER_DELIVERY_PROXY = 5
+prune_before = max(0, cutoff_round - max(retention, 1) * ROUNDS_PER_DELIVERY_PROXY)
 
 active = []
 archive = []

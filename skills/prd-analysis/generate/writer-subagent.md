@@ -26,10 +26,11 @@ The IPC model is **Direct Write + ACK**:
 | Role | Write count | Final paths |
 |------|-------------|-------------|
 | `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
-| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
+| `reviewer` (cross / adversarial) | 1 write | `.review/round-<N>/reviewer-output/<trace_id>.json` (raw JSON; orchestrator pipes through `scripts/create-issues.sh` to materialize per-issue files) |
+| `reviser` | 1+ writes | `<artifact-path>` + state-transitioned `.review/round-<N>/issues/<id>.md` files |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
-| `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
+| `summarizer` (per-round) | 1 write | `.review/round-<N>/index.md` |
+| `summarizer` (on-converge) | 2–3 writes | `versions/<N>.md` + CHANGELOG entry + (conditional) README.md row |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
 | `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
