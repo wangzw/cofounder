@@ -6,7 +6,7 @@ CHECK="$REPO_SCRIPTS/check-issue.sh"
 
 GOOD_ISSUE='---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: new
@@ -62,7 +62,7 @@ test_case "CR-IS01: invalid state value"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: bogus
@@ -84,7 +84,7 @@ test_case "CR-IS01: invalid id format"
 setup_fixture
 write_file ".review/round-1/issues/I-1.md" '---
 id: I-1
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: new
@@ -105,7 +105,7 @@ test_case "CR-IS01: state=deferred missing defer_until"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: deferred
@@ -127,7 +127,7 @@ test_case "CR-IS01: state=fixed missing fixed_in_round"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: fixed
@@ -148,7 +148,7 @@ test_case "CR-IS01: superseded_by points to nonexistent id"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: superseded
@@ -170,7 +170,7 @@ test_case "CR-IS01: missing body section"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: x.md
 severity: error
 state: new

@@ -10,7 +10,7 @@ GOOD='{
   "trace_id": "R1-V-001",
   "issues": [
     {
-      "criterion_id": "CR-PP06",
+      "criterion_id": "CR-SD05",
       "file": "features/F-001.md",
       "severity": "error",
       "description": "missing traceability link to journey J-001",
@@ -53,7 +53,7 @@ test_case "CR-RO02: issue missing required field"
 setup_fixture
 write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
   "issues": [
-    {"criterion_id": "CR-PP06", "severity": "error"}
+    {"criterion_id": "CR-SD05", "severity": "error"}
   ]
 }'
 assert_exit 1 "$CHECK" "$FIXTURE"
@@ -65,7 +65,7 @@ setup_fixture
 write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
   "issues": [
     {
-      "criterion_id": "CR-PP06",
+      "criterion_id": "CR-SD05",
       "file": "x.md",
       "severity": "huge",
       "description": "longer than five chars",

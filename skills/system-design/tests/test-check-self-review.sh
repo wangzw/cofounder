@@ -8,8 +8,8 @@ GOOD='# Self-Review — R3-W-001
 
 ## Checklist
 
-- CR-PP06 traceability-chain: PASS
-- CR-PP14 self-containment: PASS
+- CR-SD05 traceability-chain: PASS
+- CR-SD-DESIGN01 self-containment: PASS
 
 ## Summary
 
@@ -46,7 +46,7 @@ teardown_fixture
 test_case "CR-SR02: FAIL row without blocker_scope"
 setup_fixture
 write_file ".review/round-1/self-reviews/R1-W-001.md" '## Checklist
-- CR-PP06 x: FAIL — note: bad
+- CR-SD05 x: FAIL — note: bad
 
 ## Summary
 FULL_PASS: no
@@ -59,7 +59,7 @@ teardown_fixture
 test_case "CR-SR02: FAIL row with invalid blocker_scope"
 setup_fixture
 write_file ".review/round-1/self-reviews/R1-W-001.md" '## Checklist
-- CR-PP06 x: FAIL — blocker_scope: bogus — note: bad
+- CR-SD05 x: FAIL — blocker_scope: bogus — note: bad
 
 ## Summary
 FULL_PASS: no
@@ -72,7 +72,7 @@ teardown_fixture
 test_case "CR-SR03: FULL_PASS=yes but FAIL row present"
 setup_fixture
 write_file ".review/round-1/self-reviews/R1-W-001.md" '## Checklist
-- CR-PP06 x: FAIL — blocker_scope: input-ambiguity — note: x
+- CR-SD05 x: FAIL — blocker_scope: input-ambiguity — note: x
 
 ## Summary
 FULL_PASS: yes

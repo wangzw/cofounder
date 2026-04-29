@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHECK="$REPO_SCRIPTS/create-issues.sh"
 
 GOOD_JSON='{"round": 1, "issues": [
-  {"criterion_id": "CR-PP06", "file": "features/F-001.md", "severity": "error",
+  {"criterion_id": "CR-SD05", "file": "features/F-001.md", "severity": "error",
    "description": "missing traceability link to journey J-001", "suggested_fix": "add a touchpoint reference"}
 ]}'
 
@@ -52,7 +52,7 @@ setup_fixture
 mkdir -p "$FIXTURE/.review/round-1/reviewer-output"
 cat > "$FIXTURE/.review/round-1/reviewer-output/R1-V-001.json" <<'EOFJSON'
 {"round":1,"reviewer_variant":"cross","issues":[
-  {"criterion_id":"CR-PP06","file":"features/F-001.md","severity":"error","description":"some problem found","suggested_fix":"fix it specifically"}
+  {"criterion_id":"CR-SD05","file":"features/F-001.md","severity":"error","description":"some problem found","suggested_fix":"fix it specifically"}
 ]}
 EOFJSON
 run_with_stdin "" "$CHECK" "$FIXTURE" "1"
@@ -64,10 +64,10 @@ test_case "default (from-dir): merges multiple reviewer-output files"
 setup_fixture
 mkdir -p "$FIXTURE/.review/round-1/reviewer-output"
 cat > "$FIXTURE/.review/round-1/reviewer-output/R1-V-001.json" <<'EOFJSON'
-{"issues":[{"criterion_id":"CR-PP06","file":"a.md","severity":"error","description":"problem A","suggested_fix":"fix A specifically"}]}
+{"issues":[{"criterion_id":"CR-SD05","file":"a.md","severity":"error","description":"problem A","suggested_fix":"fix A specifically"}]}
 EOFJSON
 cat > "$FIXTURE/.review/round-1/reviewer-output/R1-V-002.json" <<'EOFJSON'
-{"issues":[{"criterion_id":"CR-PP24","file":"b.md","severity":"warning","description":"problem B","suggested_fix":"fix B specifically"}]}
+{"issues":[{"criterion_id":"CR-SD-DESIGN03","file":"b.md","severity":"warning","description":"problem B","suggested_fix":"fix B specifically"}]}
 EOFJSON
 run_with_stdin "" "$CHECK" "$FIXTURE" "1"
 [ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
@@ -93,8 +93,8 @@ piped_input=$(cat <<'EOF'
 FOUND 2 issue(s) across 14 formal-review checker(s) (worst severity: critical):
 {
   "issues": [
-    {"criterion_id":"CR-PP01","file":"README.md","severity":"critical","description":"required top-level file missing: README.md","suggested_fix":"create README.md from common/templates/prd-template.md"},
-    {"criterion_id":"CR-PP01","file":"features/","severity":"critical","description":"required directory missing: features/","suggested_fix":"create features/ and add at least one leaf file"}
+    {"criterion_id":"CR-SD01","file":"README.md","severity":"critical","description":"required top-level file missing: README.md","suggested_fix":"create README.md from common/templates/prd-template.md"},
+    {"criterion_id":"CR-SD01","file":"features/","severity":"critical","description":"required directory missing: features/","suggested_fix":"create features/ and add at least one leaf file"}
   ]
 }
 EOF

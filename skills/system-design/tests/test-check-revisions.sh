@@ -14,13 +14,13 @@ assert_exit 0 "$CHECK" "$FIXTURE"
 assert_stdout_contains "PASS"
 teardown_fixture
 
-test_case "CR-PP05: dangling Previous Version path"
+test_case "CR-RV01: dangling Previous Version path"
 setup_fixture
 write_file "REVISIONS.md" '# Revisions
 Previous Version: ../nonexistent-prd-2025-01-01
 '
 assert_exit 1 "$CHECK" "$FIXTURE"
-assert_stdout_contains "CR-PP05"
+assert_stdout_contains "CR-RV01"
 assert_stdout_contains "does not resolve"
 teardown_fixture
 
@@ -35,13 +35,13 @@ assert_stdout_contains "PASS"
 teardown_fixture
 rm -rf /tmp/test-prev
 
-test_case "CR-PP04: TODO in REVISIONS"
+test_case "CR-SD03: TODO in REVISIONS"
 setup_fixture
 write_file "REVISIONS.md" "# Revisions
 TODO: write the v2 changelog
 "
 assert_exit 1 "$CHECK" "$FIXTURE"
-assert_stdout_contains "CR-PP04"
+assert_stdout_contains "CR-SD03"
 teardown_fixture
 
 end_tests

@@ -6,7 +6,7 @@ CHECK="$REPO_SCRIPTS/check-revise-completeness.sh"
 
 ISSUE_NEW='---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: new

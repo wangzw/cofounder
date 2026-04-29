@@ -6,7 +6,7 @@ CHECK="$REPO_SCRIPTS/update-summary.sh"
 
 ISSUE_NEW='---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: new
@@ -22,7 +22,7 @@ fix it
 
 ISSUE_DEFERRED='---
 id: I-002
-criterion_id: CR-PP02
+criterion_id: CR-SD04
 file: features/F-001.md
 severity: warning
 state: deferred
@@ -98,7 +98,7 @@ test_case "summary records history list per issue"
 setup_fixture
 write_file ".review/round-2/issues/I-001.md" '---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: fixed
@@ -126,7 +126,7 @@ test_case "summary records fix_history list per issue"
 setup_fixture
 write_file ".review/round-3/issues/I-002.md" '---
 id: I-002
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: fixed
@@ -155,7 +155,7 @@ test_case "summary records recurrence_of and recurrence_count"
 setup_fixture
 write_file ".review/round-2/issues/I-002.md" '---
 id: I-002
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: new

@@ -6,7 +6,7 @@ CHECK="$REPO_SCRIPTS/verify-phase-entry.sh"
 
 ISSUE_NEW='---
 id: I-001
-criterion_id: CR-PP01
+criterion_id: CR-SD01
 file: README.md
 severity: error
 state: new
@@ -24,8 +24,54 @@ ISSUE_FIXED=$(printf '%s' "$ISSUE_NEW" | sed 's/state: new/state: fixed/' | sed 
 fixed_in_round: 2')
 
 write_minimal_valid_bundle() {
-    write_file "README.md" "# Test"
-    write_file "architecture.md" "# arch"
+    write_file "README.md" '---
+id: SD-test
+title: Test
+owner: alice
+status: draft
+version: 0.1.0
+prd_ref: na
+---
+
+# Test Design
+
+## Modules
+
+- [M-001 widget](modules/M-001-widget.md)
+
+## Feature-Module Mapping
+
+| Feature | M-001 |
+|---------|-------|
+| F-001 widget | ✦ |
+'
+    write_file "modules/M-001-widget.md" '---
+id: M-001
+title: Widget
+owner: alice
+status: draft
+version: 0.1.0
+depends_on: []
+---
+
+## Responsibilities
+Holds the widget.
+
+## Public Interfaces
+- `getWidget() -> Widget` returns the current widget.
+
+## Data Models
+- `Widget { id: str, name: str }`
+
+## Dependencies
+None.
+
+## Boundary Enforcement
+
+| Boundary | Mechanism | Enforced At | Failure Mode |
+|----------|-----------|-------------|--------------|
+| input | schema check | api boundary | reject 400 |
+'
 }
 
 # ════════════════════════════════════════════════
@@ -75,7 +121,7 @@ teardown_fixture
 
 test_case "read: FAIL when bundle fails formal review"
 setup_fixture
-# Don't write README.md → CR-PP01 missing
+# Don't write README.md → CR-SD01 missing
 assert_exit 1 "$CHECK" read "$FIXTURE"
 assert_stdout_contains "REFUSE entering read"
 teardown_fixture
@@ -153,16 +199,16 @@ test_case "generate-fresh: FAIL when README.md exists"
 setup_fixture
 write_file "README.md" "existing"
 assert_exit 1 "$CHECK" generate-fresh "$FIXTURE"
-assert_stdout_contains "existing PRD content found"
+assert_stdout_contains "existing design content"
 assert_stdout_contains "README.md"
 teardown_fixture
 
-test_case "generate-fresh: FAIL when features/ has files"
+test_case "generate-fresh: FAIL when modules/ has files"
 setup_fixture
-write_file "features/F-001-x.md" "existing"
+write_file "modules/M-001-x.md" "existing"
 assert_exit 1 "$CHECK" generate-fresh "$FIXTURE"
 assert_stdout_contains "REFUSE entering generate-fresh"
-assert_stdout_contains "features/"
+assert_stdout_contains "modules/"
 teardown_fixture
 
 test_case "generate-fresh: PASS when only .review/ present (allows re-bootstrap)"

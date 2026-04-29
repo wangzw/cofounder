@@ -64,9 +64,9 @@ status: draft
 '
 run_command "$CHECK" "$FIXTURE"
 [ "$LAST_EXIT" = "1" ] && _record_pass || _record_fail "expected 1"
-# Should contain findings from both check-readme (CR-PP04) and check-feature (CR-PP02 + CR-PP15F)
-echo "$LAST_STDOUT" | grep -q "CR-PP04" && _record_pass || _record_fail "missing CR-PP04"
-echo "$LAST_STDOUT" | grep -q "CR-PP02\|CR-PP15F" && _record_pass || _record_fail "missing CR-PP02/PP15F"
+# Should contain findings from both check-readme (CR-SD03) and check-feature (CR-SD04 + CR-SD06F)
+echo "$LAST_STDOUT" | grep -q "CR-SD03" && _record_pass || _record_fail "missing CR-SD03"
+echo "$LAST_STDOUT" | grep -q "CR-SD04\|CR-SD06F" && _record_pass || _record_fail "missing CR-SD04/PP15F"
 teardown_fixture
 
 test_case "phase gates excluded from dispatch"
