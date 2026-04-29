@@ -326,6 +326,7 @@ Next steps:
   - Helpers:
     - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1)
     - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
+    - `scripts/synthesize-clarification.sh`  --no-consultant: synthesize deferred-only clarification.yml without violating orchestrator pure-dispatch contract
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`
   - `generate/planner-subagent.md`

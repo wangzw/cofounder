@@ -94,6 +94,87 @@ write_file ".review/round-1/issues/I-001.md" "no frontmatter at all"
 assert_exit 1 "$CHECK" "$FIXTURE"
 teardown_fixture
 
+test_case "summary records history list per issue"
+setup_fixture
+write_file ".review/round-2/issues/I-001.md" '---
+id: I-001
+criterion_id: CR-PP01
+file: README.md
+severity: error
+state: fixed
+created_in_round: 1
+fixed_in_round: 2
+history:
+  - {round: 1, action: created}
+  - {round: 2, action: state-change, from: new, to: fixed}
+fix_history: []
+---
+
+## Description
+some problem
+
+## Suggested fix
+fix it
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+grep -q "history:" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "history block missing"
+grep -q "action: created" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "history entries missing"
+grep -q "state-change" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "state-change history missing"
+teardown_fixture
+
+test_case "summary records fix_history list per issue"
+setup_fixture
+write_file ".review/round-3/issues/I-002.md" '---
+id: I-002
+criterion_id: CR-PP01
+file: README.md
+severity: error
+state: fixed
+created_in_round: 2
+fixed_in_round: 3
+recurrence_of: I-001
+recurrence_count: 1
+history:
+  - {round: 2, action: created}
+fix_history:
+  - {round: 3, summary: "rewrote AC#2 with explicit Given block"}
+---
+
+## Description
+recurred problem
+
+## Suggested fix
+fix again
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+grep -q "fix_history:" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "fix_history block missing"
+grep -q "rewrote AC#2" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "fix_history entries missing"
+teardown_fixture
+
+test_case "summary records recurrence_of and recurrence_count"
+setup_fixture
+write_file ".review/round-2/issues/I-002.md" '---
+id: I-002
+criterion_id: CR-PP01
+file: README.md
+severity: error
+state: new
+created_in_round: 2
+recurrence_of: I-001
+recurrence_count: 2
+---
+
+## Description
+keeps coming back
+
+## Suggested fix
+investigate root cause
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+grep -q "recurrence_of: I-001" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "recurrence_of missing"
+grep -q "recurrence_count:" "$FIXTURE/.review/issues/summary.yml" && _record_pass || _record_fail "recurrence_count missing"
+teardown_fixture
+
 test_case "idempotent — running twice produces same summary"
 setup_fixture
 write_file ".review/round-1/issues/I-001.md" "$ISSUE_NEW"

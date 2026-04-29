@@ -75,19 +75,16 @@ Dispatch: review/cross-reviewer-subagent.md
   `recurrence_of: <prior-id>` in the output.
 - `common/review-criteria.md` — every entry whose `checker_type: llm`
 
-**Sub-agent output (stdout)**: one JSON document per the LLM raw-output
-schema in `common/issue-schema.md`. The reviewer NEVER writes issue files
-directly (guide §7.1).
+**Sub-agent output (one disk write)**: writes a JSON document to
+`<prd-dir>/.review/round-<N>/reviewer-output/<trace_id>.json`, conforming
+to the LLM raw-output schema in `common/issue-schema.md`. The reviewer
+NEVER writes issue files directly (guide §7.1) — `create-issues.sh`
+walks the `reviewer-output/` directory and materializes per-issue files
+in a later step.
 
-**Orchestrator action on ACK**:
-
-```bash
-scripts/create-issues.sh <prd-dir> <round> < <sub-agent-stdout>
-```
-
-Materializes one issue file per finding. If `create-issues.sh` exits 1,
-the reviewer's output violated the schema — surface to user with the
-specific schema error, do NOT silently drop findings.
+**Orchestrator action on ACK**: record the trace_id in `state.yml`. Do
+not yet materialize issues; that happens after Step 4 (so cross +
+adversarial reviewer outputs are merged in one create-issues pass).
 
 ### Step 4 — Adversarial-Reviewer Dispatch (conditional)
 
@@ -99,10 +96,25 @@ adversarial_review.triggered_by`).
 Dispatch: review/adversarial-reviewer-subagent.md
 ```
 
-Same input contract as cross-reviewer; same output → `create-issues.sh`
-pipeline.
+Same input contract as cross-reviewer; writes a separate
+`reviewer-output/<trace_id>.json` file.
 
-### Step 5 — Update Summary
+### Step 5 — Materialize Issue Files
+
+After both reviewer dispatches have ACKed:
+
+```bash
+scripts/create-issues.sh <prd-dir> <round>
+```
+
+Default mode (no `--stdin`) walks every
+`<prd-dir>/.review/round-<N>/reviewer-output/*.json`, merges their
+`issues` lists, and writes one schema-conformant `.md` file per accepted
+finding to `<prd-dir>/.review/round-<N>/issues/`. If `create-issues.sh`
+exits 1, at least one reviewer's output violated the schema — surface
+the specific error to the user; do NOT silently drop findings.
+
+### Step 6 — Update Summary
 
 ```bash
 scripts/update-summary.sh <prd-dir>
@@ -112,7 +124,7 @@ Refreshes `<prd-dir>/.review/issues/summary.yml` so the next round's
 fingerprint matching sees this round's issues. Per guide §7.5, this is
 where recurrence detection happens for the next iteration.
 
-### Step 6 — Summarizer Dispatch
+### Step 7 — Summarizer Dispatch
 
 ```
 Dispatch: shared/summarizer-subagent.md (per-round phase)
@@ -122,7 +134,7 @@ Sub-agent writes `<prd-dir>/.review/round-<N>/index.md` with issue counts
 (by state and severity), `false_positive_ratio`, `deferred_ratio`, and
 recurrence statistics (guide §7.7).
 
-### Step 7 — Judge Dispatch
+### Step 8 — Judge Dispatch
 
 ```
 Dispatch: shared/judge-subagent.md
@@ -148,17 +160,17 @@ considers:
 - `diverging`    — error/critical count rose vs prior round
 - `stalled`      — `max_iterations` reached without convergence
 
-### Step 8 — Verdict Routing
+### Step 9 — Verdict Routing
 
 | Verdict        | Next Action |
 |----------------|-------------|
-| `converged`    | Delivery sequence (Step 9 below) |
+| `converged`    | Delivery sequence (Step 10 below) |
 | `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
 | `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
 | `diverging`    | HITL gate: surface regression report; same options |
 | `stalled`      | HITL gate: report stall; same options |
 
-### Step 9 — Delivery Sequence (only on `converged`)
+### Step 10 — Delivery Sequence (only on `converged`)
 
 1. Set `state.yml phase: on-converge` and inject `git_sha: <HEAD sha>`.
 2. Re-dispatch `shared/summarizer-subagent.md` with `phase: on-converge`. The

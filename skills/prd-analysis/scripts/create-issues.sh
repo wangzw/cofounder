@@ -3,18 +3,30 @@
 #
 # Per guide §7.1: review-stage issues "必须通过脚本创建 — LLM reviewer 输出原始
 # 判断, 由脚本组装为符合 schema 的 issue 文件落盘". This script is that
-# assembler. Reviewers (cross / adversarial) emit a JSON document on stdout;
-# the orchestrator pipes it here to write per-issue .md files.
+# assembler. Reviewers (cross / adversarial) write JSON documents to
+# .review/round-<N>/reviewer-output/<trace_id>.json (per the IPC contract in
+# review/cross-reviewer-subagent.md); the orchestrator runs this script to
+# walk those files and materialize per-issue .md files.
 #
 # Usage:
 #   create-issues.sh <artifact-root> <round-number> [--dry-run]
-#       reads JSON document from stdin
+#       reads every <artifact-root>/.review/round-<N>/reviewer-output/*.json
+#       (default mode after the cross-reviewer / adversarial-reviewer have
+#       ACKed)
 #
-# Stdin: JSON object matching the LLM raw-output schema in
-#   common/issue-schema.md ("issues" list of dicts with criterion_id / file /
-#   severity / description / suggested_fix / [recurrence_of]).
+#   create-issues.sh <artifact-root> <round-number> --stdin [--dry-run]
+#       reads ONE JSON document from stdin (legacy mode for tests / direct
+#       callers)
 #
-# Output: writes one file per issue at
+# JSON schema (per common/issue-schema.md):
+#   { "round": <N>, "reviewer_variant": "cross|adversarial",
+#     "trace_id": "...", "issues": [
+#       { "criterion_id": "CR-...", "file": "...", "severity": "...",
+#         "description": "...", "suggested_fix": "...",
+#         "recurrence_of": "I-NNN"  # optional
+#       }, ...]}
+#
+# Output: writes one file per accepted issue at
 #   <artifact-root>/.review/round-<N>/issues/<id>.md
 # Stdout: line-delimited list of created issue ids on success.
 #
@@ -27,14 +39,22 @@ set -euo pipefail
 
 ARTIFACT_ROOT="${1:-}"
 ROUND_NUM="${2:-}"
+INPUT_MODE="from-dir"   # default
 DRY_RUN=0
-if [ "${3:-}" = "--dry-run" ]; then
-  DRY_RUN=1
-fi
+
+# Parse remaining flags (--dry-run, --stdin)
+shift 2 2>/dev/null || true
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --stdin) INPUT_MODE="stdin"; shift ;;
+    *) echo "ERROR: unknown flag: $1" >&2; exit 2 ;;
+  esac
+done
 
 if [ -z "$ARTIFACT_ROOT" ] || [ ! -d "$ARTIFACT_ROOT" ]; then
   echo "ERROR: artifact root not found: ${ARTIFACT_ROOT:-<empty>}" >&2
-  echo "Usage: create-issues.sh <artifact-root> <round-number> [--dry-run]" >&2
+  echo "Usage: create-issues.sh <artifact-root> <round-number> [--dry-run] [--stdin]" >&2
   exit 2
 fi
 if [ -z "$ROUND_NUM" ] || ! echo "$ROUND_NUM" | grep -qE '^[0-9]+$'; then
@@ -44,10 +64,43 @@ fi
 
 ARTIFACT_ROOT="${ARTIFACT_ROOT%/}"
 
-INPUT="$(cat)"
-if [ -z "$INPUT" ]; then
-  echo "ERROR: empty stdin — pass LLM raw JSON via pipe" >&2
-  exit 2
+if [ "$INPUT_MODE" = "stdin" ]; then
+  INPUT="$(cat)"
+  if [ -z "$INPUT" ]; then
+    echo "ERROR: --stdin specified but stdin is empty" >&2
+    exit 2
+  fi
+else
+  # Walk every reviewer-output/*.json and merge their `issues` lists into
+  # a single document. If the dir is missing or empty, treat as no issues.
+  REVIEWER_OUTPUT_DIR="$ARTIFACT_ROOT/.review/round-${ROUND_NUM}/reviewer-output"
+  if [ ! -d "$REVIEWER_OUTPUT_DIR" ] || [ -z "$(ls -A "$REVIEWER_OUTPUT_DIR" 2>/dev/null)" ]; then
+    echo "OK created 0 issue(s) in round-${ROUND_NUM} (no reviewer-output files found)"
+    exit 0
+  fi
+  INPUT=$(python3 - "$REVIEWER_OUTPUT_DIR" <<'PYEOF'
+import json, os, sys
+out_dir = sys.argv[1]
+merged = {"issues": []}
+for fname in sorted(os.listdir(out_dir)):
+    if not fname.endswith(".json"):
+        continue
+    fpath = os.path.join(out_dir, fname)
+    try:
+        with open(fpath, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"ERROR: cannot parse {fpath}: {e}", file=sys.stderr)
+        sys.exit(2)
+    if isinstance(doc, dict):
+        merged["issues"].extend(doc.get("issues", []) or [])
+print(json.dumps(merged, ensure_ascii=False))
+PYEOF
+)
+  if [ -z "$INPUT" ]; then
+    echo "ERROR: failed to merge reviewer-output JSON files" >&2
+    exit 2
+  fi
 fi
 
 DRY_RUN="$DRY_RUN" python3 - "$ARTIFACT_ROOT" "$ROUND_NUM" "$INPUT" <<'PYEOF'

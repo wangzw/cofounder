@@ -8,10 +8,10 @@ test_case "exit 2 on missing arg"
 run_command "$CHECK"
 [ "$LAST_EXIT" = "2" ] && _record_pass || _record_fail "expected 2 got $LAST_EXIT"
 
-test_case "CR-PP01 when neither architecture.md nor architecture/ exists"
+test_case "CR-PP01-ARCH when neither architecture.md nor architecture/ exists"
 setup_fixture
 assert_exit 1 "$CHECK" "$FIXTURE"
-assert_stdout_contains "CR-PP01"
+assert_stdout_contains "CR-PP01-ARCH"
 teardown_fixture
 
 test_case "exit 0 when architecture.md alone exists"

@@ -60,24 +60,49 @@ if os.path.isfile(config_path):
 
 # ─── Frontmatter parser (minimal) ─────────────────────────────────────
 def parse_frontmatter(text):
+    """Returns (flat_dict, list_blocks_dict).
+
+    - flat_dict: scalar key → value (single-line key: value pairs)
+    - list_blocks_dict: list-key → list of strings (raw indented entries
+      under that key, preserving the YAML form). Captures `history:` and
+      `fix_history:` so consumers can re-emit them verbatim.
+    """
     if not text.startswith('---'):
-        return None
+        return None, {}
     end = text.find('\n---', 3)
     if end < 0:
-        return None
+        return None, {}
     fm = {}
-    for raw in text[3:end].splitlines():
+    list_blocks = {}
+    current_list_key = None
+    fm_lines = text[3:end].splitlines()
+    for raw in fm_lines:
+        if raw.startswith((' ', '\t')) and current_list_key:
+            # indented line — part of the current list block
+            list_blocks.setdefault(current_list_key, []).append(raw)
+            continue
+        # top-level line — terminates any list block in progress
         line = raw.rstrip()
+        if not line.strip():
+            current_list_key = None
+            continue
         m = re.match(r'^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$', line)
         if not m:
+            current_list_key = None
             continue
         k, v = m.group(1), m.group(2).strip()
+        if not v:
+            # top-level key with no inline value → likely a list/mapping block
+            current_list_key = k
+            list_blocks[k] = []
+            continue
+        current_list_key = None
         if v.startswith('"') and v.endswith('"'):
             v = v[1:-1]
         elif v.startswith("'") and v.endswith("'"):
             v = v[1:-1]
         fm[k] = v
-    return fm
+    return fm, list_blocks
 
 desc_re = re.compile(r'## Description\s*\n(.*?)(?=\n## |\Z)', re.S)
 
@@ -105,7 +130,7 @@ for entry in sorted(os.listdir(review_dir)):
         except OSError as e:
             errors.append(f"cannot read {fpath}: {e}")
             continue
-        fm = parse_frontmatter(text)
+        fm, list_blocks = parse_frontmatter(text)
         if not fm:
             errors.append(f"missing/bad frontmatter: {fpath}")
             continue
@@ -115,7 +140,9 @@ for entry in sorted(os.listdir(review_dir)):
             continue
         m_desc = desc_re.search(text)
         summary_text = (m_desc.group(1).strip().splitlines()[0][:200] if m_desc else '')
-        # Latest record wins (issue files are versioned by round; latest is canonical)
+        # Latest record wins (issue files are versioned by round; latest is canonical).
+        # Cross-round consumers (judge oscillation detection, reviser fix-history
+        # lookup) need history + fix_history + recurrence_* — propagate them.
         records[iid] = {
             'id': iid,
             'state': fm.get('state', ''),
@@ -128,6 +155,11 @@ for entry in sorted(os.listdir(review_dir)):
             'defer_until': fm.get('defer_until', ''),
             'defer_reason': fm.get('defer_reason', ''),
             'dismissed_reason': fm.get('dismissed_reason', ''),
+            'recurrence_of': fm.get('recurrence_of', ''),
+            'recurrence_count': fm.get('recurrence_count', ''),
+            'superseded_by': fm.get('superseded_by', ''),
+            'history_lines': list_blocks.get('history', []),
+            'fix_history_lines': list_blocks.get('fix_history', []),
             'last_seen_in_round': round_num,
         }
 
@@ -188,6 +220,29 @@ def render(records_list, header):
                 lines.append(f"    defer_reason: {yaml_quote(r['defer_reason'])}")
         if r['state'] == 'false-positive' and r.get('dismissed_reason'):
             lines.append(f"    dismissed_reason: {yaml_quote(r['dismissed_reason'])}")
+        if r['state'] == 'superseded' and r.get('superseded_by'):
+            lines.append(f"    superseded_by: {yaml_quote(r['superseded_by'])}")
+        # Recurrence — judge uses this for oscillation detection (guide §7.5)
+        if r.get('recurrence_of'):
+            lines.append(f"    recurrence_of: {yaml_quote(r['recurrence_of'])}")
+        if r.get('recurrence_count'):
+            lines.append(f"    recurrence_count: {yaml_quote(r['recurrence_count'])}")
+        # History / fix_history — reviser reads fix_history on recurrence to
+        # avoid repeating the prior failed approach (guide §7.5.1).
+        # Re-indent the captured 2-space-indent lines to match the 4-space
+        # frame used inside summary.yml entries.
+        for blk_key, raw_lines in (
+            ('history', r.get('history_lines') or []),
+            ('fix_history', r.get('fix_history_lines') or []),
+        ):
+            if not raw_lines:
+                continue
+            lines.append(f"    {blk_key}:")
+            for src in raw_lines:
+                # Source is "  - {round: 1, action: created}" → re-indent to
+                # "      - {round: 1, action: created}"
+                stripped = src.lstrip(' \t')
+                lines.append(f"      {stripped}")
         lines.append(f"    last_seen_in_round: {yaml_quote(r['last_seen_in_round'])}")
     return "\n".join(lines) + "\n"
 

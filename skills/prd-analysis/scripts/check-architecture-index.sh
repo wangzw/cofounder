@@ -39,7 +39,7 @@ has_dir = os.path.isdir(arch_dir)
 
 if not has_md and not has_dir:
     findings.append(Finding(
-        criterion_id="CR-PP01",
+        criterion_id="CR-PP01-ARCH",
         file="architecture",
         severity="error",
         description="neither architecture.md nor architecture/ directory exists",

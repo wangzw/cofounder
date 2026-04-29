@@ -28,22 +28,40 @@ script emits one issue per finding in the schema documented in
 
 ---
 
-## CR-PP01 prd-directory-structure
+## CR-PP01 readme-and-leaves-present
 
-A generated PRD bundle MUST have the canonical directory structure: `README.md` at root,
-`journeys/` sub-directory with at least one `J-NNN.md` file, `features/` sub-directory with at
-least one `F-NNN-slug.md` file, and `architecture/` sub-directory. Missing any top-level component
-means the PRD is incomplete and downstream system-design cannot consume it.
+A generated PRD bundle MUST have `README.md` at root, `journeys/` sub-directory with at
+least one `J-NNN.md` file, and `features/` sub-directory with at least one `F-NNN-slug.md`
+file. Missing any of these means downstream system-design cannot consume the PRD.
 
 ```yaml
 - id: CR-PP01
-  name: "prd-directory-structure"
+  name: "readme-and-leaves-present"
   version: 1.0.0
   checker_type: script
   script_path: scripts/check-readme.sh
   severity: critical
   conflicts_with: []
   priority: 1
+```
+
+---
+
+## CR-PP01-ARCH architecture-present
+
+A generated PRD bundle MUST have either an `architecture.md` index file OR an `architecture/`
+directory with topic files. The two shapes are interchangeable; downstream consumers tolerate
+either, but at least one MUST exist for the PRD to be complete.
+
+```yaml
+- id: CR-PP01-ARCH
+  name: "architecture-present"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-architecture-index.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
 ```
 
 ---

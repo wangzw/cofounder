@@ -46,9 +46,12 @@ Outputs `<prd-dir>/.review/round-0/trigger-flags.yml` (`glossary_hit`,
 **Trigger**: `glossary_hit: true` OR `sparse_input: true` OR user passed
 `--interactive`. Skip otherwise.
 
-`--no-consultant` override: skip unconditionally; orchestrator
-synthesizes a minimal `clarification/<ts>.yml` locally with R-001..R-007
-marked `status: deferred`.
+`--no-consultant` override: skip unconditionally. The orchestrator
+delegates the clarification write to
+`scripts/synthesize-clarification.sh <prd-dir> <skill-name>
+<skill-version> <skill-description> <artifact-root>` (which marks
+R-001..R-007 as `status: deferred`). This keeps the orchestrator
+pure-dispatch — it does not write `clarification/<ts>.yml` directly.
 
 - Dispatches: `generate/domain-consultant-subagent.md`
 - Inputs: `round-0/input.md`, `input-meta.yml`, `trigger-flags.yml`,
