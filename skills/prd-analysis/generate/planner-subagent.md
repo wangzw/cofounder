@@ -59,17 +59,27 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
   alphabetically is the most recent). Fallback: if no clarification file exists (consultant was
   skipped per `trigger-flags.yml` conditions), read `<target>/.review/round-0/input.md` directly.
 - Constraint: `delete` and `keep` lists MUST be empty (no existing files to preserve or remove)
-- `add` list typically contains 7–9 domain-specific files:
-  - `SKILL.md`
-  - `common/review-criteria.md`
-  - `common/domain-glossary.md`
-  - `generate/domain-consultant-subagent.md`
-  - `generate/planner-subagent.md`
-  - `generate/writer-subagent.md`
-  - `review/cross-reviewer-subagent.md`
-  - `review/adversarial-reviewer-subagent.md`
-  - `revise/per-issue-reviser-subagent.md`
-  - (optionally) `shared/summarizer-subagent.md`, `shared/judge-subagent.md` if customization needed
+- `add` list contains the PRD bundle: a `README.md` index, one `J-NNN-{slug}.md` per persona
+  journey under `journeys/`, one `F-NNN-{slug}.md` per feature derived from the journeys'
+  touchpoints under `features/`, and an architecture index + topic files. A typical first
+  delivery has 1–3 journeys, 5–9 features, and 4–8 architecture topic files.
+- Canonical FromScratch `add` shape (paths are PRD-relative, not skill-relative):
+  - `README.md`                                — product overview + journey/feature index + roadmap
+  - `journeys/J-001-{slug}.md`                 — one per persona (typically 1–3 in MVP)
+  - `features/F-001-{slug}.md`                 — one per feature (typically 5–9 in MVP); derive
+                                                  features from the touchpoints in journeys
+  - `architecture.md`                          — INDEX (~50 lines, links to topic files)
+  - `architecture/tech-stack.md`               — frontend / backend / data / hosting choices
+  - `architecture/design-tokens.md`            — color / spacing / typography / motion tokens
+  - `architecture/data-model.md`               — primary entities + relationships
+  - `architecture/coding-conventions.md`       — naming, layering, module boundaries
+  - `architecture/security.md`                 — authn / authz / secrets / privacy posture
+  - (additional topics like accessibility, i18n, observability, deployment as the PRD scope warrants)
+- Templates available under `common/templates/`:
+  - `prd-template.md`         — for `README.md`
+  - `journey-template.md`     — for `journeys/J-NNN-*.md`
+  - `feature-template.md`     — for `features/F-NNN-*.md`
+  - `architecture-template.md` — for `architecture.md` AND each `architecture/*.md` topic file
 
 **NewVersion mode** (`mode: new-version` in plan.md):
 
@@ -100,19 +110,22 @@ plan:
   delete: []           # new-version only; target-relative paths
   modify: []           # target-relative paths (new-version: files to update)
   add:                 # new files to author (both modes)
-    - path: "generate/writer-subagent.md"
-      template: "common/templates/writer-subagent-template.md"
-      description: "Writer sub-agent prompt for <target-skill-name>"
-    # ... one entry per file
+    - path: "features/F-001-checkout.md"
+      template: "common/templates/feature-template.md"
+      description: "Cart checkout feature — covers payment + receipt screens"
+    - path: "journeys/J-001-onboarding.md"
+      template: "common/templates/journey-template.md"
+      description: "First-time-user onboarding from signup through first transaction"
+    # ... one entry per leaf file in the PRD bundle
   keep: []             # new-version only; planner-certified unchanged files
 rationale: |
   <1–3 sentences explaining the plan shape and any non-obvious choices>
 ```
 
 Each entry in `add` and `modify` MUST include:
-- `path`: target-relative path of the file to create or update
+- `path`: PRD-relative path of the file to create or update (relative to `<target>` artifact root)
 - `template`: path to the template the writer should use (relative to this skill root); use `null` if no template applies
-- `description`: one sentence describing the file's purpose in the target skill
+- `description`: one sentence describing the file's purpose in the PRD bundle
 
 ### Reasoning Guidelines
 

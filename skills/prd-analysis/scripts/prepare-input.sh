@@ -244,7 +244,15 @@ input_md_content = f"# User Prompt\n\n{prompt_text}\n\n# Expanded References\n\n
 input_md_path.write_text(input_md_content, encoding="utf-8")
 
 # ── 4. Compute meta fields ──────────────────────────────────────────────────
-word_count        = len(prompt_text.split())
+# word_count uses whitespace-split for ASCII-style languages, BUT that
+# under-counts CJK and other no-whitespace scripts (e.g. 5KB of Chinese
+# text reports ~50 "words" because nothing splits on whitespace). Add
+# every CJK character as one token to keep sparse_input thresholds meaningful
+# across languages.
+ws_word_count    = len(prompt_text.split())
+cjk_char_count   = len(re.findall(r'[一-鿿぀-ヿ가-힯]', prompt_text))
+word_count        = ws_word_count + cjk_char_count
+char_count        = len(prompt_text)
 has_code_block    = "```" in prompt_text
 has_structured    = bool(re.search(r'\n[-*] |\n\d+\. ', "\n" + prompt_text))
 generated_at      = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -264,6 +272,7 @@ fetch_errors_yaml = "[]" if not fetch_errors else (
 meta_yml = (
     f"generated_at: \"{generated_at}\"\n"
     f"word_count: {word_count}\n"
+    f"char_count: {char_count}\n"
     f"has_code_block: {bool_str(has_code_block)}\n"
     f"has_structured_lists: {bool_str(has_structured)}\n"
     f"expanded_references: {expanded_count}\n"

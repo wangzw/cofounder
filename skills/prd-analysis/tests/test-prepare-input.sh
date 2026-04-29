@@ -41,6 +41,36 @@ setup_fixture
 mkdir -p "$FIXTURE/.review"
 run_command "$CHECK" "A relatively short prompt" "$FIXTURE/.review"
 grep -q "word_count:" "$FIXTURE/.review/round-0/input-meta.yml" && _record_pass || _record_fail "word_count missing"
+grep -q "char_count:" "$FIXTURE/.review/round-0/input-meta.yml" && _record_pass || _record_fail "char_count missing"
+teardown_fixture
+
+test_case "CJK input: word_count includes Chinese characters (not whitespace-only)"
+# Real-world bug: a 3000+ Chinese-character input produced word_count=65 because
+# Python's str.split() only counts whitespace-delimited tokens, and Chinese has
+# no inter-word spaces. That tripped glossary-probe's sparse_input threshold
+# (< 50) on inputs that were demonstrably substantial.
+setup_fixture
+mkdir -p "$FIXTURE/.review"
+# A 200-character Chinese paragraph (no whitespace between characters)
+chinese_text="多agent的设计现在看来是错误的。和人类社会不同，人类社会中一个人就是一个实实在在的人，他的大脑是不能分离的，他的大脑也不能复制，当一个人被占用做一件事情的时候，那这个人确实就被占用了。所以在人类社会中人需要合作但代价是沟通的成本是巨大的。"
+run_command "$CHECK" "$chinese_text" "$FIXTURE/.review"
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
+# word_count should be > 50 (the sparse_input threshold), reflecting actual content density
+wc=$(grep "^word_count:" "$FIXTURE/.review/round-0/input-meta.yml" | awk '{print $2}')
+[ "$wc" -gt 50 ] && _record_pass || _record_fail "word_count $wc should be > 50 for ~120-char Chinese input"
+# char_count should match the actual character length
+cc=$(grep "^char_count:" "$FIXTURE/.review/round-0/input-meta.yml" | awk '{print $2}')
+[ "$cc" -gt 100 ] && _record_pass || _record_fail "char_count $cc should be > 100 for the test input"
+teardown_fixture
+
+test_case "Mixed CJK + ASCII counted correctly"
+setup_fixture
+mkdir -p "$FIXTURE/.review"
+mixed="Build a 多任务系统 with 规划者 and 实施者 roles."
+run_command "$CHECK" "$mixed" "$FIXTURE/.review"
+wc=$(grep "^word_count:" "$FIXTURE/.review/round-0/input-meta.yml" | awk '{print $2}')
+# 7 ASCII tokens + 9 CJK characters = 16
+[ "$wc" -ge 14 ] && _record_pass || _record_fail "mixed word_count $wc should reflect both ASCII and CJK"
 teardown_fixture
 
 test_case "reads stdin when prompt is '-'"
