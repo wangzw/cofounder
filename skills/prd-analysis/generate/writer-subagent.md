@@ -163,22 +163,26 @@ Path: `<prd-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path
 Before writing the self-review archive, you MUST run
 
 ```bash
-scripts/run-checkers.sh <prd-dir>
+scripts/check-prd-formal.sh <prd-dir>
 ```
 
-against the bundle (which now includes your new leaf). The aggregator
-invokes `check-prd-formal.sh` and `check-issue-schema.sh`.
+against the bundle (which includes your new leaf). This is the
+PRD-content formal check only — `scripts/check-issue-schema.sh`
+(audit-artifact self-closure) is the orchestrator's concern in review
+mode, not yours; existing schema-broken issue files are not your
+responsibility to fix.
 
 | Result | Action |
 |--------|--------|
 | `PASS 0 issues found` (exit 0) | Proceed to self-review archive (Write 2) |
-| `FOUND <N> issue(s)` (exit 1) | **Fix every reported issue in place**, then re-run. Do NOT file these as issues — guide §4.1 forbids self-audit issue creation; auto-fix-then-retry is the only correct path. Repeat until exit 0. |
+| `FOUND <N> issue(s)` (exit 1), all on YOUR leaf | **Fix every reported issue in place**, then re-run. Do NOT file these as issues — guide §4.1 forbids self-audit issue creation; auto-fix-then-retry is the only correct path. Repeat until exit 0 OR until 3 consecutive failures (see escalation below). |
+| `FOUND <N> issue(s)` (exit 1), some on OTHER leaves | Fix only the issues whose `file:` matches your assigned leaf. Issues on other leaves are surfaced by writers responsible for those leaves; ACK normally and proceed to Write 2. |
 | script error (exit 2) | ACK `FAIL trace_id=... reason=script-error <exit code>` — formal-checker bug; HITL |
 
-If the same formal failure recurs more than 3 times after fixes, ACK
-with `OK ... self_review_status=PARTIAL fail_count=1` and add ONE row
-to the self-review with `blocker_scope: input-ambiguity` referencing
-the formal CR id; the orchestrator will escalate to HITL.
+If the same formal failure recurs more than 3 times on your leaf after
+fixes, ACK with `OK ... self_review_status=PARTIAL fail_count=1` and
+add ONE row to the self-review with `blocker_scope: input-ambiguity`
+referencing the formal CR id; the orchestrator will escalate to HITL.
 
 The self-review archive (Write 2 below) covers **substantive** CRs only
 — formal violations are already handled by the loop above, not recorded
