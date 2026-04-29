@@ -75,7 +75,9 @@ revise_groups:
     issues: [I-014]
 ```
 
-If no `state: new` issues remain, jump directly to Step 6.
+(Step 1's `verify-phase-entry revise` already guarantees at least one
+`state: new` issue exists in the round, so the manifest is always
+non-empty when we reach Step 2.)
 
 ### Step 3 — Fan-out Per-Issue-Reviser (parallel)
 
@@ -104,8 +106,11 @@ The reviser MUST NOT silently leave an issue at `state: new` while
 claiming to have addressed it. Any such issue is caught by the gate in
 Step 5.
 
-**Reviser is forbidden to** edit `history` or `fix_history`; those are
-maintained by `update-summary.sh` (Step 6).
+**Reviser MUST append** to `history` (one row per state transition) and
+**MAY append** to `fix_history` (one row per non-trivial fix per guide
+§7.5.1). Reviser MUST NOT rewrite or delete prior history entries —
+append-only. `update-summary.sh` (Step 6) reads but does not modify
+these blocks; it propagates them verbatim into `summary.yml`.
 
 ### Step 4 — Self-Verify Formal Pass (writer self-loop, no issues created)
 
@@ -170,7 +175,7 @@ These are quality-at-delivery signals. The judge consumes them in Step 8.
 
 Dispatch `shared/judge-subagent.md`. Verdict considers:
 
-- The Step 6 summary (issue counts, severities, state distribution)
+- The Step 7 per-round index (issue counts, severities, state distribution); `summary.yml` from Step 6 is also read for cross-round oscillation history
 - Ratio signals from Step 7
 - Recurrence counts for any `recurrence_of` matches
 

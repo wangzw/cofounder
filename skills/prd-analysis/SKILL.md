@@ -14,7 +14,7 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; `common/scope-reference.md` + `common/templates/review-checklist.md` on demand) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
+| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; `common/scope-reference.md` and `common/templates/review-checklist.md` are read by writer subagent at self-audit time, not loaded into orchestrator context) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
 | generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
 | review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
@@ -77,8 +77,9 @@ the prior phase has ended.
   the revise (write) phase that follows. It MUST NEVER survive into
   the next read phase — the readiness gate enforces this.
 - A bundle that fails formal review **never** reaches LLM cross-
-  reviewer dispatch. The Step 2 hard gate in `review/index.md`
-  short-circuits to revise without spending LLM tokens (guide §6).
+  reviewer dispatch. The Step 1 hard gate in `review/index.md`
+  (`verify-phase-entry.sh read`) short-circuits to revise without
+  spending LLM tokens (guide §6).
 - Write phase loops on its own scripts (writer self-audit + reviser
   self-loop) until formal PASS — it does NOT escape to read phase
   with formal violations.
@@ -142,7 +143,7 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 - `.review/` lives at target root. Pyramid-indexed: `round-<N>/` + `metrics/` + `versions/`.
 - Round numbers are cross-delivery monotonic.
 
-**Exception for review-mode Step 1 and Step 4:** The main agent MAY read `README.md`, `REVISIONS.md`, and `architecture.md` (the index file) during inventory — these are index/navigation files, not per-feature or per-journey artifact leaves. The main agent MAY perform targeted reads of single feature or journey files when a cross-file check requires spot-verification. It MUST NOT bulk-read the full feature/journey set.
+**Permitted main-agent reads:** in `generate/from-scratch.md` Step 7 (HITL plan-approval gate) and `generate/new-version.md` Step 7 (same), the orchestrator MUST read `<prd-dir>/.review/round-N/plan.md` to present the plan to the user. It MAY also read `README.md`, `REVISIONS.md`, and `architecture.md` (index files, not per-feature/per-journey leaves) when a cross-file routing check requires spot-verification. It MUST NOT bulk-read the per-feature or per-journey leaf set; that is the cross-reviewer's scope.
 
 ## Input Modes (Summary)
 
@@ -413,7 +414,7 @@ Next steps:
     - `scripts/check-journey.sh`             journeys/J-NNN-*.md (CR-PP02, CR-PP04, CR-FM01)
     - `scripts/check-feature.sh`             features/F-NNN-*.md (CR-PP02, CR-PP04, CR-PP15F, CR-FM01)
     - `scripts/check-revisions.sh`           REVISIONS.md (CR-PP05, CR-PP04)
-    - `scripts/check-architecture-index.sh`  architecture.md (CR-PP01, CR-PP04)
+    - `scripts/check-architecture-index.sh`  architecture.md (CR-PP01-ARCH, CR-PP03 soft, CR-PP04)
     - `scripts/check-architecture-topic.sh`  architecture/*.md (CR-PP04)
   - Audit artifacts (guide §10 self-closure):
     - `scripts/check-issue.sh`               .review/round-*/issues/I-NNN.md (CR-IS01)

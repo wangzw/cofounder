@@ -18,6 +18,14 @@ Criteria are partitioned per the dual-criteria from
 
 Severity-to-priority mapping: `critical = 1`, `error = 2`, `warning = 3`.
 
+> **`script_path` semantics**: when multiple per-artifact `check-*.sh`
+> scripts emit the same CR (e.g. `CR-PP04 no-tbd-remaining` is enforced
+> by every per-artifact checker against its own scope), the `script_path`
+> field names the **canonical primary owner**. `run-checkers.sh`
+> auto-discovers and invokes every applicable `check-*.sh` regardless
+> of this field; the canonical owner is purely a documentation pointer
+> for "where to look first when triaging this CR-id".
+
 ---
 
 ## Formal Criteria (Script-Type)
@@ -342,6 +350,45 @@ cannot verify completeness of their implementation against requirements.
   conflicts_with: []
   priority: 1
   incremental_skip: full_scan
+```
+
+---
+
+## CR-META-mechanize criteria-evolution-suggestion
+
+Substantive reviewers (cross-reviewer) emit findings under this criterion when they observe a
+recurring substantive pattern that COULD be lifted into a formal (script-tier) check (guide §8
+formal/substantive evolution). The finding is informational — the reviser does not "fix" it on
+the artifact; instead, a maintainer reviewing repeated CR-META-mechanize findings should consider
+adding a new per-artifact `check-*.sh` rule.
+
+```yaml
+- id: CR-META-mechanize
+  name: "criteria-evolution-suggestion"
+  version: 1.0.0
+  checker_type: llm
+  severity: info
+  conflicts_with: []
+  priority: 3
+```
+
+---
+
+## CR-META-adversarial novel-adversarial-finding
+
+Adversarial-reviewer emits findings under this criterion when its probe surfaces a real issue
+that does not match any existing CR-PP## or CR-FM## category. The reviser handles the artifact
+fix; a maintainer reviewing repeated CR-META-adversarial findings should consider creating a
+new substantive criterion.
+
+```yaml
+- id: CR-META-adversarial
+  name: "novel-adversarial-finding"
+  version: 1.0.0
+  checker_type: llm
+  severity: warning
+  conflicts_with: []
+  priority: 3
 ```
 
 ---

@@ -70,6 +70,31 @@ if [ "$INPUT_MODE" = "stdin" ]; then
     echo "ERROR: --stdin specified but stdin is empty" >&2
     exit 2
   fi
+  # Tolerate a leading summary line emitted by formal-review scripts (e.g.
+  # `run-checkers.sh` prepends "FOUND <N> issue(s) ...:" before the JSON
+  # document per guide §9.2 contract). If stdin doesn't start with `{` or
+  # `[`, strip lines until we find one that does. This makes the recipe
+  # `run-checkers.sh ... | create-issues.sh ... --stdin` work directly,
+  # without callers having to remember `tail -n +2`.
+  if ! printf '%s' "$INPUT" | head -c 1 | grep -qE '^[{[]'; then
+    INPUT=$(printf '%s' "$INPUT" | python3 -c '
+import sys
+text = sys.stdin.read()
+# Find the first line whose first non-whitespace character is { or [
+for i, line in enumerate(text.splitlines()):
+    s = line.lstrip()
+    if s.startswith("{") or s.startswith("["):
+        print("\n".join(text.splitlines()[i:]))
+        break
+else:
+    # No JSON found — emit empty so downstream parser fails clearly
+    pass
+')
+    if [ -z "$INPUT" ]; then
+      echo "ERROR: --stdin received no JSON document (after stripping leading non-JSON lines)" >&2
+      exit 1
+    fi
+  fi
 else
   # Walk every reviewer-output/*.json and merge their `issues` lists into
   # a single document. If the dir is missing or empty, treat as no issues.

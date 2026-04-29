@@ -83,6 +83,35 @@ run_with_stdin "" "$CHECK" "$FIXTURE" "1"
 [ "$LAST_EXIT" = "2" ] && _record_pass || _record_fail "expected 2 got $LAST_EXIT"
 teardown_fixture
 
+test_case "--stdin tolerates leading run-checkers summary line"
+# The formal-failure short-circuit in review/index.md pipes run-checkers'
+# stdout to create-issues --stdin. run-checkers' first stdout line is a
+# "FOUND <N> issue(s) ..." summary per guide §9.2; create-issues must
+# auto-skip non-JSON leading lines.
+setup_fixture
+piped_input=$(cat <<'EOF'
+FOUND 2 issue(s) across 14 formal-review checker(s) (worst severity: critical):
+{
+  "issues": [
+    {"criterion_id":"CR-PP01","file":"README.md","severity":"critical","description":"required top-level file missing: README.md","suggested_fix":"create README.md from common/templates/prd-template.md"},
+    {"criterion_id":"CR-PP01","file":"features/","severity":"critical","description":"required directory missing: features/","suggested_fix":"create features/ and add at least one leaf file"}
+  ]
+}
+EOF
+)
+run_with_stdin "$piped_input" "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
+[ -f "$FIXTURE/.review/round-1/issues/I-001.md" ] && _record_pass || _record_fail "I-001 not written"
+[ -f "$FIXTURE/.review/round-1/issues/I-002.md" ] && _record_pass || _record_fail "I-002 not written"
+teardown_fixture
+
+test_case "--stdin tolerates PASS line then no JSON (treated as empty)"
+setup_fixture
+run_with_stdin "PASS 0 issues found across 14 formal-review checker(s)" \
+    "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "1" ] && _record_pass || _record_fail "expected 1 got $LAST_EXIT"
+teardown_fixture
+
 test_case "exit 1 on invalid JSON"
 setup_fixture
 run_with_stdin "{not json" "$CHECK" "$FIXTURE" "1" --stdin
