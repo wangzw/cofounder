@@ -152,11 +152,26 @@ considers:
 
 | Verdict        | Next Action |
 |----------------|-------------|
-| `converged`    | Delivery: `scripts/commit-delivery.sh`; summarizer writes CHANGELOG + `.review/versions/<N>.md`; orchestrator exits cleanly |
+| `converged`    | Delivery sequence (Step 9 below) |
 | `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
 | `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
 | `diverging`    | HITL gate: surface regression report; same options |
 | `stalled`      | HITL gate: report stall; same options |
+
+### Step 9 — Delivery Sequence (only on `converged`)
+
+1. Set `state.yml phase: on-converge` and inject `git_sha: <HEAD sha>`.
+2. Re-dispatch `shared/summarizer-subagent.md` with `phase: on-converge`. The
+   summarizer writes:
+   - `<prd-dir>/.review/versions/<N>.md` — quality_at_delivery snapshot
+   - `<prd-dir>/CHANGELOG.md` — prepend a delivery entry
+   - (conditional) `<prd-dir>/README.md` — append a Revisions row
+3. Run `scripts/commit-delivery.sh <prd-dir> <delivery-id> <slug>` to create
+   the annotated git tag `delivery-<N>-<slug>`.
+4. Orchestrator exits cleanly.
+
+Steps 1 and 3 are orchestrator-side (no LLM); Step 2 is the only Phase 2
+sub-agent dispatch in the entire delivery sequence.
 
 ---
 

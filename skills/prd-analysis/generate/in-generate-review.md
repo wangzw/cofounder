@@ -4,11 +4,11 @@ Referenced by `generate/writer-subagent.md`. Defines which **substantive**
 CRs apply to which PRD-bundle leaf types and the PASS/FAIL format for
 the writer's self-review archive.
 
-> **Formal CRs are NOT in this table.** CR-PP01–CR-PP05, CR-PP04 (no
-> TBD), and CR-FM01 (frontmatter) are enforced by
-> `scripts/run-checkers.sh` as a hard gate before the writer ACKs (guide
-> §4 + §4.1). Failures there are auto-fixed in place by the writer
-> without creating issue files. The table below covers only the
+> **Formal CRs are NOT in this table.** CR-PP01–CR-PP05, CR-PP15F
+> (acceptance-criteria BDD format), and CR-FM01 (frontmatter) are
+> enforced by `scripts/run-checkers.sh` as a hard gate before the writer
+> ACKs (guide §4 + §4.1). Failures there are auto-fixed in place by the
+> writer without creating issue files. The table below covers only the
 > substantive CRs the writer self-reviews after formal PASS.
 
 ---

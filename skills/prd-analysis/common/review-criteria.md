@@ -355,15 +355,35 @@ excerpt instead.
 
 ---
 
-## CR-PP15 acceptance-criteria-testable
+## CR-PP15F acceptance-criteria-format (formal)
 
-Every Acceptance Criterion in a Feature file MUST be precise enough to write a test assertion.
-Vague verbs — "correctly handles", "properly displays", "works as expected" — are FORBIDDEN.
-Every AC MUST express observable behavior (what the system returns, emits, renders, or stores).
-Every Edge Case MUST have a Given/When/Then form that maps to an automated test. Every Feature
-with non-trivial state or integration MUST have at least one non-behavioral criterion (performance,
-concurrency, or resource limit). Every Feature with a Permission line MUST have at least one edge
-case testing unauthorized access.
+Every feature file MUST contain a `## Acceptance Criteria` section with at least one
+Given/When/Then block (all three keywords present). This is the mechanical format check;
+the substantive testability assessment is CR-PP15 (below).
+
+```yaml
+- id: CR-PP15F
+  name: "acceptance-criteria-format"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+```
+
+---
+
+## CR-PP15 acceptance-criteria-testable (substantive)
+
+In addition to the formal BDD format gate (CR-PP15F), every Acceptance Criterion in a Feature
+file MUST be precise enough to write a test assertion. Vague verbs — "correctly handles",
+"properly displays", "works as expected" — are FORBIDDEN. Every AC MUST express observable
+behavior (what the system returns, emits, renders, or stores). Every Edge Case MUST have a
+Given/When/Then form that maps to an automated test. Every Feature with non-trivial state or
+integration MUST have at least one non-behavioral criterion (performance, concurrency, or
+resource limit). Every Feature with a Permission line MUST have at least one edge case testing
+unauthorized access.
 
 ```yaml
 - id: CR-PP15

@@ -107,10 +107,12 @@ review_dir = os.path.join(artifact_root, '.review')
 existing_ids = set()
 existing_signatures = {}      # (criterion_id, file, description-prefix) → id
 existing_in_this_round = set()
+recurrence_counts = {}        # id → recurrence_count value (int) from frontmatter
 
 id_re = re.compile(r'^id:\s*(\S+)\s*$', re.M)
 crit_re = re.compile(r'^criterion_id:\s*(\S+)\s*$', re.M)
 file_re = re.compile(r'^file:\s*(.*)$', re.M)
+rec_count_re = re.compile(r'^recurrence_count:\s*(\d+)\s*$', re.M)
 desc_re = re.compile(r'## Description\s*\n(.*?)(?=\n## |\Z)', re.S)
 
 if os.path.isdir(review_dir):
@@ -135,6 +137,9 @@ if os.path.isdir(review_dir):
                 existing_ids.add(iid)
                 if entry == f"round-{round_num}":
                     existing_in_this_round.add(iid)
+                m_rec_count = rec_count_re.search(text)
+                if m_rec_count:
+                    recurrence_counts[iid] = int(m_rec_count.group(1))
                 m_crit = crit_re.search(text)
                 m_file = file_re.search(text)
                 m_desc = desc_re.search(text)
@@ -168,8 +173,9 @@ for it in issues_in:
     rec_of = it.get('recurrence_of', '').strip() if isinstance(it.get('recurrence_of', ''), str) else ''
     if sig in existing_signatures and not rec_of:
         rec_of = existing_signatures[sig]
+    # Dedupe against any issue already filed in this round, whether pre-existing or
+    # written earlier in this same batch (existing_in_this_round is updated below).
     if sig in existing_signatures and existing_signatures[sig] in existing_in_this_round:
-        # Already filed this exact issue in the current round — skip silently.
         deduped.append(existing_signatures[sig])
         continue
 
@@ -183,8 +189,14 @@ for it in issues_in:
         f"created_in_round: {round_num}",
     ]
     if rec_of:
+        # Per guide §7.5.1, recurrence_count tracks how many times this signature has
+        # surfaced after the original (count >= 2 triggers HITL). Look up the prior
+        # issue's count and increment so chains accumulate correctly.
+        prior_count = recurrence_counts.get(rec_of, 0)
+        new_count = prior_count + 1
         fm_lines.append(f"recurrence_of: {rec_of}")
-        fm_lines.append("recurrence_count: 1")
+        fm_lines.append(f"recurrence_count: {new_count}")
+        recurrence_counts[iid] = new_count
     fm_lines.append("history:")
     fm_lines.append(f"  - {{round: {round_num}, action: created}}")
     fm_lines.append("fix_history: []")
@@ -206,6 +218,7 @@ for it in issues_in:
             sys.exit(2)
     written.append(iid)
     existing_signatures[sig] = iid
+    existing_in_this_round.add(iid)
 
 if dry_run:
     print(f"DRY-RUN would create {len(written)} issue(s); deduped {len(deduped)} duplicate(s)")

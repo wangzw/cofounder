@@ -13,7 +13,7 @@
 #   CR-PP03  readme-index-complete            — leaf ↔ README index mapping
 #   CR-PP04  no-tbd-remaining                 — TBD / TODO / FIXME absent
 #   CR-PP05  version-chain-integrity          — REVISIONS.md paths resolve
-#   CR-PP15  acceptance-criteria-format       — features carry BDD blocks
+#   CR-PP15F acceptance-criteria-format       — features carry BDD blocks
 #   CR-FM01  frontmatter-required-fields      — leaf frontmatter fields
 #
 # Per guide §9.1 (3-state returncode) and §9.2 (stdout restates the meaning):
@@ -233,7 +233,7 @@ for fname in list_dir('features'):
     fm, body = parse_frontmatter(text)
     m_ac = re.search(r'(?im)^\s*##\s+Acceptance\s+Criteria\b', body)
     if not m_ac:
-        add('CR-PP15', 'error', rel,
+        add('CR-PP15F', 'error', rel,
             "feature missing '## Acceptance Criteria' section",
             "add '## Acceptance Criteria' with at least one Given/When/Then "
             "block")
@@ -247,7 +247,7 @@ for fname in list_dir('features'):
     has_then = re.search(r'\bThen\b', ac_block)
     if not (has_given and has_when and has_then):
         missing = [k for k, v in [('Given', has_given), ('When', has_when), ('Then', has_then)] if not v]
-        add('CR-PP15', 'error', rel,
+        add('CR-PP15F', 'error', rel,
             f"Acceptance Criteria section missing BDD keyword(s): "
             f"{', '.join(missing)}",
             "rewrite the section with at least one Given/When/Then block")
