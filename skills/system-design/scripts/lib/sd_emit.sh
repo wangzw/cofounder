@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
-# sd_legacy_emit.sh — shared post-processor for cross-bundle scripts that
-# pre-date the §9 contract.  Each cross-bundle script accumulates findings
-# into a comma-separated `$JSON_FINDINGS` shell variable; this helper
-# turns that into the conformant `PASS … / FOUND … {"issues":[…]}` format,
-# normalising legacy criterion ids (CR-X3/X4/X6/L2/X7/X8) and severities
-# (blocker/mechanical) to the canonical CR-SD14..19 values and the
-# sd_lint.py severity vocabulary.
+# sd_emit.sh — shared §9 emitter for cross-bundle linters.
+#
+# Cross-bundle scripts (architecture-coverage, analytics-coverage, dependency-
+# layering, placeholder-json, readme-references, single-source-of-truth)
+# accumulate findings into a comma-separated `$JSON_FINDINGS` shell variable
+# whose objects use a pre-§9 vocabulary (criterion ids `CR-X3/X4/X6/L2/X7/X8`,
+# severities `blocker/mechanical`).  This helper normalises that vocabulary
+# to the canonical `CR-SD14..19` ids and `sd_lint.py` severity values, then
+# emits the conformant `PASS … / FOUND … {"issues":[…]}` format and exits
+# the process with the §9 status code.
 #
 # Usage at the END of a cross-bundle script:
 #
-#     SCOPE_LABEL="(scope)"
-#     SD_LEGACY_FINDINGS="$JSON_FINDINGS" "$SCRIPT_DIR/lib/sd_legacy_emit.sh" "$SCOPE_LABEL"
-#     # the helper exits the process with the §9 status code
+#     SCOPE_LABEL="(check-X)"
+#     SD_LEGACY_FINDINGS="$JSON_FINDINGS" exec bash "$SCRIPT_DIR/lib/sd_emit.sh" "$SCOPE_LABEL"
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

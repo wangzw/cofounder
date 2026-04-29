@@ -181,7 +181,7 @@ and one test runner. **~32 scripts / 20 test runners / 364 tests** (run
 |------|------|
 | `scripts/lib/sd_lint.py` | Shared Finding dataclass, frontmatter parser, `emit()` per guide §9 contract. Imported by every per-artifact `check-*.sh`. |
 | `scripts/lib/aggregate.py` | Pure-Python metrics aggregator backing `metrics-aggregate.sh`. |
-| `scripts/lib/sd_legacy_emit.sh`, `sd_legacy_wrapper.sh` | Bash bridge helpers used by older check-*.sh scripts pre-Python. |
+| `scripts/lib/sd_emit.sh` | Shared §9 emitter for cross-bundle linters: normalises legacy `CR-X*/CR-L2` ids and `blocker/mechanical` severities to canonical `CR-SD14..19` and `sd_lint` severity vocabulary. |
 
 ---
 
