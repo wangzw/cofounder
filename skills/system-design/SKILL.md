@@ -37,13 +37,118 @@ system-design generates technical design documents as a **multi-file directory**
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/review-criteria.md` | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); structural-lint runs BEFORE semantic review |
-| generate (new version) | `/cofounder:system-design --target <design-dir> "<change>"` | `generate/new-version.md`, `common/review-criteria.md` | Evolve existing design; planner emits delta plan (delete/modify/add/keep); forced full cross-review on first round |
-| review | `/cofounder:system-design --review <design-dir>` | `review/index.md`, `common/review-criteria.md` | Read-only: scripts/run-checkers.sh (structural-lint) runs first; then cross-reviewer + adversarial-reviewer dispatch in parallel; writes per-round issue files to `<design-dir>/.review/round-<N>/issues/<issue-id>.md` |
-| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md`, `common/review-criteria.md` | Per-issue revise loop driven by open issues from `.review/round-<N>/issues/`; re-runs structural-lint gate after batch |
+| generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
+| generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
+| review | `/cofounder:system-design --review <design-dir>` | `review/index.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
+| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
+
+## Phase Contract
+
+The skill operates as an alternating **write → read → write → read …**
+sequence, with hard gates at every phase boundary. A phase MUST NOT
+end until its exit gate passes; the next phase MUST NOT start until
+the prior phase has ended.
+
+### Write phase
+
+- **Modes**: initial `generate` (writers author leaves from a plan) and
+  `revise` (per-issue revisers fix leaves to address issues).
+- **Goal**: produce a design bundle that is structurally well-formed and,
+  in the revise case, has no open issues.
+- **Exit gate** (necessary before write phase ends):
+  1. **Formal review PASS** — `scripts/run-checkers.sh <design-dir>`
+     exits 0. This is the bundle-level structural gate (every per-
+     artifact `check-*.sh` passes). Failures cause the orchestrator to
+     loop the writer / reviser until PASS, never to ACK the phase as
+     done with formal violations outstanding.
+  2. **State-machine PASS (revise only)** —
+     `scripts/check-revise-completeness.sh <design-dir> <round>` exits 0;
+     i.e. **no issue is left in `state: new`** in the current round.
+     Every issue created during the prior read phase has been
+     dispositioned to `fixed`, `false-positive`, `deferred`, or
+     `superseded` with the appropriate metadata. (Generate's first
+     round has no inbound issues, so this clause is vacuous.)
+- Both gates are short-circuit: if either fails, the write phase loops
+  until both PASS, OR the orchestrator escalates to HITL after the
+  iteration cap (`config.yml convergence.max_iterations`).
+
+### Read phase
+
+- **Mode**: `review`. LLM cross-reviewer (and conditionally adversarial-
+  reviewer) inspect the bundle, emit findings as JSON in
+  `reviewer-output/<trace_id>.json`, and `scripts/create-issues.sh`
+  materializes per-issue files in `state: new`.
+- **Entry gate** (necessary before read phase starts):
+  - `scripts/check-review-readiness.sh <design-dir>` exits 0 — i.e. **no
+    issue from any prior round is still in `state: new`**. This
+    enforces "the previous write phase finished cleanly" (guide §7.3).
+    Equivalent to verifying the prior write phase's state-machine PASS
+    persists across the boundary.
+- **Exit gate**: judge writes `verdict.yml`. There is no formal/state
+  gate on read phase exit — read phase's job is to produce issues
+  (which are by definition `state: new` until revise acts on them).
+- After read phase ends, **if the verdict is `progressing`, control
+  passes to revise (a write phase) which inherits the open
+  `state: new` issues** and must dispose of them before exiting.
+
+### Cycle invariants
+
+- A `state: new` issue **only** exists during read phase output and
+  the revise (write) phase that follows. It MUST NEVER survive into
+  the next read phase — the readiness gate enforces this.
+- A bundle that fails formal review **never** reaches LLM cross-
+  reviewer dispatch. The Step 1 hard gate in `review/index.md`
+  (`verify-phase-entry.sh read`) short-circuits to revise without
+  spending LLM tokens (guide §6).
+- Write phase loops on its own scripts (writer self-audit + reviser
+  self-loop) until formal PASS — it does NOT escape to read phase
+  with formal violations.
+
+### Script-enforced boundary gates
+
+Every phase has a **MANDATORY first step** that calls a single
+boundary-gate script. The script's non-zero exit halts the phase before
+any further action. Documenting the contract in prose is
+enforcement-by-LLM; threading it through a script is enforcement-by-
+process — even if subsequent steps are skipped or reordered, control
+cannot reach a phase's main work without the gate having exited 0.
+
+The unified entry point is `scripts/verify-phase-entry.sh <phase>
+<design-dir> [round]`. Each orchestration file's Step 1 (or Step 2 after
+the bootstrap precheck for generate modes) is this call:
+
+| Phase | Orchestration file | First call |
+|-------|-------------------|------------|
+| read (review) | `review/index.md` Step 1 | `verify-phase-entry.sh read <design-dir>` |
+| write (revise) | `revise/index.md` Step 1 | `verify-phase-entry.sh revise <design-dir> <round>` |
+| write (generate-fresh) | `generate/from-scratch.md` Step 2 | `verify-phase-entry.sh generate-fresh <design-dir>` |
+| write (generate-evolve) | `generate/new-version.md` Step 2 | `verify-phase-entry.sh generate-evolve <design-dir>` |
+
+`verify-phase-entry.sh` consolidates the underlying gates per phase:
+
+| Phase | Underlying gate scripts |
+|-------|-------------------------|
+| read | `check-review-readiness.sh` (no `state: new` from prior rounds) AND `run-checkers.sh` (bundle formal PASS) |
+| revise | round-N has at least one `state: new` issue (otherwise no work) |
+| generate-fresh | bundle is empty/absent (avoids overwriting an existing design) |
+| generate-evolve | prior delivery's `versions/<N-1>.md` exists |
+
+Exit codes follow the §9 contract uniformly: `0` = phase may proceed,
+`1` = phase MUST NOT proceed (precondition failed; see stdout), `2` =
+script-level error → HITL.
+
+### Boundary-to-gate mapping (cycle view)
+
+| Boundary | Gate script(s) at the boundary | Exit gate of | Entry gate of |
+|----------|--------------------------------|--------------|---------------|
+| revise → review | `verify-phase-entry.sh read` (= readiness + run-checkers) | revise (write) | review (read) |
+| review → revise | (verdict-driven; revise's own entry gate `verify-phase-entry.sh revise` then runs) | review (read) | revise (write) |
+| revise → revise (loop) | `check-revise-completeness.sh` + `run-checkers.sh` (Step 5 + Step 4 self-loop) | revise iteration | next revise iteration |
+| generate → review (first delivery) | `verify-phase-entry.sh read` | generate (write) | review (read) |
+| converged → delivery | (verdict only) | review (read) | delivery sequence |
 
 ## Output Structure
 
@@ -246,12 +351,6 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 
 5. **No LLM post-processing**: do not rewrite, summarize, or embellish script output. The `.review/metrics/<scope>.metrics.yml` file is the machine-readable source of truth.
 
-6. **Scaffold drift recovery**: `scripts/metrics-aggregate.sh` and `scripts/lib/aggregate.py` are managed by skill-forge and MUST NOT be edited in-place. If `scripts/check-scaffold-sha.sh` reports SHA drift (CR-S12 block), run:
-   ```bash
-   scripts/scaffold.sh --refresh
-   ```
-   This re-pulls both files from skill-forge canonical and regenerates `common/shared-scripts-manifest.yml` atomically. A fresh `git clone` (CI) gets correct file content from git but without hardlinks — the SHA check still passes because content is identical; drift only occurs when either side is edited after divergence. If `scripts/scaffold.sh --refresh` is unavailable, restore the files manually from `skills/skill-forge/common/skeleton/scripts/`.
-
 ## Model Tiers
 
 Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml` (`model_tier_defaults` + `model_mapping`).
@@ -284,7 +383,6 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 
 | Flag | Applies to | Semantics |
 |------|-----------|-----------|
-| `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus`. Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
 | `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-006 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
@@ -305,7 +403,8 @@ Next steps:
 ## Configuration & Subagent Files
 
 - **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions)
-- **Review criteria**: `common/review-criteria.md` (CR catalog: script-type L1..L5 + X1..X8 structural-lint checks + LLM-type design-review dimensions)
+- **Review criteria**: `common/review-criteria.md` (CR catalog: formal script-type CR-SD01..CR-SD19 + frontmatter CR-SDFM01..03 + LLM-type CR-SD-DESIGN01..08 + audit-artifact schema CRs + meta CRs)
+- **Issue schema**: `common/issue-schema.md` (issue-file frontmatter contract, state-machine transitions, history append-only invariants — read at runtime by `create-issues.sh`, `check-issue.sh`, and the reviser subagent)
 - **Domain glossary**: `common/domain-glossary.md` (system-design domain terms: module, API surface, Boundary Enforcement, Feature-Module mapping, etc.)
 - **Templates**:
   - `common/templates/design-readme-template.md`
@@ -326,17 +425,21 @@ Next steps:
   - `generate/new-version.md`
   - `review/index.md`
   - `revise/index.md`
-- **Structural-lint scripts** (auto-discovered by `scripts/run-checkers.sh` via `check-*.sh` glob):
-  - `scripts/check-api-per-endpoint-blocks.sh` — L1: all seven per-endpoint subsections present
-  - `scripts/check-placeholder-json.sh` — L2: no placeholder JSON tokens in code blocks
-  - `scripts/check-boundary-enforcement-cols.sh` — L3: all four Boundary Enforcement columns filled
-  - `scripts/check-api-surface-cols.sh` — L4: all seven API Surface table columns filled per row
-  - `scripts/check-module-interface-types.sh` — L5: type names resolve to inline or imported definition
-  - `scripts/check-module-deps-vs-protocols.sh` — X1: Module Deps edges match README Interaction Protocols
-  - `scripts/check-endpoint-literal-vs-api.sh` — X2: endpoint literals in module API Surface exist in api/
-  - `scripts/check-architecture-coverage.sh` — X3: every PRD architecture/ file appears in Implementation Conventions table
-  - `scripts/check-analytics-coverage.sh` — X4: every PRD analytics event appears in Analytics Coverage section
-  - `scripts/check-feature-module-traceability.sh` — X5: every PRD F-NNN referenced in Feature-Module matrix
-  - `scripts/check-dependency-layering.sh` — X6: no reverse-layer imports (blockers, not warnings)
-  - `scripts/check-single-source-of-truth.sh` — X7: data-model/endpoint/boundary definitions have exactly one canonical home
-  - `scripts/check-readme-references.sh` — X8: all relative paths in README.md resolve to existing files
+- **Per-artifact formal-review scripts** (per-artifact harness; auto-discovered by `scripts/run-checkers.sh`):
+  - `scripts/check-readme.sh` — README-class checks (CR-SD01, CR-SD02, CR-SD05, CR-SD09, CR-SD14, CR-SD15, CR-SD18, CR-SDFM01)
+  - `scripts/check-module.sh` — Module-class checks (CR-SD03, CR-SD04, CR-SD06, CR-SD07, CR-SD08, CR-SD16, CR-SD17, CR-SD19, CR-SDFM02)
+  - `scripts/check-api.sh` — API-class checks (CR-SD03, CR-SD10, CR-SD11, CR-SD12, CR-SD13, CR-SD17, CR-SDFM03)
+  - `scripts/check-issue.sh` — issue-file frontmatter + state-machine schema (CR-IS01)
+- **Phase-gate scripts**:
+  - `scripts/verify-phase-entry.sh` — single entry point dispatched per `<phase>` argument (`read | revise | generate-fresh | generate-evolve`); composes the underlying gates below
+  - `scripts/check-review-readiness.sh` — read-phase entry: zero `state: new` issues from prior rounds
+  - `scripts/check-revise-completeness.sh` — write-phase exit (revise): zero `state: new` issues in current round
+  - `scripts/run-checkers.sh` — bundle-level formal-review gate (composes every per-artifact `check-*.sh`)
+- **Pipeline-stage scripts** (per audit-design guide §6):
+  - `scripts/prepare-input.sh` — input-classification (CR-CL) → planner-input (CR-PL)
+  - `scripts/create-issues.sh` — reviewer-output (CR-RO) → issue files (CR-IS01); idempotent
+  - `scripts/finalize-revisions.sh` — issue state transitions (CR-RI) → write-side discipline
+  - `scripts/judge-round.sh` — round verdict (CR-VD) using fixed convergence rule
+  - `scripts/summarize-round.sh` / `scripts/summarize-delivery.sh` — summarizer Phase 1/2 (CR-VS)
+- **Diagnostic scripts**:
+  - `scripts/metrics-aggregate.sh` — aggregate harness JSONL + dispatch-log into `.review/metrics/<scope>.metrics.yml`
