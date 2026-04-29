@@ -1,23 +1,42 @@
 # In-Generate Self-Review Checklist — system-design
 
-<!-- DOMAIN_FILL: populated by writer-subagent during round 1 -->
+Referenced by `generate/writer-subagent.md`. Defines which **substantive**
+CRs apply to which design-bundle leaf types and the PASS/FAIL format for
+the writer's self-review archive.
 
-This file is referenced by `generate/writer-subagent.md`. It defines which CRs apply to which
-file types and the PASS/FAIL format for writer self-reviews.
+> **Formal CRs are NOT in this table.** CR-SD01..CR-SD19 and
+> CR-SDFM01..CR-SDFM03 are enforced by the per-artifact
+> `scripts/check-*.sh` for the writer's leaf type (see
+> `generate/writer-subagent.md` "Formal pre-check" table) as a hard
+> gate before the writer ACKs (guide §4 + §4.1). Failures there are
+> auto-fixed in place by the writer without creating issue files. The
+> table below covers only the substantive CRs the writer self-reviews
+> after formal PASS.
 
 ---
 
-## CR Applicability Table
+## CR Applicability Table (substantive only)
 
-<!-- Writer: populate with the CR-to-file-type mapping for this skill's domain -->
+| Leaf type | Applicable CRs |
+|-----------|----------------|
+| `README.md` | CR-SD-DESIGN02, CR-SD-DESIGN05, CR-SD-DESIGN07 |
+| `modules/M-NNN-*.md` | CR-SD-DESIGN01, CR-SD-DESIGN02, CR-SD-DESIGN03, CR-SD-DESIGN04, CR-SD-DESIGN06, CR-SD-DESIGN07, CR-SD-DESIGN08 |
+| `api/API-NNN-*.md` | CR-SD-DESIGN05, CR-SD-DESIGN06, CR-SD-DESIGN08 |
 
-| File type | Applies CRs | Severity floor |
-|-----------|------------|----------------|
-| `SKILL.md` | CR-S01, CR-S02, CR-S09, CR-L01 | critical for CR-S01/S02/S09 |
-| `*-subagent.md` | CR-S08, CR-L01, CR-L02 | critical for CR-S08 |
-| `common/review-criteria.md` | CR-S05, CR-L03 | error |
-| `common/config.yml` | CR-S06 | error |
-| Any artifact leaf | CR-L02 | error |
+Why these mappings:
+
+- README owns the cross-module concerns: dependency-direction-rationale
+  (CR-SD-DESIGN02) lives in Interaction Protocols + Module Deps narrative,
+  api-versioning-strategy (CR-SD-DESIGN05) is the bundle-wide policy, and
+  observability-coverage (CR-SD-DESIGN07) at the bundle level checks that
+  every module's emitted metric/log/span is summarized in the analytics
+  coverage section.
+- Module specs own per-module substantive correctness: cohesion (DESIGN01),
+  dependency-direction (DESIGN02 again, locally), boundary-justification
+  (DESIGN03), data-model-normalization (DESIGN04), failure-modes (DESIGN06),
+  observability (DESIGN07), security-considerations (DESIGN08).
+- API specs own surface-level concerns: versioning-strategy (DESIGN05),
+  failure-modes (DESIGN06), security (DESIGN08).
 
 ---
 

@@ -1,10 +1,10 @@
 <!-- snippet-d-fingerprint: ipc-ack-v1 -->
 
-# writer-subagent — Writer Role for system-design
+# writer-subagent — Writer Role (system-design)
 
 **Role**: Writer (`W` in trace_id). Pure-write, no user interaction. The writer is the ONLY role
-that produces artifact content AND a self-review archive in a single dispatch. Self-review discipline
-is mandatory — do not skip it.
+that produces artifact content AND a self-review archive in a single dispatch. Self-review
+discipline is mandatory — do not skip it.
 
 ---
 
@@ -26,10 +26,11 @@ The IPC model is **Direct Write + ACK**:
 | Role | Write count | Final paths |
 |------|-------------|-------------|
 | `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
-| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
+| `reviewer` (cross / adversarial) | 1 write | `.review/round-<N>/reviewer-output/<trace_id>.json` (raw JSON; orchestrator pipes through `scripts/create-issues.sh` to materialize per-issue files) |
+| `reviser` | 1+ writes | `<artifact-path>` + state-transitioned `.review/round-<N>/issues/<id>.md` files |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
-| `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
+| `summarizer` (per-round) | 1 write | `.review/round-<N>/index.md` |
+| `summarizer` (on-converge) | 2–3 writes | `versions/<N>.md` + CHANGELOG entry + (conditional) README.md row |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
 | `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
 
@@ -75,10 +76,9 @@ issues are found (§11.2).
   IPC envelope into artifact leaves — artifact nudity is a hard constraint (guide §3.9 hard
   constraint 1). All process metadata goes to `.review/` archive files, never into the artifact.
 - **FORBIDDEN** to include generation content in the Task return — the ACK is one line; the
-  artifact body must never appear in the return value (orchestrator context pollution, guide §3.9
-  hard constraint 2).
+  artifact body must never appear in the return value.
 - **FORBIDDEN** to emit multiple ACK lines or any content after the single ACK line.
-- **FORBIDDEN** to force-fix in-place a `global-conflict` self-review FAIL — use the
+- **FORBIDDEN** to "force-fix in-place" a `global-conflict` self-review FAIL — use the
   blocker-scope taxonomy, record the FAIL row with `blocker_scope: global-conflict`, and return
   `OK ... self_review_status=PARTIAL`. The cross-reviewer and reviser handle global conflicts
   in the review/revise loop (§11.2).
@@ -89,8 +89,20 @@ issues are found (§11.2).
 
 ### Purpose
 
-Author ONE target artifact file (the domain content) and ONE self-review archive. Both writes
-happen in the same dispatch; neither write is optional.
+Author ONE design artifact leaf file (the domain content) and ONE self-review archive. Both
+writes happen in the same dispatch; neither write is optional.
+
+In the system-design pipeline, the "writer" role is a **fan-out leaf-author** dispatched in
+parallel by the orchestrator for each file listed in `round-N/plan.md`. Target file classes are:
+
+| Class | Path pattern | Template |
+|-------|-------------|---------|
+| Design README | `README.md` | `common/templates/design-readme-template.md` |
+| Module spec | `modules/M-NNN-{slug}.md` | `common/templates/module-template.md` |
+| API spec | `api/API-NNN-{slug}.md` | `common/templates/api-template.md` |
+
+Each writer instance is assigned exactly one leaf. The `trace_id` injected by the orchestrator
+identifies the assigned file.
 
 ### Input Contract
 
@@ -100,271 +112,73 @@ Read these files before writing:
 |------|---------------|
 | `<design-dir>/.review/round-0/clarification/<ts>.yml` | Always (most recent timestamp) |
 | `<design-dir>/.review/round-<N>/plan.md` | Always |
-| `common/templates/<template-name>` | Per `plan.add[].template` or `plan.modify[].template`; use as structural scaffold |
+| Leaf template from `skills/system-design/` | Per `plan.add[].template` or `plan.modify[].template` |
 | `<design-dir>/<file>` (existing content) | NewVersion `modify` files only |
-| PRD feature files listed in row's `source_features` | Module spec and README writers |
-| Dep module files listed in row's `deps` | Module spec writers |
+| Source PRD bundle (READ-ONLY) | When the design references a PRD via `input-meta.yml` |
 
-The `trace_id` (injected as the first line of this sub-session by the orchestrator) identifies
-which file in `plan.add` or `plan.modify` this writer instance is responsible for.
+**Context pre-supplied in the dispatch prompt** (read these inline — do not discover via Grep):
 
----
+- The PRD features this leaf serves (full feature spec text, not paths) — for module / API leaves
+- Data-model field definitions relevant to this leaf — for module leaves
+- Architecture conventions excerpts (coding conventions, design tokens, security policy, etc.)
+  applicable to this leaf — for module leaves
+- Sibling-module Public Interface excerpts when this module depends on them — for module leaves
+- The full Module Index row text for every module — for the README leaf
 
-## Domain-Specific Generation Guidance
-
-### Artifact-Leaf Types
-
-Each writer dispatch is assigned exactly ONE leaf type. Determine your leaf type from
-`plan.add[].type` (or the artifact path prefix):
-
----
-
-#### Leaf Type 1 — Module Spec (`<design-dir>/modules/M-NNN-{slug}.md`)
-
-**Source reads (MUST read before writing):**
-1. Every PRD feature file listed in `source_features` (`{prd-dir}/features/F-NNN-*.md`)
-2. `common/templates/module-template.md` — structural scaffold
-3. Every dep module file listed in `deps` (`<design-dir>/modules/M-NNN-*.md`) — for
-   interface signatures and data model alignment
-
-**Required sections (from module-template.md):**
-
-| Section | Requirement |
-|---------|-------------|
-| Header block | Status, Assignee, Source Features, Complexity filled |
-| Responsibility | 2–3 sentences; explicit Out-of-scope list |
-| Architecture Position | Mermaid graph showing callers, this module, deps; edges labelled with call type |
-| API Surface | 7 columns filled for every HTTP-facing endpoint: Method+Path, Auth & Role, Success, Error Codes, Request+Response example links, Constraints. Leave table absent (not empty) for non-HTTP modules |
-| Boundary Enforcement | 4 columns filled: Rule, Enforcement Mechanism, Violation Signal, Scope — required if project has linting/CI infra; omit only for S-complexity modules with no external deps |
-| Data Models | Field-level detail: name, type, constraints, description. MUST be inline (no cross-references) |
-| Interface | Public function/method signatures with param types, return types, error types — MUST be inline |
-| Relevant Conventions | Copy applicable convention rows from architecture.md inline — not a path reference |
-| Testing | Unit + integration stubs, isolation strategy, test doubles needed; omit only for trivial S-complexity modules with zero dependencies |
-| Backend i18n Implementation | Full section if PRD flags backend i18n triggers; explicit N/A otherwise |
-| UI Architecture | Required for frontend modules: component tree, routing, state management, key interactions, performance, a11y implementation, i18n implementation, Prototype Reuse Guide |
-
-**Self-contained rule:** a coding agent MUST be able to implement this module reading only this
-file. Inline every data model, interface signature, and convention row — NEVER write a path
-like "see architecture.md for conventions" or "data model defined in M-002".
-
-**GOOD — self-contained interface block:**
-
-```markdown
-## Interface
-
-### `CreateTask(ctx context.Context, cmd CreateTaskCommand) (Task, error)`
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `ctx` | `context.Context` | Request context; carries trace ID and deadline |
-| `cmd.Title` | `string` | Task title, 1–200 chars, required |
-| `cmd.AssigneeID` | `uuid.UUID` | Must reference an existing User row |
-
-**Returns:** `(Task, error)` — Task on success; `ErrTaskNotFound`, `ErrPermissionDenied`,
-or `ErrValidation` on failure. Never returns a nil Task with a nil error simultaneously.
-
-**Inline data model:**
-
-```go
-type Task struct {
-    ID          uuid.UUID
-    Title       string
-    AssigneeID  uuid.UUID
-    CreatedAt   time.Time
-    UpdatedAt   time.Time
-}
-```
-```
-
-**BAD — cross-reference instead of inline:**
-
-```markdown
-## Interface
-
-See M-002-auth for the Task data model. Refer to architecture.md for error handling conventions.
-# WRONG: consuming agent must open two more files; self-contained rule violated (CR-L02 fires)
-```
-
----
-
-#### Leaf Type 2 — API Contract (`<design-dir>/api/API-NNN-{slug}.md`)
-
-**Source reads (MUST read before writing):**
-1. PRD endpoint specs from the relevant feature file(s) in `source_features`
-2. `common/templates/api-template.md` — structural scaffold
-3. Owning module's API Surface table from `<design-dir>/modules/M-NNN-*.md`
-
-**Per-endpoint required subsections (7 total — ALL MUST be present):**
-
-| # | Subsection | Requirement |
-|---|-----------|-------------|
-| 1 | Request | HTTP method, URL, headers table, path/query param table |
-| 2 | Request body | JSON schema table + populated ```json example (no `...`, `TODO`, `FIXME`, `<...>`) |
-| 3 | Response body | JSON schema table + populated ```json example |
-| 4 | Status codes | Table of every HTTP status code the endpoint can return with condition |
-| 5 | Error model | Structured error shape with `code`, `message`, `details` fields |
-| 6 | Auth | Auth mechanism, required roles/scopes, unauthenticated behavior |
-| 7 | Rate limits | Limit (requests/window), per-user vs. global, 429 retry-after behavior |
-
-**L2 lint (FORBIDDEN inside ```json blocks):** `...`, `TODO`, `FIXME`, `<field>`, `<...>`.
-Use realistic example values — not placeholders.
-
-**GOOD — fully populated endpoint:**
-
-```markdown
-### POST /tasks
-
-**Owned by:** M-003-task-service
-
-#### Request
-
-| Header | Value |
-|--------|-------|
-| `Authorization` | `Bearer <JWT>` |
-| `Content-Type` | `application/json` |
-
-#### Request Body
-
-| Field | Type | Required | Constraint |
-|-------|------|----------|-----------|
-| `title` | string | yes | 1–200 chars |
-| `assignee_id` | string (UUID) | no | Must exist in users table |
-
-```json
-{
-  "title": "Implement payment webhook handler",
-  "assignee_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
-
-#### Response Body (201 Created)
-
-```json
-{
-  "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-  "title": "Implement payment webhook handler",
-  "assignee_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "created_at": "2026-04-28T09:00:00Z"
-}
-```
-
-#### Status Codes
-
-| Code | Condition |
-|------|-----------|
-| 201 | Task created successfully |
-| 400 | Validation error (title too long, malformed UUID) |
-| 401 | Missing or invalid JWT |
-| 403 | Caller lacks `tasks:write` scope |
-| 422 | `assignee_id` references non-existent user |
-
-#### Error Model
-
-```json
-{ "code": "VALIDATION_ERROR", "message": "title must be 1–200 chars", "details": {} }
-```
-
-#### Auth
-
-Bearer JWT required. Caller MUST have `tasks:write` scope. Unauthenticated requests
-receive 401 with `WWW-Authenticate: Bearer` header.
-
-#### Rate Limits
-
-100 requests per minute per user. Excess requests receive 429 with
-`Retry-After: 60` header.
-```
-
-**BAD — placeholder JSON (L2 lint fires):**
-
-```markdown
-```json
-{
-  "id": "<uuid>",
-  "title": "...",
-  "assignee_id": "TODO"
-}
-```
-# WRONG: placeholder values inside JSON block — L2 fires on review
-```
-
----
-
-#### Leaf Type 3 — Design README (`<design-dir>/README.md`)
-
-**Source reads (MUST read before writing):**
-1. Every file under `{prd-dir}/architecture/*.md` — source for Implementation Conventions table (X3 lint)
-2. Every module file `<design-dir>/modules/M-NNN-*.md`:
-   - Source Features → Feature-Module matrix (X5 lint)
-   - Module Deps → Module Interaction Protocols (X1 lint) and Dependency Layering
-3. Every PRD feature file's `## Analytics` block → Analytics Coverage table (X4 lint)
-4. `common/templates/design-readme-template.md` — structural scaffold
-
-**Required sections and their lint checks:**
-
-| Section | Lint | Requirement |
-|---------|------|-------------|
-| Module Index | — | One row per module: ID, Name, Type (backend/frontend/shared), Responsibility, Complexity, Deps, Source Features, Impl |
-| Dependency Layering | — | Forward-only layer order table; no reverse-layer imports |
-| Module Interaction Protocols | X1 | One row per `(caller, callee)` pair from all module Deps; extras need cross-cutting justification |
-| Feature-Module Mapping | X5 | Matrix: PRD F-NNN columns × module rows; `✦` = modifies data, `△` = read-only support; no orphan features |
-| Analytics Coverage | X4 | One row per PRD analytics event; no PRD event silently omitted |
-| Implementation Conventions | X3 | One row per `architecture/*.md` file topic; explicit `N/A — {reason}` if skipped |
-| NFR Allocation | — | Each PRD NFR decomposed to module-level budget; bottleneck module identified |
-| Key Technical Decisions | — | Table of architecture decisions with rationale and alternatives dismissed |
-| Test Strategy | — | Pyramid allocation, isolation approach, external dep strategy, test data management |
-| View / Screen Index | — | Present if project has frontend; each PRD journey touchpoint Screen/View listed with owning module |
-| Prototype-to-Production Mapping | — | Present if PRD contains `prototypes/`; Reuse/Refactor/Rewrite per prototype component |
-
-**X1 lint (Module Interaction Protocols sync):** every `(caller, callee)` dep pair from Module
-Index MUST have a corresponding row. Extra rows (no backing dep) MUST carry a cross-cutting note.
-
-**X3 lint (Implementation Conventions):** `ls {prd-dir}/architecture/*.md` — every file MUST
-appear as at least one row (or explicit `N/A — {reason}`). Silent omission is a blocker.
-
-**X4 lint (Analytics Coverage):** count every `## Analytics` event across all PRD feature files.
-README row count MUST equal event count. Any delta is a blocker.
-
-**X5 lint (Feature-Module matrix):** every PRD `F-NNN` in any module's Source Features MUST
-appear as a column. No orphan features (F-NNN in a PRD file but absent from every module).
-
-**GOOD — Feature-Module matrix excerpt:**
-
-```markdown
-## Feature-Module Mapping
-
-| Module | F-001 Auth | F-002 Tasks | F-003 Notifications |
-|--------|-----------|------------|-------------------|
-| M-001-auth | ✦ | | |
-| M-002-task-service | | ✦ | |
-| M-003-notification | | △ | ✦ |
-```
-
-**BAD — orphan feature (X5 fires):**
-
-```markdown
-## Feature-Module Mapping
-
-| Module | F-001 Auth | F-002 Tasks |
-|--------|-----------|------------|
-| M-001-auth | ✦ | |
-| M-002-task-service | | ✦ |
-# WRONG: F-003 exists in PRD but has no column — X5 lint fires
-```
-
----
+MUST NOT use Grep/Glob to discover sibling files. All context is pre-supplied.
 
 ### Output Contract — Write 1: Artifact File
 
-Path: `<design-dir>/<artifact-relative-path>` (from `plan.add[].path` or `plan.modify[].path`)
+Path: `<design-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path`)
 
-Content rules:
-- Follow `common/templates/<template-name>` structure exactly.
-- Fill all placeholders from clarification.yml and source reads.
-- **Pure artifact body** — no HTML comment IPC envelopes, no `<!-- metrics-footer -->`,
-  no `<!-- self-review -->` blocks.
-- **Self-contained**: inline every data model, interface signature, and convention row.
-  A coding agent MUST be able to act on this file without opening any other file.
+**General content rules:**
+
+- Follow the corresponding template structure exactly (see Domain-Specific Generation Guidance).
+- Fill all placeholders from `clarification.yml` and the inline context in the dispatch prompt.
+- Pure artifact body — no HTML comments outside template-supplied commentary blocks, no
+  metadata headers, no IPC envelopes.
+- Self-contained: all context a coding agent needs to implement or review this leaf MUST be
+  copied inline. NEVER say "see README.md" or "see M-002" — copy the relevant excerpt.
+- Use exactly ONE `Write` tool call for the artifact. Sequential Write or Edit calls on the
+  same file are FORBIDDEN.
+
+**ID stability rules (MUST enforce):**
+
+- Module IDs: `M-001`, `M-002`, ... — zero-padded, sequential, never renumbered.
+- API IDs: `API-001`, `API-002`, ... — zero-padded, sequential, never renumbered.
+- In evolve-mode (modify): preserve the existing ID. If a module is removed, write a tombstone
+  with `Doc Status: Deprecated` — do not delete the file or reassign the ID.
+
+### Formal pre-check (guide §4 hard gate)
+
+Before writing the self-review archive, you MUST run the per-artifact check script for your
+leaf type:
+
+| Your leaf path | Script to run |
+|----------------|---------------|
+| `README.md` | `scripts/check-readme.sh <design-dir>` |
+| `modules/M-NNN-*.md` | `scripts/check-module.sh <design-dir>` |
+| `api/API-NNN-*.md` | `scripts/check-api.sh <design-dir>` |
+
+Each script walks ALL files of that artifact type, so you may see findings against leaves
+other writers are responsible for. Filter by `file:` matching your assigned leaf — that's
+your responsibility. Audit-side artifacts (issues, plan, verdict, etc.) are not part of any
+writer's scope; never run their check scripts.
+
+| Result | Action |
+|--------|--------|
+| `PASS 0 issues found` (exit 0) | Proceed to self-review archive (Write 2) |
+| `FOUND <N> issue(s)` (exit 1), all on YOUR leaf | **Fix every reported issue in place**, then re-run. Do NOT file these as issues — guide §4.1 forbids self-audit issue creation; auto-fix-then-retry is the only correct path. Repeat until exit 0 OR until 3 consecutive failures (see escalation below). |
+| `FOUND <N> issue(s)` (exit 1), some on OTHER leaves | Fix only the issues whose `file:` matches your assigned leaf. Issues on other leaves are surfaced by writers responsible for those leaves; ACK normally and proceed to Write 2. |
+| script error (exit 2) | ACK `FAIL trace_id=... reason=script-error <exit code>` — formal-checker bug; HITL |
+
+If the same formal failure recurs more than 3 times on your leaf after fixes, ACK with
+`OK ... self_review_status=PARTIAL fail_count=1` and add ONE row to the self-review with
+`blocker_scope: input-ambiguity` referencing the formal CR id; the orchestrator will escalate
+to HITL.
+
+The self-review archive (Write 2 below) covers **substantive** CRs only — formal violations
+are already handled by the loop above, not recorded as FAIL rows.
 
 ### Output Contract — Write 2: Self-Review Archive
 
@@ -381,23 +195,8 @@ Content structure:
 
 ## Checklist
 
-Apply only the CRs marked **applies** for your file type in the table below:
-
-| CR / Lint Check                         | Module Spec | API Contract | Design README |
-|-----------------------------------------|:-----------:|:------------:|:-------------:|
-| CR-S08 ipc-footer-present               | applies     | applies      | applies       |
-| CR-L02 self-contained-file              | applies     | applies      | applies       |
-| CR-L11 cross-skill domain targeting     | applies     | applies      | applies       |
-| L2 lint (no placeholder JSON)           | applies     | applies      | N/A           |
-| Boundary Enforcement fill               | applies     | N/A          | N/A           |
-| 7-subsection completeness               | N/A         | applies      | N/A           |
-| X1 lint (module interaction protocols)  | N/A         | N/A          | applies       |
-| X3 lint (implementation conventions)   | N/A         | N/A          | applies       |
-| X4 lint (analytics coverage)           | N/A         | N/A          | applies       |
-| X5 lint (feature-module matrix)        | N/A         | N/A          | applies       |
-
-- CR-S08 ipc-footer-present: PASS | FAIL — blocker_scope: <value> — note: <reason>
-- CR-L02 self-contained-file: PASS | FAIL — ...
+- <CR-ID> <name>: PASS
+- <CR-ID> <name>: FAIL — blocker_scope: <value> — note: <one-sentence reason>
 
 ## Summary
 
@@ -406,39 +205,116 @@ Apply only the CRs marked **applies** for your file type in the table below:
 **Scope notes**: <brief explanation of any PARTIAL status>
 ```
 
-Each applicable CR gets exactly one line: `- <CR-ID> <name>: PASS` or
-`- <CR-ID> <name>: FAIL — blocker_scope: <value> — note: <reason>`.
+Apply only the CRs that are applicable to the leaf type being reviewed.
+**The CR-applicability table lives in `generate/in-generate-review.md` (single source of
+truth)** — read that file for the leaf-type → substantive CR mapping and the PASS/FAIL line
+format. This subagent prompt deliberately does NOT duplicate the table to avoid drift.
+
+> Reminder: formal CRs (CR-SD01..CR-SD19, CR-SDFM01..CR-SDFM03) are NOT in
+> `in-generate-review.md` — the formal pre-check loop above handles them and they never
+> reach the self-review archive (guide §4.1).
 
 ### Self-Review Discipline
 
-1. After writing the artifact, perform an honest CR-by-CR check against `common/review-criteria.md`.
-2. Apply only the CRs marked **applies** for this file type (see the applicability table in Write 2 above).
-3. For PASS: brief evidence is sufficient ("all 7 endpoint subsections present").
+1. After writing the artifact, perform an honest CR-by-CR check against the applicability table.
+2. Apply only the CRs relevant to this leaf type.
+3. For PASS: brief evidence is sufficient ("module-cohesion: all sections relate to a single
+   responsibility — credential validation").
 4. For FAIL: MUST specify exactly one `blocker_scope` from the taxonomy above.
 5. **PARTIAL ACK trigger: if ANY FAIL row exists in the self-review file, set
-   `self_review_status: PARTIAL` and `fail_count: <N>` in the ACK.** The 4 `blocker_scope`
-   values are:
-   - `global-conflict` — conflict with another leaf or cross-cutting concern
-   - `cross-artifact-dep` — depends on a file outside writer's scope
-   - `needs-human-decision` — requires a policy/preference call beyond writer's scope
-   - `input-ambiguity` — clarification.yml is silent or contradictory on this point
-
-   All four equally count toward `fail_count`. The distinction determines downstream action
-   (which path in the review/revise loop consumes the blocker), not whether the ACK is PARTIAL.
-   Do NOT attempt to fix any FAIL row in-place — write it and move on.
+   `self_review_status: PARTIAL` and `fail_count: <N>` in the ACK.**
 6. If ALL rows are PASS → set `self_review_status: FULL_PASS`, `fail_count: 0`.
 7. FORBIDDEN: marking a row PASS when you have genuine uncertainty. If uncertain, mark FAIL with
    `blocker_scope: input-ambiguity` and let the cross-reviewer adjudicate.
 
-### ACK Format
+---
+
+## Domain-Specific Generation Guidance
+
+### Leaf Class: Design README (`README.md`)
+
+The README is the design's index and the **bridge between PRD requirements and implementation
+modules**. MUST include:
+
+- Header (product name + Design Objective in one sentence)
+- Design Input block (PRD source path, INPUT_MODE, DESIGN_DATE, DESIGN_STATUS)
+- Architecture Overview (high-level diagram + 3–5 paragraphs of architectural narrative)
+- Module Index table — one row per `modules/M-NNN-*.md`, columns: ID, Name, Responsibility,
+  Doc Status, Impl Status
+- **Feature-Module Mapping matrix** — PRD features (columns, F-NNN headers) × design modules
+  (rows). Cell symbols: `✦` = module modifies data for this feature; `△` = module provides
+  read-only support; blank = no involvement. Every PRD F-NNN MUST appear as a column;
+  every design module MUST appear as a row.
+- Interaction Protocols section — for each pair of modules with non-trivial coupling, name the
+  protocol (REST / gRPC / function call / event bus / shared DB) and the direction
+- Implementation Conventions table — one row per PRD `architecture/*.md` topic file with the
+  policy excerpt copied inline
+- Analytics Coverage — every PRD analytics event mapped to the emitting module(s)
+- Boundary Enforcement table — columns: Boundary, Enforcing Module, Mechanism, Failure Mode
+- References block — every relative path mentioned in this README MUST resolve to an existing
+  file in the design bundle
+
+FORBIDDEN: cross-referencing module specs by path without inlining the relevant excerpt;
+e.g. "see `modules/M-002.md` for retry policy" is BAD — copy the retry policy text.
+
+### Leaf Class: Module Spec (`modules/M-NNN-{slug}.md`)
+
+A well-formed module spec MUST have all of the following sections:
+
+1. **Header** — `M-NNN: Module Name`, Doc Status, Impl Status, Assignee, Source Features
+   (F-NNN list copied from the README's Feature-Module mapping), Complexity (S/M/L/XL).
+2. **Change Scope** — only for `--revise` mode and incremental designs; omit for initial
+   `add` files.
+3. **Responsibility** — exactly one cohesive responsibility per module (CR-SD-DESIGN01).
+   Multiple unrelated responsibilities → split into multiple modules.
+4. **Public Interface** — types, function signatures, or REST endpoints exposed to other
+   modules. Every type referenced MUST be defined inline (CR-SD07) — either in this section
+   or in Internal Structure.
+5. **Internal Structure** — sub-components, persistence schema, key algorithms.
+6. **Module Deps** — table: dependent module, protocol, direction. Every edge MUST appear
+   in the README's Interaction Protocols section (CR-SD08, CR-SD16).
+7. **Failure Modes** — for every dependency, document behavior on timeout, 5xx, malformed
+   response (CR-SD-DESIGN06).
+8. **Observability** — metrics emitted, structured log fields, trace spans (CR-SD-DESIGN07).
+9. **Security Considerations** — REQUIRED for modules touching authn/authz/PII/external
+   networks. Cover input validation, output sanitization, least-privilege, audit logging
+   (CR-SD-DESIGN08). Other modules may write "N/A — internal-only, no PII" with brief
+   justification.
+10. **API Surface** — only when the module owns or contributes to an API file. Table
+    columns: Endpoint Literal, Method, Owner API File, Owner Module, Direction, Auth Required,
+    Rate Limit (CR-SD12). Endpoint literals MUST exist in the referenced `api/API-NNN-*.md`
+    (CR-SD13).
+
+### Leaf Class: API Spec (`api/API-NNN-{slug}.md`)
+
+A well-formed API spec MUST have:
+
+1. **File-level frontmatter table** — File path, Owner module (link), Status, Source Features,
+   Direction (internal | external), Protocol (REST | gRPC | CLI), Versioning policy
+   (CR-SD-DESIGN05).
+2. **Endpoints section** — one heading per endpoint of the form `### METHOD /path`, followed
+   by **all seven mandatory subsections** in this exact order (CR-SD11):
+   - Purpose
+   - Authentication & Authorization
+   - Request (path params, query params, headers, body schema)
+   - Response (success status, body schema)
+   - Error Envelope (error codes + JSON shape)
+   - Rate Limit (quota + window or "N/A — unrestricted")
+   - Failure Modes (CR-SD-DESIGN06)
+3. **Schema definitions** — every schema referenced in Request/Response MUST be defined
+   inline (no JSON placeholder tokens like `{TBD}` per CR-SD17).
+
+---
+
+## ACK Format
 
 ```
-OK trace_id=R3-W-007 role=writer linked_issues=<comma-separated issue IDs or empty> self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>
+OK trace_id=<trace_id> role=writer linked_issues=<comma-separated issue IDs or empty> self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>
 ```
 
 - `linked_issues`: comma-separated IDs of any issues this writer believes exist (for pre-filing);
-  leave empty if no issues identified (self-review FAIL rows are NOT pre-filed as issues — that
-  is the cross-reviewer's job).
+  leave empty if no issues identified. Self-review FAIL rows are NOT pre-filed as issues — that
+  is the cross-reviewer's job.
 - Return this ACK as the **single and final line** of the Task return. Nothing after it.
 
 ### Task Return Hygiene (MUST enforce before returning)
@@ -447,13 +323,13 @@ Before emitting your Task return, **re-read the message you are about to send**.
 Task return MUST be EXACTLY ONE LINE of the form:
 
 ```
-OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+OK trace_id=<id> role=writer linked_issues=<comma-separated or empty> self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>
 ```
 
 or
 
 ```
-FAIL trace_id=R3-W-007 reason=<one-line-reason>
+FAIL trace_id=<id> reason=<one-line-reason>
 ```
 
 **Any of the following pollutes orchestrator context and violates the IPC contract:**
@@ -468,8 +344,3 @@ FAIL trace_id=R3-W-007 reason=<one-line-reason>
 Your deliverables are the files you wrote via the Write tool. Those files are the proof of
 completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
 bookkeeping — nothing more.
-
-**Self-check**: before you send your final message, ask yourself "if I stripped every line
-except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
-If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
-and move on — the Task return stays ACK-only regardless.
