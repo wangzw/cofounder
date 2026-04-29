@@ -16,8 +16,8 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 |------|------|-------------|-----------|
 | generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; `common/scope-reference.md` + `common/templates/review-checklist.md` on demand) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
 | generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
-| review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/templates/review-checklist.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Script-first + dimension-by-dimension LLM review; issues filed under `.review/round-N/issues/` |
-| revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand) | Per-issue revise loop driven by open issues from last review round; cascade re-review when scope changes |
+| review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/issue-schema.md` on demand for cross-reference) | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` |
+| revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/issue-schema.md` on demand) | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh` |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -275,7 +275,6 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 
 | Flag | Applies to | Semantics |
 |------|-----------|-----------|
-| `--full` | `--review` | Force full review — bypass skip-set, treat every leaf as `cross_reviewer_focus`. Orchestrator passes `--full` to `scripts/run-checkers.sh`; `skip-set.yml` records `forced_full: true`. |
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
 | `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-007 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
@@ -300,14 +299,23 @@ Next steps:
 ## Configuration & Subagent Files
 
 - **Config**: `common/config.yml`
-- **Review criteria**: `common/review-criteria.md`
+- **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; see guide §1)
+- **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format)
 - **Domain glossary**: `common/domain-glossary.md`
+- **Formal-review scripts** (each follows guide §9 contract — 3-state returncode + stdout restates meaning):
+  - `scripts/run-checkers.sh` — aggregator over check-prd-formal + check-issue-schema
+  - `scripts/check-prd-formal.sh` — PRD-shape formal review
+  - `scripts/check-issue-schema.sh` — review-artifact self-closure (guide §10)
+  - `scripts/check-review-readiness.sh` — phase gate (guide §7.3)
+  - `scripts/check-revise-completeness.sh` — phase gate (guide §7.3)
+  - `scripts/create-issues.sh` — script-driven issue creation from LLM raw output (guide §7.1)
+  - `scripts/update-summary.sh` — cross-round fingerprint summary (guide §7.6)
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`
   - `generate/planner-subagent.md`
   - `generate/writer-subagent.md`
-  - `review/cross-reviewer-subagent.md`
-  - `review/adversarial-reviewer-subagent.md`
-  - `revise/per-issue-reviser-subagent.md`
+  - `review/cross-reviewer-subagent.md` — substantive reviewer (LLM-tier criteria only)
+  - `review/adversarial-reviewer-subagent.md` — conditional adversarial probe (on critical findings)
+  - `revise/per-issue-reviser-subagent.md` — state-machine transitions (guide §7.2)
   - `shared/summarizer-subagent.md`
-  - `shared/judge-subagent.md`
+  - `shared/judge-subagent.md` — verdict per `formal_PASS ∧ substantive_PASS` (guide §5)

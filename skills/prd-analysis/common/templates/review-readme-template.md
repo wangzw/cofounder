@@ -22,12 +22,14 @@ future-round context.
 .review/
 ├── README.md               ← this file
 ├── state.yml               ← orchestrator bookkeeping (current_round, current_delivery, phase, git_sha)
+├── issues/
+│   ├── summary.yml         ← cross-round issue history (cross-reviewer reads for fingerprint matching, guide §7.6)
+│   └── archive.yml         ← pruned per-retention summary entries (older deliveries)
 ├── round-0/                ← bootstrap (input + glossary probe + clarification)
-├── round-1/, round-2/ …    ← per-round work (plan | issues | self-reviews | skip-set | index | verdict)
+├── round-1/, round-2/ …    ← per-round work (issues | self-reviews | reviewer-output | index | verdict)
 ├── traces/round-<N>/       ← dispatch-log.jsonl for that round (one JSONL line per launched/completed event)
 ├── versions/<N>.md         ← on-converge delivery summaries (only written when verdict=converged)
 ├── metrics/                ← aggregated metrics (produced by metrics-aggregate in --diagnose mode)
-├── dismissed-fails/        ← writer self-review FAIL rows the cross-reviewer explicitly dismissed
 └── hitl/                   ← human-in-the-loop override records (force-continue, regression justification, etc.)
 ```
 
@@ -73,54 +75,44 @@ correctly).
 The canonical working directory for round N. Not every file is written every round —
 presence depends on what step of the round executed.
 
-| File / dir | Produced by role | When |
+| File / dir | Produced by | When |
 |---|---|---|
 | `plan.md` | `planner` (sub-agent) | First round of a delivery; after plan approval it drives writer fan-out. New-version deliveries include `delete`/`modify`/`add`/`keep` lists. |
-| `self-reviews/R<N>-W-<NNN>.md` | `writer` (sub-agent) | One per writer dispatch. CR-by-CR PASS/FAIL checklist + `self_review_status` + `fail_count`. Summarizer reads `fail_count` for `writer_fail_count_sum`. |
-| `manifest.yml` | `run-checkers` (script) Phase A | Leaf inventory for the round (hash + last-mod). |
-| `depgraph.yml` | `run-checkers` (script) Phase A | Leaf dependency graph used by skip-set propagation. |
-| `skip-set.yml` | `run-checkers` (script) Phase A | `cross_reviewer_focus` + `cross_reviewer_skip` lists. `forced_full: true` when invoked via `--full`. |
-| `issues/round-checker-output.json` | `run-checkers` (script) Phase B | Raw JSON array of all issues produced by script-type checkers. Machine-readable source of truth. |
-| `issues/R<N>-<NNN>.md` | `run-checkers` (script source **or** carry-forward from skipped-leaf open issues) **and** `cross-reviewer` / `adversarial-reviewer` (llm source) | One file per issue, YAML frontmatter: `id`, `status`, `severity`, `criterion_id`, `file`, `round`, `source` (`script` \| `carry-forward` \| `cross-reviewer` \| `adversarial-reviewer` \| `self-review-escalation`), optional `missing_script_path` (script source), `resolved_script_path` (when marked resolved), `resolves: R<M>-<NNN>` (cross-reviewer when closing a prior-round issue), `carries_from: R<M>-<NNN>` (carry-forward when inheriting a prior-round open issue whose file is in this round's `cross_reviewer_skip`). Summarizer and judge read **frontmatter only**; they never open issue bodies. |
+| `self-reviews/R<N>-W-<NNN>.md` | `writer` (sub-agent) | One per writer dispatch. Substantive CR PASS/FAIL checklist + `self_review_status` + `fail_count`. Formal CRs are NOT recorded here — `scripts/run-checkers.sh` enforces them as a hard gate before the writer ACKs (guide §4 + §4.1). |
+| `reviewer-output/<trace_id>.json` | `cross-reviewer` / `adversarial-reviewer` (sub-agent) | One JSON document per reviewer dispatch with the LLM raw-output schema (see `common/issue-schema.md`). The orchestrator pipes this into `scripts/create-issues.sh` to materialize per-issue files. |
+| `issues/I-NNN.md` | `scripts/create-issues.sh` | One file per issue, YAML frontmatter conforming to `common/issue-schema.md`. Schema enforced by `scripts/check-issue-schema.sh` (guide §10 self-closure). |
 | `clarification/<ts>.yml` | `domain-consultant` (sub-agent, new-version deliveries) | Present when a delivery-N start required fresh clarification on top of the previous baseline. |
-| `dismissed-fails/<trace_id>-<cr-id>.md` | `cross-reviewer` (sub-agent) | Written when a writer self-review FAIL row is explicitly dismissed (instead of escalated to an issue). |
-| `index.md` | `summarizer` (sub-agent) | YAML frontmatter with aggregate counts (`open_issues`, `resolved_this_round`, `critical_count`, `error_count`, `warning_count`, `coverage_percent`, `skip_set_utilization`, `writer_fail_count_sum`) + prose. Judge reads the frontmatter only. Severity counts are scoped to OPEN issues (status ∈ {new, persistent, regressed}) so resolved issues never block convergence. |
-| `verdict.yml` | `judge` (sub-agent) | `verdict: converged\|progressing\|oscillating\|diverging\|stalled` + `next_action` + `evidence` block. Routes the next round. |
+| `index.md` | `summarizer` (sub-agent) | YAML frontmatter with aggregate counts by `state` (`new_count`, `fixed_count`, `false_positive_count`, `deferred_count`, `superseded_count`) and `severity` (`critical_count`, `error_count`, `warning_count`), plus ratio signals (`false_positive_ratio`, `deferred_ratio`, `recurrence_count`) + prose. Judge reads the frontmatter only. |
+| `verdict.yml` | `judge` (sub-agent) | `verdict: converged\|progressing\|oscillating\|diverging\|stalled` + `next_action` + `evidence` block. Verdict computed per `formal_PASS ∧ substantive_PASS` (guide §5). |
 
-### Issue-status vocabulary
+### Issue state machine (guide §7.2)
 
-Statuses must be drawn from this set (vocabulary consistent across round-N/issues/,
-summarizer, and judge):
+Each issue is in exactly one of:
 
-- `new` — first-round detection
-- `persistent` — same `criterion_id + file` was `new`/`persistent` in round N-1
-- `resolved` — existed in round N-1 but no longer detectable this round
-- `regressed` — was `resolved` in round N-1 but detected again this round
+- **`new`** — just created by `scripts/create-issues.sh` (from a reviewer's
+  raw-output JSON document).
+- **`fixed`** — the per-issue-reviser modified the leaf and the formal-review
+  re-run reported PASS for the affected criteria.
+- **`false-positive`** — the reviser dismissed the finding; requires a
+  `dismissed_reason` field in frontmatter.
+- **`deferred`** — known to be a real issue but out of scope this round;
+  requires `defer_until` (one of `round-N+M | delivery-N+M | never |
+  input-arrived`) and `defer_reason`.
+- **`superseded`** — covered by another issue; requires `superseded_by:
+  <id>`.
 
-Transition rules (who sets what, per round N):
+Phase gates around state transitions (guide §7.3):
 
-- **`new`** — emitted by `run-checkers` (script source) or by a reviewer (llm source) on
-  first detection.
-- **`persistent`** — set two ways. (a) the cross-reviewer re-evaluates a leaf in its focus
-  list and finds the same `criterion_id + file` still detectable — writes a new record
-  with `source: cross-reviewer`. (b) `run-checkers` Phase A carries the prior-round issue
-  forward because its `file` is in the **current** round's `cross_reviewer_skip` and no
-  one re-evaluated it — writes a new record with `source: carry-forward` and
-  `carries_from: R<N-1>-<NNN>`. Carry-forward guarantees open issues never vanish from the
-  summarizer's `open_issues` count just because cross-reviewer didn't re-look at them
-  (incremental-review correctness).
-- **`resolved`** — set by the cross-reviewer when a prior-round issue is no longer
-  detectable. Writes a new record with `status: resolved`, `resolves: R<N-1>-<NNN>`.
-- **`regressed`** — set by the cross-reviewer when an issue that was `resolved` in
-  round N-1 is detected again.
-
-The summarizer and the judge never set status — they only read it.
+- `scripts/check-review-readiness.sh` — refuses to enter a new review round
+  while any issue from prior rounds is still in `state: new`.
+- `scripts/check-revise-completeness.sh` — refuses to close the revise pass
+  while any issue this round is still in `state: new`.
 
 ### Issue-ID format
 
-`R<N>-<NNN>` where `<NNN>` is zero-padded 3 digits. Script-tier issues come first in a
-round (NNN=001, 002, …). When the cross-reviewer runs later in the same round, it
-starts at `max(existing_NNN) + 1` so IDs never collide.
+`I-NNN` where `<NNN>` is zero-padded 3 digits, monotonic across all rounds
+of the artifact. `create-issues.sh` allocates the next free id by scanning
+all existing issue files.
 
 ## `traces/round-<N>/dispatch-log.jsonl`
 
@@ -143,9 +135,9 @@ transcripts to produce `metrics/<scope>.metrics.yml`.
 
 Written by the summarizer's on-converge phase when the judge verdict is `converged`.
 Sits alongside the annotated git tag produced by the delivery commit. Each file is a
-frozen snapshot of `quality_at_delivery` (final issue counts, coverage, regressed
-count, writer fail count) — the authoritative "what did we ship and how clean was it"
-record.
+frozen snapshot of `quality_at_delivery` (final issue counts by state and severity,
+ratio signals, recurrence count, writer fail count, justified regressions) — the
+authoritative "what did we ship and how clean was it" record.
 
 ## `metrics/`
 

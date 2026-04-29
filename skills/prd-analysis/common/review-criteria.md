@@ -5,12 +5,26 @@ Checker scripts extract only the YAML blocks — the prose is for human readers 
 `conflicts_with` fields are intentionally empty in v1; oscillation-prone pairs are tracked via
 CR-PP22 (LLM check) rather than hard-coded exclusions.
 
-Criteria are grouped into **Structural (script-type)** and **Semantic (LLM-type)**.
+Criteria are partitioned per the dual-criteria from
+[~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md) §1.3:
+
+- **Formal (script-type)** — mechanically expressible AND the result does not imply a correctness
+  judgment. Enforced by `scripts/check-prd-formal.sh` (or another script in `scripts/`). Failure
+  is a **necessary condition** preventing convergence (guide §5). LLM reviewers MUST NOT also
+  apply these — they were already enforced before any LLM dispatch (guide §6 fast-failure).
+- **Substantive (LLM-type)** — content correctness, semantic coherence, cross-leaf
+  consistency. Applied by cross-reviewer / adversarial-reviewer. Convergence requires
+  substantive PASS in addition to formal PASS.
+
 Severity-to-priority mapping: `critical = 1`, `error = 2`, `warning = 3`.
 
 ---
 
-## Structural Criteria (Script-Type)
+## Formal Criteria (Script-Type)
+
+These criteria are evaluated mechanically by `scripts/check-prd-formal.sh`. The
+script emits one issue per finding in the schema documented in
+`common/issue-schema.md`.
 
 ---
 
@@ -25,11 +39,11 @@ means the PRD is incomplete and downstream system-design cannot consume it.
 - id: CR-PP01
   name: "prd-directory-structure"
   version: 1.0.0
-  checker_type: llm
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
   severity: critical
   conflicts_with: []
   priority: 1
-  incremental_skip: full_scan
 ```
 
 ---
@@ -45,11 +59,11 @@ evolve-mode depends on for tombstone and diff-aware generation.
 - id: CR-PP02
   name: "id-format-monotonic"
   version: 1.0.0
-  checker_type: llm
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
   severity: error
   conflicts_with: []
   priority: 2
-  incremental_skip: full_scan
 ```
 
 ---
@@ -66,11 +80,11 @@ produce incomplete output.
 - id: CR-PP03
   name: "readme-index-complete"
   version: 1.0.0
-  checker_type: llm
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
   severity: error
   conflicts_with: []
   priority: 2
-  incremental_skip: full_scan
 ```
 
 ---
@@ -85,11 +99,11 @@ unsuitable for coding agents.
 - id: CR-PP04
   name: "no-tbd-remaining"
   version: 1.0.0
-  checker_type: llm
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
   severity: error
   conflicts_with: []
   priority: 2
-  incremental_skip: per_file
 ```
 
 ---
@@ -106,16 +120,58 @@ links in the feature/journey indexes MUST point to valid files. Broken version c
 - id: CR-PP05
   name: "version-chain-integrity"
   version: 1.0.0
-  checker_type: llm
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
   severity: error
   conflicts_with: []
   priority: 2
-  incremental_skip: full_scan
 ```
 
 ---
 
-## Semantic Criteria (LLM-Type)
+## CR-FM01 frontmatter-required-fields
+
+Every leaf file (`features/F-NNN-*.md`, `journeys/J-NNN-*.md`) MUST carry a frontmatter block
+with the required fields. For features: `id`, `title`, `status`. For journeys: `id`, `title`,
+`persona`. The frontmatter is the machine-truth source for IDs and metadata; missing fields
+break downstream consumption (system-design + autoforge both index features by frontmatter ID).
+
+```yaml
+- id: CR-FM01
+  name: "frontmatter-required-fields"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-prd-formal.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+```
+
+---
+
+## CR-IS01 issue-schema-conformance
+
+Every issue file under `<artifact-root>/.review/round-<N>/issues/` MUST conform to the on-disk
+schema defined in `common/issue-schema.md`. This is review-artifact self-closure (guide §10):
+the audit pipeline produces artifacts (issue files) which are themselves audited by the same
+formal-review machinery. Without this gate, schema drift in LLM-emitted issues would corrupt
+state-machine transitions, ratio signals, and cross-round fingerprinting.
+
+```yaml
+- id: CR-IS01
+  name: "issue-schema-conformance"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-issue-schema.sh
+  severity: error
+  applies_to: [".review/round-*/issues/*.md"]
+  conflicts_with: []
+  priority: 2
+```
+
+---
+
+## Substantive Criteria (LLM-Type)
 
 ---
 

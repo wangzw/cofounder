@@ -158,6 +158,32 @@ Path: `<prd-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path
 - Copy applicable token definitions from the dispatch prompt's inline token table into the
   feature's "Design Tokens (inline copy)" sub-section — do not reference `architecture/design-tokens.md` by path.
 
+### Formal pre-check (guide §4 hard gate)
+
+Before writing the self-review archive, you MUST run
+
+```bash
+scripts/run-checkers.sh <prd-dir>
+```
+
+against the bundle (which now includes your new leaf). The aggregator
+invokes `check-prd-formal.sh` and `check-issue-schema.sh`.
+
+| Result | Action |
+|--------|--------|
+| `PASS 0 issues found` (exit 0) | Proceed to self-review archive (Write 2) |
+| `FOUND <N> issue(s)` (exit 1) | **Fix every reported issue in place**, then re-run. Do NOT file these as issues — guide §4.1 forbids self-audit issue creation; auto-fix-then-retry is the only correct path. Repeat until exit 0. |
+| script error (exit 2) | ACK `FAIL trace_id=... reason=script-error <exit code>` — formal-checker bug; HITL |
+
+If the same formal failure recurs more than 3 times after fixes, ACK
+with `OK ... self_review_status=PARTIAL fail_count=1` and add ONE row
+to the self-review with `blocker_scope: input-ambiguity` referencing
+the formal CR id; the orchestrator will escalate to HITL.
+
+The self-review archive (Write 2 below) covers **substantive** CRs only
+— formal violations are already handled by the loop above, not recorded
+as FAIL rows.
+
 ### Output Contract — Write 2: Self-Review Archive
 
 Path: `<prd-dir>/.review/round-<N>/self-reviews/<trace_id>.md`
@@ -187,12 +213,16 @@ Apply only the CRs from the table below that are applicable to the leaf type bei
 
 ### CR Applicability by Leaf Type
 
+> Note: formal CRs (CR-PP01, CR-PP02, CR-PP03, CR-PP04, CR-PP05, CR-FM01)
+> are NOT in this table — the formal pre-check loop handles them. This
+> table covers **substantive** CRs only.
+
 | Leaf type | Applicable CRs |
 |-----------|----------------|
-| `README.md` | CR-PP01, CR-PP03, CR-PP06, CR-PP07, CR-PP08, CR-PP09, CR-PP10, CR-PP11, CR-PP12, CR-PP13 |
-| `journeys/J-NNN.md` | CR-PP02, CR-PP16, CR-PP21, CR-PP34, CR-PP14 |
-| `features/F-NNN.md` | CR-PP02, CR-PP07, CR-PP12, CR-PP14, CR-PP15, CR-PP17, CR-PP18, CR-PP19, CR-PP20, CR-PP24, CR-PP25, CR-PP26, CR-PP29, CR-PP31, CR-PP32, CR-PP38, CR-PP39 |
-| `architecture.md` (index) | CR-PP01, CR-PP14 |
+| `README.md` | CR-PP06, CR-PP07, CR-PP08, CR-PP09, CR-PP10, CR-PP11, CR-PP12, CR-PP13 |
+| `journeys/J-NNN.md` | CR-PP16, CR-PP21, CR-PP34, CR-PP14 |
+| `features/F-NNN.md` | CR-PP07, CR-PP12, CR-PP14, CR-PP15, CR-PP17, CR-PP18, CR-PP19, CR-PP20, CR-PP24, CR-PP25, CR-PP26, CR-PP29, CR-PP31, CR-PP32, CR-PP38, CR-PP39 |
+| `architecture.md` (index) | CR-PP14 |
 | `architecture/design-tokens.md` | CR-PP23 |
 | `architecture/coding-conventions.md` | CR-PP40 |
 | `architecture/test-isolation.md` | CR-PP41 |
@@ -208,7 +238,6 @@ Apply only the CRs from the table below that are applicable to the leaf type bei
 | `architecture/backward-compat.md` | CR-PP44 |
 | `architecture/git-strategy.md` | CR-PP45 |
 | `architecture/code-review.md` | CR-PP46 |
-| Any leaf | CR-PP04 (no TBD/TODO/FIXME) |
 
 ### Self-Review Discipline
 
