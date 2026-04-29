@@ -1,8 +1,0 @@
-generated_at: "2026-04-25T07:56:03Z"
-glossary_hit: true
-hit_terms:
-  - term: "artifact"
-    line: 1
-    alias_matched: "output"
-sparse_input: true
-sparse_reason: "word_count=39 < 50"

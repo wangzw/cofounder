@@ -1,8 +1,0 @@
-{"event":"launched","trace_id":"R10-V-001","role":"reviewer","reviewer_variant":"cross","tier":"heavy","model":"claude-opus-4","delivery_id":3,"dispatched_at":"2026-04-28T07:57:00Z","prompt_hash":"sha256:r10-cross-reviewer-focus-review-index","linked_issues":["R9-001"]}
-{"event":"completed","trace_id":"R10-V-001","role":"reviewer","ack_status":"OK","linked_issues":["R9-001-resolved"],"returned_at":"2026-04-28T07:59:00Z"}
-{"event":"launched","trace_id":"R10-S-001","role":"summarizer","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":3,"dispatched_at":"2026-04-28T07:59:30Z","prompt_hash":"sha256:r10-summarizer-per-round","linked_issues":[]}
-{"event":"completed","trace_id":"R10-S-001","role":"summarizer","ack_status":"OK","linked_issues":["R9-001-resolved"],"returned_at":"2026-04-28T08:00:30Z"}
-{"event":"launched","trace_id":"R10-J-001","role":"judge","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":3,"dispatched_at":"2026-04-28T08:01:00Z","prompt_hash":"sha256:r10-judge-verdict","linked_issues":[]}
-{"event":"completed","trace_id":"R10-J-001","role":"judge","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-28T08:01:30Z"}
-{"event":"launched","trace_id":"R10-S-002","role":"summarizer","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":3,"dispatched_at":"2026-04-28T08:02:00Z","prompt_hash":"sha256:r10-summarizer-delivery","linked_issues":[]}
-{"event":"completed","trace_id":"R10-S-002","role":"summarizer","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-28T08:02:30Z"}
