@@ -13,10 +13,10 @@ loop the orchestrator follows for round N. Implements
 Review mode is the **read phase** of the alternating write/read cycle
 defined in `SKILL.md` "Phase Contract". This file enforces both:
 
-- **Read-phase entry gate** (Step 1 + Step 2): no `state: new` from
+- **Read-phase entry gate** (Step 1): no `state: new` from
   prior rounds AND bundle passes formal review. If either fails, the
   read phase does not start — control returns to a write (revise) phase.
-- **Read-phase exit**: judge verdict in Step 8. The read phase produces
+- **Read-phase exit**: judge verdict in Step 7. The read phase produces
   issues in `state: new`; dispositioning them is the next write
   (revise) phase's job, gated by `check-revise-completeness.sh`.
 
@@ -27,47 +27,38 @@ the Snippet D fingerprint.
 
 ## Review Loop — Step by Step
 
-### Step 1 — Phase Gate: review readiness
+### Step 1 — MANDATORY: Phase Entry Verification (script-enforced)
+
+**This MUST be the first action of the read phase. The orchestrator
+MUST NOT proceed past this script on a non-zero exit.**
 
 ```bash
-scripts/check-review-readiness.sh <prd-dir>
+scripts/verify-phase-entry.sh read <prd-dir>
 ```
 
-Exit 0 → continue. Exit 1 → at least one prior-round issue is still in
-`state: new`; refuse to enter review and surface to user that the previous
-revise pass left work unfinished. Exit 2 → script error; HITL.
+Consolidates both read-phase entry preconditions into a single gate:
 
-This gate enforces guide §7.3: "上一轮 revise 没做完就要进下一轮 review,
-禁止."
+- `check-review-readiness.sh` — no `state: new` issue from any prior
+  round (i.e. the previous revise wrote completely; guide §7.3)
+- `run-checkers.sh` — bundle is formally clean (i.e. the previous
+  write phase produced a valid bundle; guide §6 fast-failure)
 
-### Step 2 — Formal Hard Gate
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | Both preconditions PASS | continue to Step 2 (LLM substantive dispatch) |
+| 1    | At least one precondition FAIL | **short-circuit to revise**: re-run `run-checkers.sh <prd-dir>` to capture the JSON formal-failure document, pipe to `create-issues.sh <prd-dir> <round>` to materialize per-issue files, then load `revise/index.md` |
+| 2    | Script-level error in a sub-checker | HITL — do not modify the artifact (guide §9.1) |
 
-```bash
-scripts/run-checkers.sh <prd-dir>
-```
+Why this is the first step: the prose contract in `SKILL.md` "Phase
+Contract" is enforcement-by-LLM, which is unreliable. This script is
+enforcement-by-process: even if subsequent steps are skipped or
+reordered, control cannot reach LLM dispatch without
+`verify-phase-entry` having exited 0. Per guide §6, a formal problem
+caught here costs zero LLM tokens and saves an entire LLM round.
 
-Auto-discovers every `scripts/check-*.sh` (PRD bundle + audit self-closure)
-except phase gates and aggregates findings.
+### Step 2 — Cross-Reviewer Dispatch (substantive only)
 
-| Exit | Meaning | Next |
-|------|---------|------|
-| 0    | All formal checks pass | continue to Step 3 (LLM substantive dispatch) |
-| 1    | Issues found (worst severity ≥ error) | **short-circuit**: jump to revise loop with the formal-issues JSON; do NOT dispatch any LLM reviewer (guide §5, §6) |
-| 1    | Issues found (only warnings) | continue, but persist warnings into round-N issues so substantive reviewer sees them |
-| 2    | Script error | HITL — script bug, do not modify the artifact (guide §9.1) |
-
-Per guide §6: a formal problem caught here costs zero LLM tokens and
-saves an entire LLM round. Substantive review on a structurally broken
-artifact would waste tokens reviewing content that may be removed during
-the formal fix anyway.
-
-When Step 2 short-circuits, the orchestrator pipes its JSON output into
-`scripts/create-issues.sh <prd-dir> <round>` to materialize per-issue
-files, then loads `revise/index.md` and starts revise from Step 1.
-
-### Step 3 — Cross-Reviewer Dispatch (substantive only)
-
-Pre-conditions: Step 2 exit 0 (formal PASS) **and** there is meaningful
+Pre-conditions: Step 1 exit 0 (entry verification PASS) **and** there is meaningful
 work for the reviewer (artifact changed since last delivery, or prior-round
 issues are still open).
 
@@ -93,10 +84,10 @@ walks the `reviewer-output/` directory and materializes per-issue files
 in a later step.
 
 **Orchestrator action on ACK**: record the trace_id in `state.yml`. Do
-not yet materialize issues; that happens after Step 4 (so cross +
+not yet materialize issues; that happens after Step 3 (so cross +
 adversarial reviewer outputs are merged in one create-issues pass).
 
-### Step 4 — Adversarial-Reviewer Dispatch (conditional)
+### Step 3 — Adversarial-Reviewer Dispatch (conditional)
 
 Fire only if cross-reviewer's output contained at least one
 `severity: critical` finding (configurable via `config.yml
@@ -109,7 +100,7 @@ Dispatch: review/adversarial-reviewer-subagent.md
 Same input contract as cross-reviewer; writes a separate
 `reviewer-output/<trace_id>.json` file.
 
-### Step 5 — Materialize Issue Files
+### Step 4 — Materialize Issue Files
 
 After both reviewer dispatches have ACKed:
 
@@ -124,7 +115,7 @@ finding to `<prd-dir>/.review/round-<N>/issues/`. If `create-issues.sh`
 exits 1, at least one reviewer's output violated the schema — surface
 the specific error to the user; do NOT silently drop findings.
 
-### Step 6 — Update Summary
+### Step 5 — Update Summary
 
 ```bash
 scripts/update-summary.sh <prd-dir>
@@ -134,7 +125,7 @@ Refreshes `<prd-dir>/.review/issues/summary.yml` so the next round's
 fingerprint matching sees this round's issues. Per guide §7.5, this is
 where recurrence detection happens for the next iteration.
 
-### Step 7 — Summarizer Dispatch
+### Step 6 — Summarizer Dispatch
 
 ```
 Dispatch: shared/summarizer-subagent.md (per-round phase)
@@ -144,7 +135,7 @@ Sub-agent writes `<prd-dir>/.review/round-<N>/index.md` with issue counts
 (by state and severity), `false_positive_ratio`, `deferred_ratio`, and
 recurrence statistics (guide §7.7).
 
-### Step 8 — Judge Dispatch
+### Step 7 — Judge Dispatch
 
 ```
 Dispatch: shared/judge-subagent.md
@@ -156,7 +147,7 @@ The verdict is computed against the rule from guide §5:
 
 ```
 converged ⟺ formal_PASS ∧ substantive_PASS
-formal_PASS    : Step 2 exited 0 in this round
+formal_PASS    : Step 1 exited 0 in this round
 substantive_PASS: 0 issues with severity ∈ {error, critical} and state ∈ {new}
 ```
 
@@ -170,17 +161,17 @@ considers:
 - `diverging`    — error/critical count rose vs prior round
 - `stalled`      — `max_iterations` reached without convergence
 
-### Step 9 — Verdict Routing
+### Step 8 — Verdict Routing
 
 | Verdict        | Next Action |
 |----------------|-------------|
-| `converged`    | Delivery sequence (Step 10 below) |
+| `converged`    | Delivery sequence (Step 9 below) |
 | `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
 | `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
 | `diverging`    | HITL gate: surface regression report; same options |
 | `stalled`      | HITL gate: report stall; same options |
 
-### Step 10 — Delivery Sequence (only on `converged`)
+### Step 9 — Delivery Sequence (only on `converged`)
 
 1. Set `state.yml phase: on-converge` and inject `git_sha: <HEAD sha>`.
 2. Re-dispatch `shared/summarizer-subagent.md` with `phase: on-converge`. The

@@ -1,7 +1,8 @@
 # Revise Mode — Orchestration
 
 Loaded by the orchestrator when `--revise` is invoked, or when review-mode
-Step 2 short-circuits with formal failures. Defines the revise loop. Per
+Step 1 (verify-phase-entry) short-circuits with formal failures. Defines
+the revise loop. Per
 [~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md):
 
 - §7.2 — issue state machine: `new` → {fixed | false-positive | deferred | superseded}
@@ -15,10 +16,10 @@ Revise mode is a **write phase** of the alternating write/read cycle
 defined in `SKILL.md` "Phase Contract". This file enforces the
 write-phase exit gate's two clauses:
 
-1. **State-machine PASS** (Step 4) — no issue is left in `state: new`
+1. **State-machine PASS** (Step 5) — no issue is left in `state: new`
    in the current round; every issue has been dispositioned.
-2. **Formal PASS** (Step 3 self-loop, plus the next read phase's
-   Step 2 hard gate) — the bundle passes `run-checkers.sh`.
+2. **Formal PASS** (Step 4 self-loop, plus the next read phase's
+   Step 1 verify-phase-entry) — the bundle passes `run-checkers.sh`.
 
 If either clause fails, the revise phase loops; it MUST NOT ACK as
 done with violations outstanding. Only when both clauses PASS does
@@ -30,7 +31,30 @@ This file is **orchestration**, not a sub-agent prompt.
 
 ## Revise Loop — Step by Step
 
-### Step 1 — Build Issue-Group Manifest (script)
+### Step 1 — MANDATORY: Phase Entry Verification (script-enforced)
+
+**This MUST be the first action of the revise (write) phase. The
+orchestrator MUST NOT proceed past this script on a non-zero exit.**
+
+```bash
+scripts/verify-phase-entry.sh revise <prd-dir> <round>
+```
+
+Verifies the revise-phase entry precondition: round-N's issues
+directory exists AND contains at least one `state: new` issue.
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | At least one `state: new` issue in round-N — revise has work to do | continue to Step 2 (build issue-group manifest) |
+| 1    | Round dir missing OR no `state: new` issues | revise phase has nothing to do; return control to caller (typically a no-op handoff back to read phase). The orchestrator MUST NOT fan out per-issue revisers. |
+| 2    | Script-level error | HITL — do not modify the artifact |
+
+Why this is the first step: prevents the revise phase from being
+invoked on an empty or mis-numbered round. The script makes the
+precondition unskippable — control cannot reach reviser dispatch
+without `verify-phase-entry` having exited 0.
+
+### Step 2 — Build Issue-Group Manifest (script)
 
 The orchestrator reads `<prd-dir>/.review/round-<N>/issues/*.md` and groups
 them by `file:` field. Issues whose `state` is already in
@@ -51,9 +75,9 @@ revise_groups:
     issues: [I-014]
 ```
 
-If no `state: new` issues remain, jump directly to Step 5.
+If no `state: new` issues remain, jump directly to Step 6.
 
-### Step 2 — Fan-out Per-Issue-Reviser (parallel)
+### Step 3 — Fan-out Per-Issue-Reviser (parallel)
 
 For each entry in `revise_groups`, dispatch one
 `revise/per-issue-reviser-subagent.md` with:
@@ -71,19 +95,19 @@ For each entry in `revise_groups`, dispatch one
 
 | from | to | required metadata |
 |------|----|-------------------|
-| new | fixed | (verify formal pass; see Step 3) |
+| new | fixed | (verify formal pass; see Step 4) |
 | new | false-positive | `dismissed_reason` non-empty |
 | new | deferred | `defer_until` + `defer_reason` non-empty |
 | new | superseded | `superseded_by` referencing another issue id |
 
 The reviser MUST NOT silently leave an issue at `state: new` while
 claiming to have addressed it. Any such issue is caught by the gate in
-Step 4.
+Step 5.
 
 **Reviser is forbidden to** edit `history` or `fix_history`; those are
-maintained by `update-summary.sh` (Step 5).
+maintained by `update-summary.sh` (Step 6).
 
-### Step 3 — Self-Verify Formal Pass (writer self-loop, no issues created)
+### Step 4 — Self-Verify Formal Pass (writer self-loop, no issues created)
 
 After each reviser finishes, the orchestrator re-runs
 
@@ -96,24 +120,24 @@ issues — the reviser is dispatched again on the affected leaf with the
 formal-checker's JSON output and is expected to fix the structural problem
 in place. This loop continues until either:
 
-- formal pass (exit 0) — proceed to Step 4
+- formal pass (exit 0) — proceed to Step 5
 - 3 consecutive formal failures on the same leaf — escalate to HITL with
   the leaf path and the failing CR-IDs (per guide §4.1 last paragraph,
   this is the only time a self-audit failure becomes a real issue)
 
-### Step 4 — Phase Gate: revise completeness
+### Step 5 — Phase Gate: revise completeness
 
 ```bash
 scripts/check-revise-completeness.sh <prd-dir> <round-number>
 ```
 
 Exit 0 → all issues this round have left `state: new`; proceed.
-Exit 1 → at least one issue still in `state: new`; loop back to Step 2 for
+Exit 1 → at least one issue still in `state: new`; loop back to Step 3 for
 the affected groups (guide §7.4 allows revise to repeat until the gate
 passes). After 3 such iterations, escalate to HITL.
 Exit 2 → script error; HITL.
 
-### Step 5 — Update Summary
+### Step 6 — Update Summary
 
 ```bash
 scripts/update-summary.sh <prd-dir>
@@ -122,7 +146,7 @@ scripts/update-summary.sh <prd-dir>
 Refreshes `summary.yml` with the new issue states. Cross-reviewer in the
 next review round will read this for fingerprint matching.
 
-### Step 6 — Summarizer (update-state phase)
+### Step 7 — Summarizer (update-state phase)
 
 Dispatch `shared/summarizer-subagent.md` to write the updated round-N
 index with state transitions and ratio signals (guide §7.7):
@@ -140,14 +164,14 @@ Default thresholds (overridable in `config.yml`):
 | `deferred_ratio` | > 0.7 | warn — writer is deferring instead of fixing |
 | critical/error issue with `defer_until: never` | any | error — must be in `versions/<N>.md.justified_regressions` |
 
-These are quality-at-delivery signals. The judge consumes them in Step 7.
+These are quality-at-delivery signals. The judge consumes them in Step 8.
 
-### Step 7 — Judge Dispatch
+### Step 8 — Judge Dispatch
 
 Dispatch `shared/judge-subagent.md`. Verdict considers:
 
-- The Step 5 summary (issue counts, severities, state distribution)
-- Ratio signals from Step 6
+- The Step 6 summary (issue counts, severities, state distribution)
+- Ratio signals from Step 7
 - Recurrence counts for any `recurrence_of` matches
 
 Verdict routing is identical to review/index.md Step 8.
@@ -158,7 +182,7 @@ Verdict routing is identical to review/index.md Step 8.
 
 - The orchestrator does NOT read leaf content — it routes on ACKs and
   scripts only (orchestrator dispatch contract).
-- Round numbers are monotonic. If Step 4 passes, the round closes; the
+- Round numbers are monotonic. If Step 5 passes, the round closes; the
   next review pass increments N.
 - Skeleton-protected files: removed concept. With `skill-forge` deleted,
   the artifact is the PRD bundle which has no skeleton. Every leaf is

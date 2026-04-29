@@ -1,7 +1,7 @@
 # generate/from-scratch.md — FromScratch Mode Entry
 
 Loaded by the orchestrator when mode = generate and no `--evolve` is
-provided. Defines Round 0 + Round 1 setup. After Step 7 (writer fan-out)
+provided. Defines Round 0 + Round 1 setup. After Step 8 (writer fan-out)
 the orchestrator loads `review/index.md` and runs the review pipeline —
 this file does not duplicate the review-loop orchestration.
 
@@ -9,10 +9,10 @@ FromScratch is a **write phase** of the alternating write/read cycle
 defined in `SKILL.md` "Phase Contract". The first write phase has no
 inbound issues, so the state-machine clause is vacuous; only the
 **formal review PASS** clause applies as exit gate. Each writer's
-self-audit (Step 7) loops on the per-artifact check script for its
-leaf type until formal PASS for that leaf; review mode's Step 2
-re-runs `run-checkers.sh` over the full bundle as the cross-leaf
-boundary check before any LLM dispatch.
+self-audit (Step 8) loops on the per-artifact check script for its
+leaf type until formal PASS for that leaf; review mode's Step 1
+(`verify-phase-entry read`) re-runs `run-checkers.sh` over the full
+bundle as the cross-leaf boundary check before any LLM dispatch.
 
 This file is **orchestration**, not a sub-agent prompt. It does not
 carry the Snippet D fingerprint.
@@ -29,7 +29,28 @@ scripts/git-precheck.sh
 
 Exit non-zero → stop the skill; do not enter generate mode.
 
-### Step 2 — Prepare Input (script)
+### Step 2 — MANDATORY: Phase Entry Verification (script-enforced)
+
+**This MUST be the second action of generate-from-scratch (after the
+git precheck). The orchestrator MUST NOT proceed past this script on
+a non-zero exit.**
+
+```bash
+scripts/verify-phase-entry.sh generate-fresh <prd-dir>
+```
+
+Verifies the from-scratch entry precondition: the target PRD bundle
+does not yet exist (no `README.md`, no `features/*`, no `journeys/*`).
+Refuses to overwrite an existing PRD; the user should use `--evolve`
+instead.
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | Bundle is empty/absent — safe to generate | continue to Step 3 |
+| 1    | Existing PRD content found | refuse to start; surface the diagnostic and tell the user to use `--evolve` |
+| 2    | Script-level error | HITL |
+
+### Step 3 — Prepare Input (script)
 
 ```bash
 scripts/prepare-input.sh "<user-prompt>" <prd-dir>/.review
@@ -41,7 +62,7 @@ and (idempotently, on first bootstrap) `.review/README.md` from
 
 Orchestrator: read exit code only; never read the written files.
 
-### Step 3 — Glossary Probe (script)
+### Step 4 — Glossary Probe (script)
 
 ```bash
 scripts/glossary-probe.sh <prd-dir>/.review common/domain-glossary.md
@@ -50,7 +71,7 @@ scripts/glossary-probe.sh <prd-dir>/.review common/domain-glossary.md
 Outputs `<prd-dir>/.review/round-0/trigger-flags.yml` (`glossary_hit`,
 `sparse_input`, `ambiguous_artifact_type`).
 
-### Step 4 — Domain Consultant (conditional)
+### Step 5 — Domain Consultant (conditional)
 
 **Trigger**: `glossary_hit: true` OR `sparse_input: true` OR user passed
 `--interactive`. Skip otherwise.
@@ -67,7 +88,7 @@ pure-dispatch — it does not write `clarification/<ts>.yml` directly.
   `common/domain-glossary.md`
 - Outputs: `<prd-dir>/.review/round-0/clarification/<ISO-ts>.yml`
 
-### Step 5 — Planner (sub-agent dispatch)
+### Step 6 — Planner (sub-agent dispatch)
 
 - Dispatches: `generate/planner-subagent.md`
 - Inputs: `round-0/clarification/<ts>.yml` (or `round-0/input.md` directly
@@ -78,21 +99,21 @@ The planner produces an `add:` list of PRD leaves to author (typically
 README.md, journeys/J-NNN-*.md, features/F-NNN-*.md, architecture.md,
 architecture/*.md). PRDs have no skeleton — every leaf is an `add`.
 
-### Step 6 — HITL: Plan Approval Gate
+### Step 7 — HITL: Plan Approval Gate
 
 Orchestrator reads `round-1/plan.md` (the only artifact it is permitted
 to read). Wait for user response:
 
-- approve / `/approve` → continue to Step 7
+- approve / `/approve` → continue to Step 8
 - revise / `/revise <feedback>` → re-dispatch planner with feedback;
-  loop Steps 5–6
+  loop Steps 6–7
 - abort / `/abort` → exit the skill
 
 ---
 
 ## Round 1 — Writer fan-out
 
-### Step 7 — Writer Fan-out (parallel)
+### Step 8 — Writer Fan-out (parallel)
 
 Fan-out one writer per entry in `plan.add`. Each writer:
 
@@ -113,9 +134,9 @@ Fan-out one writer per entry in `plan.add`. Each writer:
 - Returns single-line ACK.
 
 Orchestrator: collect `self_review_status` and `fail_count` from each
-ACK. Proceed to Step 8.
+ACK. Proceed to Step 9.
 
-### Step 8 — Enter Review Loop
+### Step 9 — Enter Review Loop
 
 Load `review/index.md` and execute the review-mode steps with
 `round=1`. The review pipeline handles formal hard gate (re-runs
@@ -139,7 +160,7 @@ Verdict routing (per `review/index.md` Step 8):
   round 1 globally; delivery 2 starts at round-(K+1) where K is the
   last delivery 1 round.
 - The orchestrator MUST NOT read any artifact leaf except `plan.md`
-  (Step 6). All other routing decisions ride on ACK fields and verdict
-  files.
+  (during Step 7 HITL approval). All other routing decisions ride on
+  ACK fields and verdict files.
 - PRD generation has no scaffold step — there is no skeleton to copy
   from. Each leaf is authored fresh by a writer based on the template.

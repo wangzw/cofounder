@@ -83,17 +83,47 @@ the prior phase has ended.
   self-loop) until formal PASS — it does NOT escape to read phase
   with formal violations.
 
-The phase-gate scripts (`check-review-readiness.sh`,
-`check-revise-completeness.sh`, `run-checkers.sh`) implement the gates
-above. Orchestration files reference them at the exact boundary they
-guard:
+### Script-enforced boundary gates
 
-| Boundary | Gate script | Exit gate of | Entry gate of |
-|----------|-------------|--------------|---------------|
-| revise → review | `check-review-readiness.sh` + `run-checkers.sh` | revise (write) | review (read) |
-| review → revise | (none — verdict-driven) | review (read) | revise (write) |
-| revise → revise (loop) | `check-revise-completeness.sh` + `run-checkers.sh` | revise iteration | next revise iteration |
-| generate → review (first delivery) | `run-checkers.sh` | generate (write) | review (read) |
+Every phase has a **MANDATORY first step** that calls a single
+boundary-gate script. The script's non-zero exit halts the phase before
+any further action. Documenting the contract in prose is
+enforcement-by-LLM; threading it through a script is enforcement-by-
+process — even if subsequent steps are skipped or reordered, control
+cannot reach a phase's main work without the gate having exited 0.
+
+The unified entry point is `scripts/verify-phase-entry.sh <phase>
+<prd-dir> [round]`. Each orchestration file's Step 1 (or Step 2 after
+the bootstrap precheck for generate modes) is this call:
+
+| Phase | Orchestration file | First call |
+|-------|-------------------|------------|
+| read (review) | `review/index.md` Step 1 | `verify-phase-entry.sh read <prd-dir>` |
+| write (revise) | `revise/index.md` Step 1 | `verify-phase-entry.sh revise <prd-dir> <round>` |
+| write (generate-fresh) | `generate/from-scratch.md` Step 2 | `verify-phase-entry.sh generate-fresh <prd-dir>` |
+| write (generate-evolve) | `generate/new-version.md` Step 2 | `verify-phase-entry.sh generate-evolve <prd-dir>` |
+
+`verify-phase-entry.sh` consolidates the underlying gates per phase:
+
+| Phase | Underlying gate scripts |
+|-------|-------------------------|
+| read | `check-review-readiness.sh` (no `state: new` from prior rounds) AND `run-checkers.sh` (bundle formal PASS) |
+| revise | round-N has at least one `state: new` issue (otherwise no work) |
+| generate-fresh | bundle is empty/absent (avoids overwriting an existing PRD) |
+| generate-evolve | prior delivery's `versions/<N-1>.md` exists |
+
+Exit codes follow the §9 contract uniformly: `0` = phase may proceed,
+`1` = phase MUST NOT proceed (precondition failed; see stdout), `2` =
+script-level error → HITL.
+
+### Boundary-to-gate mapping (cycle view)
+
+| Boundary | Gate script(s) at the boundary | Exit gate of | Entry gate of |
+|----------|--------------------------------|--------------|---------------|
+| revise → review | `verify-phase-entry.sh read` (= readiness + run-checkers) | revise (write) | review (read) |
+| review → revise | (verdict-driven; revise's own entry gate `verify-phase-entry.sh revise` then runs) | review (read) | revise (write) |
+| revise → revise (loop) | `check-revise-completeness.sh` + `run-checkers.sh` (Step 5 + Step 4 self-loop) | revise iteration | next revise iteration |
+| generate → review (first delivery) | `verify-phase-entry.sh read` | generate (write) | review (read) |
 | converged → delivery | (verdict only) | review (read) | delivery sequence |
 
 ## Bootstrap Precheck
