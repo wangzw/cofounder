@@ -2,8 +2,8 @@
 # check-revisions.sh — formal review of REVISIONS.md (version chain).
 #
 # Implements:
-#   CR-PP05  version-chain-integrity   — Previous Version / Predecessor paths resolve
-#   CR-PP04  no-tbd-remaining
+#   CR-RV01  version-chain-integrity   — Previous Version / Predecessor paths resolve
+#   CR-SD03  no-tbd-remaining
 #
 # Usage: check-revisions.sh <prd-dir>
 #
@@ -34,7 +34,7 @@ revisions = read_text(os.path.join(prd_root, "REVISIONS.md"))
 if revisions is None:
     emit([], scope_label="(no REVISIONS.md — optional)")
 
-# CR-PP05: previous-version paths must resolve
+# CR-RV01: previous-version paths must resolve
 path_re = re.compile(
     r"(?im)^\s*(?:Previous Version|Predecessor)\s*:\s*[`\'\"]?([^`\'\"\n]+)"
 )
@@ -47,7 +47,7 @@ for m in path_re.finditer(revisions):
         candidate = os.path.normpath(os.path.join(prd_root, "..", candidate))
     if not os.path.exists(candidate):
         findings.append(Finding(
-            criterion_id="CR-PP05",
+            criterion_id="CR-RV01",
             file="REVISIONS.md",
             severity="error",
             description=f"Previous Version path {path!r} does not resolve",
@@ -57,12 +57,12 @@ for m in path_re.finditer(revisions):
             ),
         ))
 
-# CR-PP04: no TBD/TODO/FIXME
+# CR-SD03: no TBD/TODO/FIXME
 forbidden = re.compile(r"\b(TBD|TODO|FIXME)\b")
 for i, line in enumerate(revisions.splitlines(), 1):
     if forbidden.search(line):
         findings.append(Finding(
-            criterion_id="CR-PP04",
+            criterion_id="CR-SD03",
             file="REVISIONS.md",
             severity="error",
             description=f"placeholder marker on line {i}: {line.strip()[:80]!r}",
