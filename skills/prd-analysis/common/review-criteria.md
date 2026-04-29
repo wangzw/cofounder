@@ -162,9 +162,139 @@ state-machine transitions, ratio signals, and cross-round fingerprinting.
   name: "issue-schema-conformance"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-issue-schema.sh
+  script_path: scripts/check-issue.sh
   severity: error
   applies_to: [".review/round-*/issues/*.md"]
+  conflicts_with: []
+  priority: 2
+```
+
+---
+
+## Audit-Artifact Schema Criteria (CR-CL / CR-PL / CR-SR / CR-RO / CR-RI / CR-VD / CR-VS)
+
+These criteria audit LLM-produced artifacts of the review pipeline itself
+(guide §10 self-closure). Each pairs with a per-artifact check script.
+
+```yaml
+- id: CR-CL01
+  name: "clarification-required-keys-present"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-clarification.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-CL02
+  name: "clarification-flat-keys-first"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-clarification.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-PL01
+  name: "plan-required-fields"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-plan.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-PL02
+  name: "plan-add-modify-entry-shape"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-plan.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-SR01
+  name: "self-review-required-sections"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-self-review.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-SR02
+  name: "self-review-fail-blocker-scope"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-self-review.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-SR03
+  name: "self-review-status-fail-consistency"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-self-review.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-RO01
+  name: "reviewer-output-json-valid"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-reviewer-output.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-RO02
+  name: "reviewer-output-issue-fields"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-reviewer-output.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-RI01
+  name: "round-index-required-fields"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-round-index.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-RI02
+  name: "round-index-state-counts-sum-to-total"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-round-index.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-VD01
+  name: "verdict-required-fields"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-verdict.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-VD02
+  name: "verdict-next-action-consistency"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-verdict.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-VS01
+  name: "version-required-frontmatter"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-version.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+- id: CR-VS02
+  name: "version-converged-only"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-version.sh
+  severity: error
   conflicts_with: []
   priority: 2
 ```
