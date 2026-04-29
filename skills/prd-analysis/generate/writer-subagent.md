@@ -160,17 +160,23 @@ Path: `<prd-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].path
 
 ### Formal pre-check (guide §4 hard gate)
 
-Before writing the self-review archive, you MUST run
+Before writing the self-review archive, you MUST run the per-artifact
+check script for your leaf type:
 
-```bash
-scripts/check-prd-formal.sh <prd-dir>
-```
+| Your leaf path | Script to run |
+|----------------|---------------|
+| `features/F-NNN-*.md` | `scripts/check-feature.sh <prd-dir>` |
+| `journeys/J-NNN-*.md` | `scripts/check-journey.sh <prd-dir>` |
+| `README.md` | `scripts/check-readme.sh <prd-dir>` |
+| `architecture.md` | `scripts/check-architecture-index.sh <prd-dir>` |
+| `architecture/*.md` | `scripts/check-architecture-topic.sh <prd-dir>` |
+| `REVISIONS.md` | `scripts/check-revisions.sh <prd-dir>` |
 
-against the bundle (which includes your new leaf). This is the
-PRD-content formal check only — `scripts/check-issue-schema.sh`
-(audit-artifact self-closure) is the orchestrator's concern in review
-mode, not yours; existing schema-broken issue files are not your
-responsibility to fix.
+Each script walks ALL files of that artifact type, so you may see
+findings against leaves other writers are responsible for. Filter by
+`file:` matching your assigned leaf — that's your responsibility.
+Audit-side artifacts (issues, plan, verdict, etc.) are not part of any
+writer's scope; never run their check scripts.
 
 | Result | Action |
 |--------|--------|

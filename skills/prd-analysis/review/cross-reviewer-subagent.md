@@ -29,7 +29,7 @@ issues.
    for you.
 4. Apply every criterion in `common/review-criteria.md` whose
    `checker_type: llm`. Do not apply `checker_type: script` criteria —
-   those were already enforced by `scripts/check-prd-formal.sh` before
+   those were already enforced by `scripts/run-checkers.sh` (the per-artifact check-*.sh dispatcher) before
    you were dispatched.
 5. For each problem you find, decide if it is a **recurrence** of a
    prior issue (see "Fingerprint matching" below).

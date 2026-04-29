@@ -7,7 +7,7 @@ source of truth consumed by:
   they NEVER write issue files directly (see `scripts/create-issues.sh`).
 - `scripts/create-issues.sh` — converts LLM raw output into per-issue files at
   `.review/round-N/issues/I-NNN.md`.
-- `scripts/check-issue-schema.sh` — validates that on-disk issue files conform
+- `scripts/check-issue.sh` — validates that on-disk issue files conform
   to the **on-disk schema** (formal review of audit artifacts; guide §10).
 - `scripts/update-summary.sh` — aggregates open / deferred issues into
   `.review/issues/summary.yml` for cross-round fingerprint matching (guide §7.6).

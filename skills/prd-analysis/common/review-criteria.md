@@ -9,7 +9,7 @@ Criteria are partitioned per the dual-criteria from
 [~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md) §1.3:
 
 - **Formal (script-type)** — mechanically expressible AND the result does not imply a correctness
-  judgment. Enforced by `scripts/check-prd-formal.sh` (or another script in `scripts/`). Failure
+  judgment. Enforced by a per-artifact script under `scripts/check-*.sh` (one script per artifact type). Failure
   is a **necessary condition** preventing convergence (guide §5). LLM reviewers MUST NOT also
   apply these — they were already enforced before any LLM dispatch (guide §6 fast-failure).
 - **Substantive (LLM-type)** — content correctness, semantic coherence, cross-leaf
@@ -22,7 +22,7 @@ Severity-to-priority mapping: `critical = 1`, `error = 2`, `warning = 3`.
 
 ## Formal Criteria (Script-Type)
 
-These criteria are evaluated mechanically by `scripts/check-prd-formal.sh`. The
+These criteria are evaluated mechanically by per-artifact scripts under `scripts/`. The
 script emits one issue per finding in the schema documented in
 `common/issue-schema.md`.
 
@@ -40,7 +40,7 @@ means the PRD is incomplete and downstream system-design cannot consume it.
   name: "prd-directory-structure"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-readme.sh
   severity: critical
   conflicts_with: []
   priority: 1
@@ -60,7 +60,7 @@ evolve-mode depends on for tombstone and diff-aware generation.
   name: "id-format-monotonic"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-feature.sh
   severity: error
   conflicts_with: []
   priority: 2
@@ -81,7 +81,7 @@ produce incomplete output.
   name: "readme-index-complete"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-readme.sh
   severity: error
   conflicts_with: []
   priority: 2
@@ -100,7 +100,7 @@ unsuitable for coding agents.
   name: "no-tbd-remaining"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-readme.sh
   severity: error
   conflicts_with: []
   priority: 2
@@ -121,7 +121,7 @@ links in the feature/journey indexes MUST point to valid files. Broken version c
   name: "version-chain-integrity"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-revisions.sh
   severity: error
   conflicts_with: []
   priority: 2
@@ -141,7 +141,7 @@ break downstream consumption (system-design + autoforge both index features by f
   name: "frontmatter-required-fields"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-feature.sh
   severity: error
   conflicts_with: []
   priority: 2
@@ -496,7 +496,7 @@ the substantive testability assessment is CR-PP15 (below).
   name: "acceptance-criteria-format"
   version: 1.0.0
   checker_type: script
-  script_path: scripts/check-prd-formal.sh
+  script_path: scripts/check-feature.sh
   severity: error
   conflicts_with: []
   priority: 2

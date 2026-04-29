@@ -302,14 +302,30 @@ Next steps:
 - **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; see guide §1)
 - **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format)
 - **Domain glossary**: `common/domain-glossary.md`
-- **Formal-review scripts** (each follows guide §9 contract — 3-state returncode + stdout restates meaning):
-  - `scripts/run-checkers.sh` — aggregator over check-prd-formal + check-issue-schema
-  - `scripts/check-prd-formal.sh` — PRD-shape formal review
-  - `scripts/check-issue-schema.sh` — review-artifact self-closure (guide §10)
-  - `scripts/check-review-readiness.sh` — phase gate (guide §7.3)
-  - `scripts/check-revise-completeness.sh` — phase gate (guide §7.3)
-  - `scripts/create-issues.sh` — script-driven issue creation from LLM raw output (guide §7.1)
-  - `scripts/update-summary.sh` — cross-round fingerprint summary (guide §7.6)
+- **Formal-review scripts** — one per artifact type (guide §1.1 + §9 contract: 3-state returncode + stdout restates meaning + idempotent + agent-actionable):
+  - `scripts/run-checkers.sh` — dispatcher; auto-discovers and invokes every `check-*.sh` (except phase gates), aggregates findings
+  - PRD bundle:
+    - `scripts/check-readme.sh`              README.md (CR-PP01, CR-PP03, CR-PP04)
+    - `scripts/check-journey.sh`             journeys/J-NNN-*.md (CR-PP02, CR-PP04, CR-FM01)
+    - `scripts/check-feature.sh`             features/F-NNN-*.md (CR-PP02, CR-PP04, CR-PP15F, CR-FM01)
+    - `scripts/check-revisions.sh`           REVISIONS.md (CR-PP05, CR-PP04)
+    - `scripts/check-architecture-index.sh`  architecture.md (CR-PP01, CR-PP04)
+    - `scripts/check-architecture-topic.sh`  architecture/*.md (CR-PP04)
+  - Audit artifacts (guide §10 self-closure):
+    - `scripts/check-issue.sh`               .review/round-*/issues/I-NNN.md (CR-IS01)
+    - `scripts/check-clarification.sh`       .review/round-0/clarification/*.yml (CR-CL01, CR-CL02)
+    - `scripts/check-plan.sh`                .review/round-*/plan.md (CR-PL01, CR-PL02)
+    - `scripts/check-self-review.sh`         .review/round-*/self-reviews/*.md (CR-SR01..03)
+    - `scripts/check-reviewer-output.sh`     .review/round-*/reviewer-output/*.json (CR-RO01, CR-RO02)
+    - `scripts/check-round-index.sh`         .review/round-*/index.md (CR-RI01, CR-RI02)
+    - `scripts/check-verdict.sh`             .review/round-*/verdict.yml (CR-VD01, CR-VD02)
+    - `scripts/check-version.sh`             .review/versions/*.md (CR-VS01, CR-VS02)
+  - Phase gates (separate argument shape; invoked by orchestrator, not by run-checkers):
+    - `scripts/check-review-readiness.sh`    no prior `state: new` issues (guide §7.3)
+    - `scripts/check-revise-completeness.sh` no `state: new` in current round (guide §7.3)
+  - Helpers:
+    - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1)
+    - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`
   - `generate/planner-subagent.md`
