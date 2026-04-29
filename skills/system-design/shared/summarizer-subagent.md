@@ -2,280 +2,216 @@
 
 # summarizer-subagent — Summarizer Role
 
-**Role**: `summarizer` (`S` in trace_id). LIGHT-tier. Aggregates round results and, on
-convergence, writes the delivery version summary and CHANGELOG. Multiple writes per dispatch.
-No user interaction.
+Role: `summarizer` (`S` in trace_id). LIGHT-tier. Aggregates issue
+frontmatter and self-review counts; produces the round index, version
+summary on convergence, and CHANGELOG entry. Read-only against
+frontmatter; never reads issue bodies or artifact leaves.
+
+Two phases, dispatched independently by the orchestrator:
+
+| Phase | When | Output |
+|-------|------|--------|
+| **per-round** | After all reviewers ACK; before the judge | `<artifact-root>/.review/round-<N>/index.md` |
+| **on-converge** | After judge emits `verdict: converged` | `<artifact-root>/.review/versions/<N>.md` + CHANGELOG entry |
+
+Check `state.yml phase` to determine which phase applies.
 
 ---
 
-## IPC Contract (Snippet D)
-
-### Direct Write + ACK model (guide §3.9)
-
-The IPC model is **Direct Write + ACK**:
-
-- The sub-agent writes to final paths **in its own sub-session** using the Write tool (one or
-  multiple writes per dispatch, depending on role — see table below).
-- The sub-agent's Task return is **exactly one line** (the ACK):
-  - `OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>`
-  - Writer-only extras appended to the OK ACK: `self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>`
-  - On technical failure: `FAIL trace_id=R3-W-007 reason=<one-line>`
-
-### Role → final-path mapping
-
-| Role | Write count | Final paths |
-|------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
-| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
-| `planner` | 1 write | `.review/round-<N>/plan.md` |
-| `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
-| `judge` | 1 write | `.review/round-<N>/verdict.yml` |
-| `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
-
-> The orchestrator holds no Write permission to any of the above paths — only `state.yml` and
-> `dispatch-log.jsonl` (§19.1). This physically enforces §5.1 pure-dispatch.
-
-### Blocker-scope taxonomy for writer self-review FAIL rows
-
-When a writer's self-review produces a FAIL row, it MUST carry a `blocker_scope` from this
-4-value taxonomy:
-
-| `blocker_scope` | Definition |
-|-----------------|-----------|
-| `global-conflict` | The artifact leaf conflicts with another leaf or another criterion — requires cross-artifact view that is outside writer scope |
-| `cross-artifact-dep` | This leaf depends on a fact from another leaf that is not yet ready (produced) in this round |
-| `needs-human-decision` | The choice requires information only a human can provide (terminology, business priority, style direction) — no skill-internal evidence can resolve it |
-| `input-ambiguity` | The input spec is ambiguous or incomplete; a clarification not yet covered by domain-consultant output is needed |
-
-Every FAIL row in a self-review archive MUST select exactly one `blocker_scope` value.
-
-### `FAIL` ACK semantics (collapsed scope)
-
-`FAIL` ACK covers **technical failures only**:
-
-- Write tool call denied by sandbox
-- Prompt parse error / input so corrupted no leaf could be produced
-- Timeout with zero writes completed
-
-**Self-review FAIL rows do NOT trigger `FAIL` ACK.** A writer that finds scope-external conflicts
-MUST return:
-
-```
-OK trace_id=R3-W-007 role=writer linked_issues=R3-012 self_review_status=PARTIAL fail_count=1
-```
-
-Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /
-reviser handles the conflicts. This is the writer's normal success path when scope-external
-issues are found (§11.2).
-
-Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
-
-### FORBIDDEN
-
-- **FORBIDDEN** to write `<!-- metrics-footer -->`, `<!-- self-review -->`, or any HTML-comment
-  IPC envelope into artifact leaves — artifact nudity is a hard constraint (guide §3.9 hard
-  constraint 1). All process metadata goes to `.review/` archive files, never into the artifact.
-- **FORBIDDEN** to include generation content in the Task return — the ACK is one line; the
-  artifact body must never appear in the return value (orchestrator context pollution, guide §3.9
-  hard constraint 2).
-- **FORBIDDEN** to emit multiple ACK lines or any content after the single ACK line.
-- **FORBIDDEN** (writer) to force-fix in-place a `global-conflict` self-review FAIL —
-  use the blocker-scope taxonomy, record the FAIL row with `blocker_scope`, and return
-  `OK ... self_review_status=PARTIAL`. The cross-reviewer and reviser handle global conflicts
-  in the review/revise loop (§11.2).
-
----
-
-## Role-Specific Instructions
-
-### Purpose
-
-Aggregate per-round review results and, upon convergence, produce the delivery record. Two
-distinct phases based on orchestrator trigger — always check `state.yml phase` to determine
-which phase applies.
-
-### Input Contract
+## Inputs (frontmatter only)
 
 | Source | Purpose |
 |--------|---------|
-| `<target>/.review/round-<N>/issues/*.md` frontmatter | Issue aggregation counts by severity and status |
-| `<target>/.review/round-<N>/verdict.yml` | Verdict for coverage calculation reference (if already written by judge for this round) |
-| `<target>/.review/round-<N>/self-reviews/*.md` frontmatter | `fail_count` and `self_review_status` per writer dispatch |
-| `<target>/.review/round-<N>/skip-set.yml` | `cross_reviewer_focus` length for skip-set utilization metric |
-| `<target>/.review/versions/<N-1>.md` | Previous version summary (if it exists; omit if first delivery) |
-| `<target>/.review/traces/round-<N>/dispatch-log.jsonl` | Dispatch events for latency metrics, tier distribution, and coverage completeness |
+| `<artifact-root>/.review/round-<N>/issues/*.md` frontmatter | Per-issue counts by `state` and `severity`, recurrence detection |
+| `<artifact-root>/.review/issues/summary.yml` | Cross-round history (read-only here; `update-summary.sh` is the only writer) |
+| `<artifact-root>/.review/round-<N>/self-reviews/*.md` frontmatter | Writer `fail_count` and `self_review_status` |
+| `<artifact-root>/.review/round-<N>/verdict.yml` (if exists) | Verdict reference (post-judge phase) |
+| `<artifact-root>/.review/versions/<N-1>.md` (if exists) | Previous delivery's quality_at_delivery for trend |
+| `<artifact-root>/.review/traces/round-<N>/dispatch-log.jsonl` | Latency, tier distribution, coverage |
 
-The orchestrator path to the skill-forge directory is injected as `skill-root: <path>` in
-`state.yml`. Use this when referencing script paths below.
+**Forbidden**: reading issue bodies, artifact leaves, or any narrative
+prose.
 
 ---
 
-### Phase 1 — Per-Round Summary
+## Phase 1 — Per-Round Summary
 
-**Trigger**: dispatched by orchestrator after cross-reviewer (and optionally adversarial-reviewer)
-complete for round N, BEFORE the judge is dispatched.
-
-**Outputs** (all Writes):
-
-**Write 1 — Round index**: `<target>/.review/round-<N>/index.md`
+Output: `<artifact-root>/.review/round-<N>/index.md`
 
 ```markdown
 ---
 round: <N>
 delivery_id: <D>
-open_issues: <count of new+persistent+regressed>
-resolved_this_round: <count of resolved>
-regressed_count: <count of regressed>
-# Severity counts are scoped to OPEN issues only (status ∈ {new, persistent, regressed}).
-# Resolved issues are excluded — else a converged verdict would be impossible once any
-# resolved error/critical exists (judge-subagent §Verdict Definitions requires
-# critical_count == 0 AND error_count == 0 for convergence).
-critical_count: <open count where severity=critical>
-error_count: <open count where severity=error>
-warning_count: <open count where severity=warning>
-coverage_percent: <int 0-100>
-skip_set_utilization: <focused_leaves / total_leaves * 100>%
-writer_fail_count_sum: <sum of fail_count across all writer self-reviews this round>
+
+# Counts by state (sum to total_issues)
+total_issues: <int>
+new_count: <int>
+fixed_count: <int>
+false_positive_count: <int>
+deferred_count: <int>
+superseded_count: <int>
+
+# Counts by severity (over total_issues, including all states)
+critical_count: <int>
+error_count: <int>
+warning_count: <int>
+info_count: <int>
+
+# Quality-at-delivery signals (guide §7.7)
+false_positive_ratio: <float, 0..1>     # false_positive_count / total_issues
+deferred_ratio: <float, 0..1>            # deferred_count / total_issues
+recurrence_count: <int>                  # number of issues with recurrence_of set
+
+# Justified regressions (deferred critical/error issues with valid reason)
+justified_regressions_ok: <bool>         # true iff every (severity ∈ {critical,error} AND state=deferred) has defer_until=never AND non-empty defer_reason
+justified_regressions: []                # list of issue ids that fit that criterion
+
+# Writer self-review aggregation (when applicable)
+writer_dispatch_count: <int>
+writer_fail_count_sum: <int>
+writer_full_pass_count: <int>
 ---
 
 # Round <N> Review Summary
 
-[Brief prose summary of what was checked, what was found, and status trends.]
+<2-4 sentence prose summary: how many issues this round, what trended
+how vs prior round, top criterion ids contributing to new findings.>
+
+## State distribution
+
+<small markdown table — state vs count>
+
+## Recurrences (if recurrence_count > 0)
+
+<bullet list of issues with recurrence_of set, listing their prior id
+and recurrence_count>
+
+## Open work for revise
+
+<bullet list of issues with state: new, grouped by file, listing
+criterion_id and severity>
 ```
 
-**Coverage percent calculation**: read `coverage_check.effective_coverage_percent` directly
-from `skip-set.yml` — `run-checkers.sh` Phase A pre-computes it as
-`100 * (cross_reviewer_focus_count + scaffold_skip_count) / total_leaves` (rounded). The
-formula counts both leaves the cross-reviewer actually evaluated AND scaffold-pure leaves
-(byte-identical to scaffold-provenance manifest) as covered, because the latter never
-need LLM review — they are proven scaffold content. Without this carve-out, Tier-2.4
-narrowing would push coverage below the converged-verdict gate (100%) and prevent
-convergence.
+**Counting rules**:
 
-**Write 2 (conditional) — Leaf index update**: if `<target>/common/index.md` exists, append
-a round-N summary row to the index table (do not rewrite the whole file — append only).
+- Always count `state: new` ONLY for issues that are still open (i.e.
+  not `state: fixed/false-positive/deferred/superseded`). The
+  state machine is mutually exclusive — every issue is in exactly one
+  state.
+- `recurrence_count` counts how many issues have `recurrence_of:` set
+  to a non-empty value, NOT the maximum recurrence depth.
+- Severity counts are over **all** issues regardless of state, because
+  `false_positive_ratio` and `deferred_ratio` need the full denominator.
 
 ---
 
-### Phase 2 — On-Converge Delivery Record
+## Phase 2 — On-Converge Delivery Record
 
-**Trigger**: dispatched by orchestrator AFTER judge emits `verdict: converged` and the orchestrator
-confirms the verdict. Check `state.yml phase: on-converge` before proceeding with these writes.
+Triggered only after `verdict: converged`. Three writes:
 
-**Write 3 — Version summary**: `<target>/.review/versions/<N>.md`
+### Write 1 — Version summary
 
-Schema (guide §10.4):
+`<artifact-root>/.review/versions/<N>.md`
 
 ```markdown
 ---
 delivery_id: <D>
 round: <N>
-git_sha: <sha — read from state.yml, injected by orchestrator>
+git_sha: <from state.yml, injected by orchestrator>
 verdict: converged
 rounds_to_convergence: <N minus first round of this delivery>
 previous_delivery: <D-1 or null>
 quality_at_delivery:
-  open_issues: 0
+  total_issues: <final-round total>
+  new_count: 0
+  fixed_count: <int>
+  false_positive_count: <int>
+  deferred_count: <int>
+  recurrence_count: 0
   critical_count: 0
   error_count: 0
-  regressed_count: 0
-  coverage_percent: 100
+  false_positive_ratio: <float>
+  deferred_ratio: <float>
   writer_fail_count_sum: 0
-justified_regressions: []
+justified_regressions:
+  - id: I-042
+    severity: error
+    defer_reason: "<copied from issue frontmatter>"
+    defer_until: never
 ---
 
 # Delivery <D> — Version Summary
 
-**Change summary**: <1-2 sentences describing what this delivery produced or fixed>
+**Change summary**: <one-sentence summary of what this delivery produced>
 
 ## Affected Leaves
 
-<bullet list of leaves modified in this delivery>
+<bullet list of leaves modified between this delivery and the previous
+one — read from `state.yml` modified_leaves field>
 
 ## Control Signals
 
-<any config.yml flags or forced-full overrides active during this delivery>
+<any non-default config.yml flags or override flags active during this
+delivery; usually empty>
+
+## Justified Regressions
+
+<expand the justified_regressions list; one paragraph per item
+explaining why it is acceptable to ship with the issue deferred>
 ```
 
-**Write 4 — CHANGELOG.md**: `<target>/CHANGELOG.md`
+### Write 2 — CHANGELOG entry
 
-Format: REVERSE chronological order (newest delivery at top). If the file already exists,
-prepend the new entry — do not overwrite older entries.
+Prepend (do not overwrite) to `<artifact-root>/CHANGELOG.md`:
 
 ```markdown
-# CHANGELOG
+## <YYYY-MM-DD> Delivery <D> — round <N>
 
-## Delivery <D> — <ISO-date>
+<one-sentence change summary>
 
-- **Verdict**: converged after <rounds_to_convergence> rounds
-- **Git SHA**: `<sha>`
-- **Changes**: <change_summary>
-- **Leaves affected**: <comma-separated list>
-
-## Delivery <D-1> — ...
-[existing entries preserved verbatim below]
+- Total issues this delivery: <total_issues>
+- Justified regressions: <count> (see `.review/versions/<N>.md`)
+- Rounds to convergence: <rounds_to_convergence>
 ```
 
-**Write 5 — Metrics README**: `<target>/.review/metrics/README.md`
+### Write 3 — Leaf index update (conditional)
 
-Append one trend row to the cumulative stats table (create the file + header if it does not
-exist):
+If `<artifact-root>/README.md` carries a "Revisions" or "Changelog"
+section, append a one-line entry pointing to this delivery's version
+summary. Otherwise no Write 3.
 
-```markdown
-| Delivery | Rounds | Coverage% | Open | Critical | Error | Regressed | Writer Fails |
-|----------|--------|-----------|------|----------|-------|-----------|-------------|
-| <D>      | <N>    | 100       | 0    | 0        | 0     | 0         | 0           |
-```
+---
 
-**Step — Commit-delivery script call**: after all Writes complete, call:
-
-```bash
-../scripts/commit-delivery.sh <target> <delivery-id> <change-summary-slug>
-```
-
-Where `<skill-root>` is the absolute path to the skill-forge plugin directory (from
-`state.yml` (skill root resolves to `..` from `.review/`)). This script creates an annotated git tag and commits the
-delivery state.
-
-### ACK Format
+## ACK contract
 
 ```
-OK trace_id=R3-S-001 role=summarizer linked_issues=[]
+OK trace_id=R5-S-001 role=summarizer linked_issues=
 ```
 
-- `linked_issues` is always empty for the summarizer (it does not file issues).
-- Return this ACK as the **single and final line** of the Task return. Nothing after it.
-
-### Task Return Hygiene (MUST enforce before returning)
-
-Before emitting your Task return, **re-read the message you are about to send**. The ENTIRE
-Task return MUST be EXACTLY ONE LINE of the form:
+For Phase 1, `linked_issues` is empty. For Phase 2, optionally list any
+issue ids appearing in `justified_regressions`.
 
 ```
-OK trace_id=R3-S-001 role=<role> linked_issues=<comma-separated or empty>[ self_review_status=<FULL_PASS|PARTIAL> fail_count=<N>]
+FAIL trace_id=R5-S-001 reason=<one-line technical reason>
 ```
 
-or
+Use FAIL only for missing input frontmatter (issue files unparseable,
+state.yml missing). If counts are zero on a round (no issues filed),
+Phase 1 still produces a valid index with all counts at 0.
 
-```
-FAIL trace_id=R3-S-001 reason=<one-line-reason>
-```
+---
 
-**Any of the following pollutes orchestrator context and violates the IPC contract:**
+## IPC contract (shared)
 
-- A summary paragraph of what you did — FORBIDDEN
-- A bulleted list of changes — FORBIDDEN
-- Markdown headers / code fences wrapping the ACK — FORBIDDEN
-- A preface like "All deliverables complete." or "Both files written." before the ACK — FORBIDDEN
-- An explanation, rationale, or reasoning trace after the ACK — FORBIDDEN
-- A closing remark / sign-off of any kind — FORBIDDEN
+| Role | Write count | Final paths |
+|------|-------------|-------------|
+| `summarizer` (Phase 1) | 1 write | `<artifact-root>/.review/round-<N>/index.md` |
+| `summarizer` (Phase 2) | 2–3 writes | `<artifact-root>/.review/versions/<N>.md`, CHANGELOG.md, optionally README.md |
 
-Your deliverables are the files you wrote via the Write tool. Those files are the proof of
-completion; orchestrator reads them. The Task return is a single ACK line for dispatch-log
-bookkeeping — nothing more.
+**Forbidden**:
 
-**Self-check**: before you send your final message, ask yourself "if I stripped every line
-except the ACK, would the orchestrator have everything it needs?" If yes → send only the ACK.
-If you feel you need to explain something, write it to `.review/round-N/notes/<trace_id>.md`
-and move on — the Task return stays ACK-only regardless.
+- Reading issue bodies or artifact leaves.
+- Re-deriving counts from raw issue file scans when the in-frontmatter
+  count is what the judge will trust — count from frontmatter only.
+- Writing prose narrative into the verdict.yml's `notes` field; that is
+  the judge's role.
