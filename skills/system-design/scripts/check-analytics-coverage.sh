@@ -96,8 +96,7 @@ README="${DESIGN_DIR}/README.md"
 
 if [ ! -f "$README" ]; then
   printf 'SKIP: README.md not found in: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
-  echo "[]"
-  exit 0
+  _finalize ""
 fi
 
 # ---------------------------------------------------------------------------
