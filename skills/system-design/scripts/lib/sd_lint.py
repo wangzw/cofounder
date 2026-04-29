@@ -14,7 +14,7 @@ Usage from a check-*.sh script:
 
     findings = []
     findings.append(Finding(
-        criterion_id="CR-PP01",
+        criterion_id="CR-SD01",
         file="README.md",
         severity="error",
         description="...",

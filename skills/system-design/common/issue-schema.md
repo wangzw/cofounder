@@ -119,11 +119,11 @@ on stdout. `create-issues.sh` reads this and writes the issue files to disk.
   "trace_id": "R3-V-001",
   "issues": [
     {
-      "criterion_id": "CR-PP01",
-      "file": "features/F-001-checkout.md",
+      "criterion_id": "CR-SD06",
+      "file": "modules/M-001-orders.md",
       "severity": "error",
-      "description": "missing '## Acceptance Criteria' section",
-      "suggested_fix": "add '## Acceptance Criteria' with at least one BDD entry",
+      "description": "missing '## Interface' section",
+      "suggested_fix": "add '## Interface' with at least one type definition",
       "recurrence_of": "I-012"
     }
   ]
@@ -153,19 +153,19 @@ issues:
   - id: I-042
     state: deferred
     defer_until: delivery-2
-    criterion_id: CR-PP01
-    file: features/F-001-checkout.md
-    summary: "missing acceptance criteria section"
+    criterion_id: CR-SD06
+    file: modules/M-001-orders.md
+    summary: "missing interface section"
     history:
       - {round: 3, action: created}
       - {round: 4, action: deferred, reason: scope-overflow}
   - id: I-073
     state: fixed
     fixed_in_round: 5
-    criterion_id: CR-PP15
-    file: features/F-002-cart.md
-    summary: "BDD format violation in AC #2"
-    fix_summary: "rewrote AC#2 as Given/When/Then"
+    criterion_id: CR-SD08
+    file: modules/M-002-payments.md
+    summary: "Deps section lists module not in Protocols"
+    fix_summary: "added missing protocol entry for M-005"
     history: [...]
 ```
 
