@@ -46,17 +46,18 @@ Evaluate in priority order — first hard condition wins.
 
 ALL conditions must hold:
 
-- `new_count` == 0 (no issue still in `state: new`)
-- `critical_count` == 0
-- `error_count` == 0
+- `new_count` == 0 (no issue still in `state: new` — the gate that
+  previously checked `critical_count == 0` and `error_count == 0` is
+  redundant: any unresolved critical/error issue would be in
+  `state: new` and caught here. Severity counts in `index.md` are
+  over **all states** including `fixed`, so they don't block
+  convergence after issues are resolved.)
 - `recurrence_count` == 0 in this round (no `fixed`-then-recurred issues)
 - formal review passed in this round (orchestrator-side; the very fact you were dispatched means it did)
-
-If `deferred_count` > 0, `converged` is still permitted **only if**
-every deferred issue with `severity ∈ {critical, error}` has a
-`defer_until: never` and a `defer_reason` (justified regression). The
-summarizer should have rolled this into `justified_regressions_ok`
-boolean in index.md frontmatter; trust it.
+- `justified_regressions_ok` == true (i.e. every deferred issue with
+  `severity ∈ {critical, error}` has `defer_until: never` and a
+  non-empty `defer_reason`; the summarizer rolls this into the
+  `index.md` frontmatter boolean — trust it).
 
 ### `oscillating` (checked before `progressing`)
 
