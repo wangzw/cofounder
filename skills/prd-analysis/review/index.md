@@ -1,129 +1,192 @@
 # Review Mode — Orchestration
 
-This file is loaded by the orchestrator when mode = `--review`. It defines the review loop the
-orchestrator follows for the current round N. It is **not** a sub-agent prompt and does not carry
+Loaded by the orchestrator when `--review` is invoked. Defines the review
+loop the orchestrator follows for round N. Implements
+[~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md):
+
+- §5 — convergence is `formal_PASS ∧ substantive_PASS`. Formal failure
+  short-circuits LLM dispatch (no point reviewing content of a malformed
+  artifact).
+- §7 — review-revise iteration with phase gates around `state: new` issues.
+- §10 — review artifacts are themselves artifacts and pass formal checks.
+
+This file is **orchestration**, not a sub-agent prompt. It does not carry
 the Snippet D fingerprint.
 
 ---
 
 ## Review Loop — Step by Step
 
-### Step 1 — Phase A + B Script Checks
+### Step 1 — Phase Gate: review readiness
 
 ```bash
-scripts/run-checkers.sh <target>/ round-<N>
+scripts/check-review-readiness.sh <prd-dir>
 ```
 
-- **Phase A**: manifest validation + depgraph consistency + skip-set computation for round N.
-  Outputs `<target>/.review/round-<N>/skip-set.yml` (lists `cross_reviewer_focus` and
-  `cross_reviewer_skip` leaves) and manifest/depgraph issue files.
-- **Phase B**: runs all script-type checkers (every entry with `checker_type: script` in `common/review-criteria.md`) against the target tree;
-  aggregates all script-detected issues to
-  `<target>/.review/round-<N>/issues/round-checker-output.json`.
+Exit 0 → continue. Exit 1 → at least one prior-round issue is still in
+`state: new`; refuse to enter review and surface to user that the previous
+revise pass left work unfinished. Exit 2 → script error; HITL.
 
-**Exit 1 with critical or error issues** → skip Steps 2–4; jump directly to Revise Phase
-(load `revise/index.md`). Do not dispatch cross-reviewer until script-type errors are resolved.
+This gate enforces guide §7.3: "上一轮 revise 没做完就要进下一轮 review,
+禁止."
 
-**Exit 0 OR only warnings** → continue to Step 2.
-
-### Step 2 — Forced-Full Override Check
-
-If `--review` was user-triggered (not part of an in-generate loop):
-
-- Apply **forced-full cross-review** (guide §8.6): ignore `cross_reviewer_skip` entries for the
-  **first** cross-reviewer dispatch of this delivery. Set a flag in `state.yml`:
-  `forced_full_cross_review: true`.
-- Subsequent rounds within the same delivery use the skip-set normally.
-
-### Step 3 — Cross-Reviewer Dispatch
-
-**Pre-dispatch drift short-circuit** (Tier-3 cost optimization):
-
-Before launching any LLM, run:
+### Step 2 — Formal Hard Gate
 
 ```bash
-scripts/check-drift.sh <target>/
+scripts/run-checkers.sh <prd-dir>
 ```
 
-Exit 0 means the target tree is byte-identical (modulo `.review/`) to the latest
-HEAD-reachable `delivery-*` tag that touches this skill. In that case the
-orchestrator MUST synthesize a `verdict: no-drift-converged, next_action: none`
-and skip Steps 3–6 entirely. This saves the full LLM cycle (~$50+ at opus rates)
-on re-runs of `--review` over an unchanged delivered skill. Exit 1 / 2 means drift
-detected or no prior delivery — proceed with normal dispatch below.
+Aggregates `check-prd-formal.sh` (PRD-shape) and `check-issue-schema.sh`
+(audit self-closure).
 
-**Empty-round short-circuit** (Tier-2 cost optimization):
+| Exit | Meaning | Next |
+|------|---------|------|
+| 0    | All formal checks pass | continue to Step 3 (LLM substantive dispatch) |
+| 1    | Issues found (worst severity ≥ error) | **short-circuit**: jump to revise loop with the formal-issues JSON; do NOT dispatch any LLM reviewer (guide §5, §6) |
+| 1    | Issues found (only warnings) | continue, but persist warnings into round-N issues so substantive reviewer sees them |
+| 2    | Script error | HITL — script bug, do not modify the artifact (guide §9.1) |
 
-After `run-checkers` Phase A, if `skip-set.yml.cross_reviewer_focus == []` AND
-the new `carry-forward` records for this round are also empty, there is nothing
-for cross-reviewer to audit. Orchestrator MUST skip Steps 3–4 and proceed
-directly to Step 5; summarizer will aggregate the (empty current-round +
-carried-forward prior) issue set, and judge will rule based on the aggregate
-`open_issues` count (non-zero iff prior rounds still have open findings).
+Per guide §6: a formal problem caught here costs zero LLM tokens and
+saves an entire LLM round. Substantive review on a structurally broken
+artifact would waste tokens reviewing content that may be removed during
+the formal fix anyway.
 
-**Normal dispatch** (drift detected + non-empty focus):
+When Step 2 short-circuits, the orchestrator pipes its JSON output into
+`scripts/create-issues.sh <prd-dir> <round>` to materialize per-issue
+files, then loads `revise/index.md` and starts revise from Step 1.
 
-- **Dispatches**: `review/cross-reviewer-subagent.md`
-- **Sub-agent inputs**: leaves listed in `skip-set.yml cross_reviewer_focus`, previous-round issue
-  frontmatter from `round-<N-1>/issues/`, writer self-review files at
-  `<target>/.review/round-<N>/self-reviews/`, and `common/review-criteria.md`
-  (every entry with `checker_type: llm`).
-- **Sub-agent outputs**: one issue file per issue found at
-  `<target>/.review/round-<N>/issues/<issue-id>.md`.
-- **Orchestrator action on ACK**: record `trace_id` in `state.yml`. If ACK is `FAIL` → apply §16
-  retry policy.
+### Step 3 — Cross-Reviewer Dispatch (substantive only)
 
-### Step 4 — Adversarial-Reviewer Dispatch (Conditional)
+Pre-conditions: Step 2 exit 0 (formal PASS) **and** there is meaningful
+work for the reviewer (artifact changed since last delivery, or prior-round
+issues are still open).
 
-**Condition**: check `config.yml adversarial_review.triggered_by`. Fire ADDITIONALLY to
-cross-reviewer if any cross-reviewer issue from Step 3 meets or exceeds the configured trigger
-severity (default: `critical`).
+```
+Dispatch: review/cross-reviewer-subagent.md
+```
 
-- **Dispatches**: `review/adversarial-reviewer-subagent.md`
-- **Sub-agent inputs**: same as cross-reviewer, plus the in-generate writer self-review files.
-- **Sub-agent outputs**: issue files with `source: adversarial-reviewer` at
-  `<target>/.review/round-<N>/issues/<issue-id>.md`.
-- **Orchestrator action on ACK**: record `trace_id` in `state.yml`.
+**Sub-agent inputs**:
 
-### Step 5 — Summarizer Dispatch
+- The PRD bundle leaves
+- Writer self-review files at `<prd-dir>/.review/round-<N>/self-reviews/` (if any)
+- `<prd-dir>/.review/issues/summary.yml` — for fingerprint matching against
+  prior issues (guide §7.6). The reviewer MUST check each new finding
+  against this list before emitting it; matched findings get
+  `recurrence_of: <prior-id>` in the output.
+- `common/review-criteria.md` — every entry whose `checker_type: llm`
 
-- **Dispatches**: `shared/summarizer-subagent.md` (per-round phase)
-- **Sub-agent outputs**: `<target>/.review/round-<N>/index.md` (issue aggregations, coverage
-  percent, skip-set utilization); updates any leaf-index pages (e.g.
-  `<target>/common/index.md`).
-- **Orchestrator action on ACK**: proceed to Step 6.
+**Sub-agent output (stdout)**: one JSON document per the LLM raw-output
+schema in `common/issue-schema.md`. The reviewer NEVER writes issue files
+directly (guide §7.1).
 
-### Step 6 — Judge Dispatch
+**Orchestrator action on ACK**:
 
-- **Dispatches**: `shared/judge-subagent.md`
-- **Sub-agent outputs**: `<target>/.review/round-<N>/verdict.yml`
-- **Orchestrator action on ACK**: read verdict (see routing below).
+```bash
+scripts/create-issues.sh <prd-dir> <round> < <sub-agent-stdout>
+```
 
-### Step 7 — Verdict Routing
+Materializes one issue file per finding. If `create-issues.sh` exits 1,
+the reviewer's output violated the schema — surface to user with the
+specific schema error, do NOT silently drop findings.
 
-| Verdict | Next Action |
-|---------|------------|
-| `converged` | Delivery phase: run `scripts/commit-delivery.sh <target> <delivery-id> <slug>`, summarizer writes `<target>/CHANGELOG.md` + `.review/versions/<N>.md`, skill-forge exits cleanly |
-| `progressing` | Revise phase: load `revise/index.md`, increment round |
-| `oscillating` | HITL gate: surface to user with oscillating-issue list; wait for `/continue`, `/override`, or `/abort` |
-| `diverging` | HITL gate: surface to user with regression report; same options |
-| `stalled` | HITL gate: report stall (max iterations reached without convergence); same options |
+### Step 4 — Adversarial-Reviewer Dispatch (conditional)
 
----
+Fire only if cross-reviewer's output contained at least one
+`severity: critical` finding (configurable via `config.yml
+adversarial_review.triggered_by`).
 
-## References
+```
+Dispatch: review/adversarial-reviewer-subagent.md
+```
 
-- **Snippet C** (orchestrator dispatch contract): `common/snippets.md` — defines `trace_id`
-  format, `launched`/`completed` event schema, and the orchestrator FORBIDDEN list.
-- **config.yml fields used here**: `adversarial_review.triggered_by`,
-  `convergence.max_iterations`, `regression_gate.diverging_threshold`.
-- **Skip-set semantics**: guide §8.5 — `cross_reviewer_focus` = leaves reviewer MUST read;
-  `cross_reviewer_skip` = leaves reviewer MUST NOT read (unchanged and not implicated by open
-  issues). Forced-full override clears the skip list for one dispatch (guide §8.6).
+Same input contract as cross-reviewer; same output → `create-issues.sh`
+pipeline.
+
+### Step 5 — Update Summary
+
+```bash
+scripts/update-summary.sh <prd-dir>
+```
+
+Refreshes `<prd-dir>/.review/issues/summary.yml` so the next round's
+fingerprint matching sees this round's issues. Per guide §7.5, this is
+where recurrence detection happens for the next iteration.
+
+### Step 6 — Summarizer Dispatch
+
+```
+Dispatch: shared/summarizer-subagent.md (per-round phase)
+```
+
+Sub-agent writes `<prd-dir>/.review/round-<N>/index.md` with issue counts
+(by state and severity), `false_positive_ratio`, `deferred_ratio`, and
+recurrence statistics (guide §7.7).
+
+### Step 7 — Judge Dispatch
+
+```
+Dispatch: shared/judge-subagent.md
+```
+
+Sub-agent writes `<prd-dir>/.review/round-<N>/verdict.yml`.
+
+The verdict is computed against the rule from guide §5:
+
+```
+converged ⟺ formal_PASS ∧ substantive_PASS
+formal_PASS    : Step 2 exited 0 in this round
+substantive_PASS: 0 issues with severity ∈ {error, critical} and state ∈ {new}
+```
+
+Verdicts other than `converged` mean further work; specifically the judge
+considers:
+
+- `progressing`  — issues exist but were refined this round (count or
+  severity decreased vs prior round)
+- `oscillating`  — the same issues keep returning between fixed and new
+  (guide §7.5.1 recurrence count ≥ 2 on the same issue id)
+- `diverging`    — error/critical count rose vs prior round
+- `stalled`      — `max_iterations` reached without convergence
+
+### Step 8 — Verdict Routing
+
+| Verdict        | Next Action |
+|----------------|-------------|
+| `converged`    | Delivery: `scripts/commit-delivery.sh`; summarizer writes CHANGELOG + `.review/versions/<N>.md`; orchestrator exits cleanly |
+| `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
+| `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
+| `diverging`    | HITL gate: surface regression report; same options |
+| `stalled`      | HITL gate: report stall; same options |
 
 ---
 
 ## Files in This Directory
 
-- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — Cross-reviewer sub-agent prompt (all LLM-type criteria — `checker_type: llm` in `common/review-criteria.md`)
-- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) — Adversarial-reviewer sub-agent prompt (skill-forge–specific attack angles)
+- [cross-reviewer-subagent.md](cross-reviewer-subagent.md) — substantive
+  reviewer (every `checker_type: llm` criterion)
+- [adversarial-reviewer-subagent.md](adversarial-reviewer-subagent.md) —
+  adversarial substantive reviewer (conditional, on critical findings)
+
+---
+
+## What Changed vs the Prior Design
+
+The prior orchestration mixed three things into one pipeline: (a) Phase
+A manifest + depgraph + skip-set machinery inherited from skill-forge,
+(b) drift short-circuit, and (c) the actual review loop. Per the audit
+guide, formal review and substantive review have asymmetric roles in
+convergence (§5) — formal is a necessary gate, substantive is the
+sufficient condition. Treating them as one continuous pipeline made the
+formal gate too easy to skip. The new design enforces:
+
+1. Formal hard gate **before** any LLM dispatch (§5, §6).
+2. Issues are created by **script** from the reviewer's JSON output, not
+   hand-written by the reviewer (§7.1, §10 self-closure).
+3. Cross-round recurrence detection lives in `summary.yml` and is read
+   by the reviewer on every dispatch (§7.6).
+4. Phase gates around `state: new` issues prevent skipping a revise pass
+   (§7.3).
+
+Skill-forge-specific machinery (Phase A skip-set, scaffolder version
+drift, force-full override) is removed — those were features of a
+generator-driven skill, not the review-revise loop.

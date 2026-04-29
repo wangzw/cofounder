@@ -1,8 +1,17 @@
 # Revise Mode — Orchestration
 
-This file is loaded by the orchestrator when mode = `--revise` (or after a review phase that
-produced critical/error issues). It defines the revise loop the orchestrator follows. It is
-**not** a sub-agent prompt and does not carry the Snippet D fingerprint.
+Loaded by the orchestrator when `--revise` is invoked, or when review-mode
+Step 2 short-circuits with formal failures. Defines the revise loop. Per
+[~/Documents/mind/raw/guide/生成式skill的审查设计.md](../../../../Documents/mind/raw/guide/生成式skill的审查设计.md):
+
+- §7.2 — issue state machine: `new` → {fixed | false-positive | deferred | superseded}
+- §7.3 — `check-revise-completeness.sh` is the exit gate
+- §7.4 — revise can run repeatedly within the same round until the gate
+  passes
+- §7.5 — recurrence handling per state
+- §7.7 — quality-at-delivery ratio signals
+
+This file is **orchestration**, not a sub-agent prompt.
 
 ---
 
@@ -10,102 +19,144 @@ produced critical/error issues). It defines the revise loop the orchestrator fol
 
 ### Step 1 — Build Issue-Group Manifest (script)
 
-The orchestrator delegates issue grouping to a deterministic grouping script — no LLM-tier
-analysis permitted here (§5.1 pure-dispatch). The grouping script reads
-`<target>/.review/round-<N>/issues/` (frontmatter only), filters to open statuses
-(`new`, `persistent`, `regressed`), skips skeleton-owned paths, and emits a YAML manifest at:
+The orchestrator reads `<prd-dir>/.review/round-<N>/issues/*.md` and groups
+them by `file:` field. Issues whose `state` is already in
+{fixed, false-positive, deferred, superseded} are skipped — only `state: new`
+needs work.
 
-```
-<target>/.review/round-<N>/revise-plan.yml
-```
-
-Manifest format:
+The grouping logic is mechanical (frontmatter-only inspection); the
+orchestrator does it inline rather than via a separate script. Output is
+held in `state.yml` as:
 
 ```yaml
-groups:
-  - leaf: generate/writer-subagent.md
-    issues: [R6-V001-001, R6-V001-005]
-  - leaf: review/cross-reviewer-subagent.md
-    issues: [R6-V002-002]
-skeleton_skipped:
-  - leaf: scripts/metrics-aggregate.sh
-    issues: [R6-V003-001]
-    meta_issue: R6-META-001
+revise_groups:
+  - leaf: features/F-001-checkout.md
+    issues: [I-007, I-012]
+  - leaf: features/F-002-cart.md
+    issues: [I-008]
+  - leaf: ""    # repo-wide issues
+    issues: [I-014]
 ```
 
-For any skeleton-owned path the script finds, it writes a meta-issue with
-`criterion_id: CR-META-skeleton-protected` into `round-<N>/issues/` and records it under
-`skeleton_skipped` in the manifest. The orchestrator does **not** evaluate skeleton ownership —
-the script handles it fully.
-
-The orchestrator reads `revise-plan.yml` **verbatim** after the script exits. It does not
-re-interpret, filter, or reorder the groups — the manifest is the dispatch plan.
-
-> **Infrastructure note**: the grouping script is a required infrastructure component. If it is
-> not yet present in `scripts/`, this step cannot execute and must be escalated as a HITL
-> blocker. The orchestrator MUST NOT fall back to inline grouping (§5.1 pure-dispatch forbids
-> the orchestrator from filtering issues by status or grouping by file field).
+If no `state: new` issues remain, jump directly to Step 5.
 
 ### Step 2 — Fan-out Per-Issue-Reviser (parallel)
 
-Fan-out one `per-issue-reviser-subagent.md` per `groups` entry in `revise-plan.yml`. All
-dispatches are parallel (guide §14.1 — each reviser is scoped to one leaf and reads
-resolved-issues history as negative constraints, so they do not conflict).
+For each entry in `revise_groups`, dispatch one
+`revise/per-issue-reviser-subagent.md` with:
 
-- **Dispatches**: `revise/per-issue-reviser-subagent.md` (N instances, one per group in manifest)
-- **Inputs consumed by each sub-agent**:
-  - All open issue files for that leaf group (issue IDs taken verbatim from manifest)
-  - The current content of the target leaf
-  - Resolved-issues history injected up to `config.yml regression_gate.max_injected_resolved`
-    (default: 20) — regression-protection rail
-- **Outputs written by each sub-agent**: the revised artifact leaf at `<target>/<leaf-path>`
-- **Orchestrator action on all ACKs**: collect `linked_issues` from each ACK; update
-  `state.yml`; proceed to Step 3.
+- The leaf path
+- The full text of every issue in that group (from
+  `<prd-dir>/.review/round-<N>/issues/<id>.md`)
+- The current content of the leaf
+- `<prd-dir>/.review/issues/summary.yml` — for any `recurrence_of`
+  reference, the reviser reads `fix_history` to see how the prior
+  attempt(s) failed (guide §7.5.1)
 
-### Step 3 — Summarizer: Update Issue Status
+**Reviser is allowed to** edit the leaf, then transition each issue's
+`state:` field. Permitted state transitions (guide §7.2):
 
-- **Dispatches**: `shared/summarizer-subagent.md` (update-status phase)
-- The summarizer aggregates from `round-N/issues/*.md` frontmatter (status field on each issue)
-  and writes `round-N/index.md` with the issue-count summary. Status transitions
-  (new → resolved, resolved → regressed, etc.) are set by the cross-reviewer in the next review
-  round — NOT by summarizer. Summarizer does NOT read artifact leaves.
-- **Orchestrator action on ACK**: proceed to Step 4.
+| from | to | required metadata |
+|------|----|-------------------|
+| new | fixed | (verify formal pass; see Step 3) |
+| new | false-positive | `dismissed_reason` non-empty |
+| new | deferred | `defer_until` + `defer_reason` non-empty |
+| new | superseded | `superseded_by` referencing another issue id |
 
-### Step 4 — Judge: Evaluate New Round Verdict
+The reviser MUST NOT silently leave an issue at `state: new` while
+claiming to have addressed it. Any such issue is caught by the gate in
+Step 4.
 
-- **Dispatches**: `shared/judge-subagent.md`
-- **Outputs written by sub-agent**: `<target>/.review/round-<N>/verdict.yml` (overwrites
-  previous verdict for this round, or uses incremented round number if orchestrator bumps N).
-- **Orchestrator action on ACK**: read verdict and route:
+**Reviser is forbidden to** edit `history` or `fix_history`; those are
+maintained by `update-summary.sh` (Step 5).
 
-| Verdict | Next Action |
-|---------|------------|
-| `converged` | Delivery phase: summarizer writes CHANGELOG + version summary; `scripts/commit-delivery.sh` |
-| `progressing` | Increment round N; loop back to `review/index.md` Step 3 (cross-reviewer) |
-| `oscillating` | HITL gate: surface oscillating-issue list; wait for user decision |
-| `diverging` | HITL gate: surface regression report; wait for user decision |
-| `stalled` | HITL gate: report stall; wait for user decision |
+### Step 3 — Self-Verify Formal Pass (writer self-loop, no issues created)
+
+After each reviser finishes, the orchestrator re-runs
+
+```bash
+scripts/run-checkers.sh <prd-dir>
+```
+
+Per guide §4 + §4.1, formal failures discovered here are NOT filed as new
+issues — the reviser is dispatched again on the affected leaf with the
+formal-checker's JSON output and is expected to fix the structural problem
+in place. This loop continues until either:
+
+- formal pass (exit 0) — proceed to Step 4
+- 3 consecutive formal failures on the same leaf — escalate to HITL with
+  the leaf path and the failing CR-IDs (per guide §4.1 last paragraph,
+  this is the only time a self-audit failure becomes a real issue)
+
+### Step 4 — Phase Gate: revise completeness
+
+```bash
+scripts/check-revise-completeness.sh <prd-dir> <round-number>
+```
+
+Exit 0 → all issues this round have left `state: new`; proceed.
+Exit 1 → at least one issue still in `state: new`; loop back to Step 2 for
+the affected groups (guide §7.4 allows revise to repeat until the gate
+passes). After 3 such iterations, escalate to HITL.
+Exit 2 → script error; HITL.
+
+### Step 5 — Update Summary
+
+```bash
+scripts/update-summary.sh <prd-dir>
+```
+
+Refreshes `summary.yml` with the new issue states. Cross-reviewer in the
+next review round will read this for fingerprint matching.
+
+### Step 6 — Summarizer (update-state phase)
+
+Dispatch `shared/summarizer-subagent.md` to write the updated round-N
+index with state transitions and ratio signals (guide §7.7):
+
+- `false_positive_ratio` = (false-positive count) / (total this round)
+- `deferred_ratio` = (deferred count) / (total this round)
+- `regression_count` = issues whose state went `fixed` → `new` between
+  rounds (caught via `recurrence_count`)
+
+Default thresholds (overridable in `config.yml`):
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| `false_positive_ratio` | > 0.5 | warn — reviewer prompt or criteria likely off |
+| `deferred_ratio` | > 0.7 | warn — writer is deferring instead of fixing |
+| critical/error issue with `defer_until: never` | any | error — must be in `versions/<N>.md.justified_regressions` |
+
+These are quality-at-delivery signals. The judge consumes them in Step 7.
+
+### Step 7 — Judge Dispatch
+
+Dispatch `shared/judge-subagent.md`. Verdict considers:
+
+- The Step 5 summary (issue counts, severities, state distribution)
+- Ratio signals from Step 6
+- Recurrence counts for any `recurrence_of` matches
+
+Verdict routing is identical to review/index.md Step 8.
 
 ---
 
 ## Notes
 
-- The orchestrator MUST NOT read the revised artifact leaf content — route on ACK fields and
-  verdict only (§5.1 pure-dispatch principle).
-- The orchestrator MUST NOT evaluate issue status, group issues, or decide fan-out shape — all
-  of this is delegated to the grouping script. The orchestrator only invokes the script and
-  consumes its YAML output verbatim (§5.1 pure-dispatch principle).
-- Round numbers are monotonically increasing. If the revise pass produces a clean round, the
-  next review pass increments N before dispatching the cross-reviewer.
-- Skeleton-protected files are never revised by the reviser. The grouping script handles
-  skeleton detection and meta-issue creation automatically. If a checker fires on a skeleton
-  file, this indicates a skeleton defect — the script surfaces it under `skeleton_skipped`
-  in the manifest so the orchestrator can escalate as a HITL issue.
-- Reference `common/snippets.md` Snippet C (orchestrator dispatch contract) for `trace_id`
-  format and `launched`/`completed` event schema.
+- The orchestrator does NOT read leaf content — it routes on ACKs and
+  scripts only (orchestrator dispatch contract).
+- Round numbers are monotonic. If Step 4 passes, the round closes; the
+  next review pass increments N.
+- Skeleton-protected files: removed concept. With `skill-forge` deleted,
+  the artifact is the PRD bundle which has no skeleton. Every leaf is
+  authored.
 
 ---
 
 ## Files in This Directory
 
-- [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) — Per-issue reviser sub-agent prompt (one dispatch per target leaf)
+- [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) —
+  per-leaf reviser sub-agent prompt
+- [revise-mode.md](revise-mode.md) — separate concern: interactive PRD
+  change-management mode (e.g. add a feature to a delivered PRD); not
+  loaded by `--revise` review-revise loop.

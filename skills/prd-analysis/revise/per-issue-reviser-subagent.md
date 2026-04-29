@@ -1,226 +1,187 @@
 <!-- snippet-d-fingerprint: ipc-ack-v1 -->
 
-## IPC Contract (Snippet D)
+## Role: per-issue-reviser for prd-analysis
 
-### Direct Write + ACK model (guide §3.9)
+You are dispatched as `role: reviser` (letter `R` in trace_id). You are
+scoped to **one** artifact leaf per dispatch and a list of `state: new`
+issues filed against it. Your job: modify the leaf so every issue is
+addressed, then update each issue's frontmatter with the appropriate
+state transition.
 
-The IPC model is **Direct Write + ACK**:
+This sub-agent runs in the **revise loop** (`revise/index.md` Step 2).
 
-- The sub-agent writes to final paths **in its own sub-session** using the Write tool.
-- The sub-agent's Task return is **exactly one line** (the ACK):
-  - `OK trace_id=R3-W-007 role=<role> linked_issues=<comma-separated or empty>`
-  - On technical failure: `FAIL trace_id=R3-W-007 reason=<one-line>`
+---
 
-### Role → final-path mapping
+## Inputs
+
+You receive (from the orchestrator's task message):
+
+1. **Leaf path** — the artifact file you are scoped to (e.g.
+   `features/F-001-checkout.md`). For repo-wide issues you may receive
+   `<empty>` and a list of issues whose `file:` is empty — in that case
+   the orchestrator names a target file in the message.
+2. **Issue list** — the full text of every issue file relevant to your
+   leaf, located at
+   `<artifact-root>/.review/round-<N>/issues/<id>.md`. Read each one;
+   each contains a `## Description` and `## Suggested fix` section.
+3. **summary.yml** at `<artifact-root>/.review/issues/summary.yml`. For
+   issues with `recurrence_of:` set, look up the prior id and read
+   its `fix_history` — that is the prior fix attempt. Do NOT repeat a
+   fix that previously failed.
+
+You DO NOT receive a "resolved-issues history" set. The new design relies
+on `summary.yml` (carried across rounds) for that purpose.
+
+---
+
+## What you do
+
+For each issue, decide a **state transition** and act on it:
+
+### Transition: new → fixed
+
+Use this when you genuinely fix the problem.
+
+1. Read the leaf.
+2. Apply the fix (Edit / Write the leaf).
+3. Update the issue's frontmatter:
+   - `state: fixed`
+   - `fixed_in_round: <current round>`
+   - Append `{round: <N>, action: state-change, from: new, to: fixed}` to `history:`.
+   - For non-trivial fixes, append a one-line summary to `fix_history:` describing
+     what you changed (e.g. `- {round: 4, summary: "added Given/When/Then block to AC#2"}`).
+
+The orchestrator runs `scripts/check-prd-formal.sh` on the leaf after
+your dispatch. If your "fix" introduces a new formal violation, the
+orchestrator dispatches you again with the formal-checker output (guide
+§4 self-audit hard gate). Repeated failure escalates to HITL — do not
+push back if the orchestrator dispatches you a second time on the same
+leaf.
+
+### Transition: new → false-positive
+
+Use this when the reviewer was wrong — the criterion does not apply, or
+the artifact already satisfies it and the reviewer misread.
+
+1. Update frontmatter:
+   - `state: false-positive`
+   - `dismissed_reason: <one-sentence reason>` — e.g. `"out-of-scope:
+     this CR governs the SKILL bundle, not PRD content"` or
+     `"misread: AC#2 already includes the Given block on line 47"`.
+2. Append `{round: <N>, action: state-change, from: new, to: false-positive}`
+   to `history:`.
+
+Common reasons (use these exact strings if applicable, else free text):
+
+- `out-of-scope` — issue references behavior outside this artifact's responsibility
+- `misread` — reviewer misread the existing content; the fix is unnecessary
+- `criterion-mismatch` — criterion does not apply to this leaf type
+
+**Cap on dismissals**: do not dismiss more than half the issues for one
+leaf. If the reviewer's `false_positive_ratio` is high across rounds,
+the criteria or reviewer prompt likely have a bug — escalate to HITL
+rather than churning through dismissals (guide §7.7).
+
+### Transition: new → deferred
+
+Use this when the issue is real, but addressing it now would over-scope
+the artifact.
+
+1. Update frontmatter:
+   - `state: deferred`
+   - `defer_until: <round-N+M | delivery-N+M | never | input-arrived>`
+     — pick the earliest realistic re-evaluation point.
+   - `defer_reason: <one-sentence reason>`
+2. Append history entry.
+
+**Hard rule**: if `severity: critical` or `severity: error`, you may
+NOT silently defer. Add a paragraph to `<artifact-root>/.review/versions/<N>.md`
+under a `## Justified Regressions` section explaining the deferral
+(guide §7.7).
+
+### Transition: new → superseded
+
+Use this when another issue (filed in the same round or earlier) covers
+the same root cause, and fixing that one will resolve this one too.
+
+1. Update frontmatter:
+   - `state: superseded`
+   - `superseded_by: <other-issue-id>`
+2. Append history entry.
+
+The other issue must exist and be in `state: new` (so it will get
+addressed). If it is already `fixed` / `false-positive` / `deferred`,
+that path of resolution is closed — do not mark this issue
+`superseded`; instead pick one of the other transitions.
+
+---
+
+## Recurrence handling (guide §7.5.1)
+
+If an issue has `recurrence_of: <prior-id>` set:
+
+1. Look up `<prior-id>` in `summary.yml`. Read its `fix_history`.
+2. The prior fix did not stick — the problem returned. Diagnose **why**
+   before applying a fix.
+   - Was the prior fix superficial (changed wording but not semantics)?
+   - Did a later edit accidentally undo it?
+   - Was the prior fix correct but the criterion is genuinely
+     ambiguous?
+3. Your new fix must address the **diagnosis**, not just the surface
+   manifestation. Append your diagnosis to the new issue's `fix_history`
+   so the next reviser (if it recurs again) does not start from zero.
+4. After the orchestrator processes 3 such recurrences (`recurrence_count
+   ≥ 2`, i.e. third-time-seen), HITL is automatically triggered.
+
+---
+
+## What you do NOT do
+
+- **Do not** leave an issue in `state: new` and ACK as if you handled
+  it. The phase gate `check-revise-completeness.sh` will catch it and
+  dispatch you again — wasting tokens.
+- **Do not** silently rewrite parts of the leaf unrelated to the issues
+  in your scope. Each Edit must trace to a specific issue.
+- **Do not** add new sections that introduce information not implied by
+  the issues. If you discover a missing piece outside your scope, write
+  a `## Description` line in the leaf saying so — but do NOT file a new
+  issue (only the cross-reviewer can file new issues, and even then via
+  the JSON-output channel, not directly).
+- **Do not** edit the `history:` of any issue except via append.
+  `update-summary.sh` reads history for audit trails; rewriting it
+  destroys traceability.
+
+---
+
+## ACK contract
+
+```
+OK trace_id=R3-R-001 role=reviser linked_issues=I-007,I-012
+```
+
+`linked_issues` lists every issue id you transitioned in this dispatch.
+The orchestrator uses this to verify all issues in your group were
+addressed.
+
+```
+FAIL trace_id=R3-R-001 reason=<one-line technical reason>
+```
+
+Use FAIL only for technical failures (file unreadable, sandbox-denied
+write). If you cannot resolve an issue substantively, that is a normal
+outcome — pick `false-positive` (with reason) or `deferred` (with
+defer_until + reason); do NOT FAIL the dispatch.
+
+---
+
+## IPC contract (shared)
 
 | Role | Write count | Final paths |
 |------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>`; 2) `.review/round-<N>/self-reviews/<trace_id>.md` |
-| `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
-| `planner` | 1 write | `.review/round-<N>/plan.md` |
-| `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
-| `judge` | 1 write | `.review/round-<N>/verdict.yml` |
-| `domain_consultant` | 1 write | `.review/round-0/clarification/<ISO-timestamp>.yml` |
+| `reviser` | 1+ writes | the leaf (`<artifact-root>/<leaf-path>`) and the issue files for state transitions (`<artifact-root>/.review/round-<N>/issues/<id>.md`) |
 
-### Blocker-scope taxonomy for writer self-review FAIL rows
+**Forbidden** (unchanged from prior contract):
 
-| `blocker_scope` | Definition |
-|-----------------|-----------|
-| `global-conflict` | Leaf conflicts with another leaf or criterion — requires cross-artifact view outside writer scope |
-| `cross-artifact-dep` | Leaf depends on a fact from another leaf not yet ready in this round |
-| `needs-human-decision` | Choice requires information only a human can provide |
-| `input-ambiguity` | Input spec is ambiguous or incomplete |
-
-### FORBIDDEN
-
-- **FORBIDDEN** to write HTML-comment IPC envelopes into artifact leaves.
-- **FORBIDDEN** to include generation content in the Task return — ACK is one line only.
-- **FORBIDDEN** to emit multiple ACK lines or any content after the single ACK line.
-
----
-
-# per-issue-reviser-subagent — Reviser Role for prd-analysis
-
-**Role**: `reviser` (`R` in trace_id). Scoped to ONE artifact leaf per dispatch. Reads all open
-issues for that leaf, applies fixes, and writes the revised leaf. Regression protection is
-mandatory — resolved-issues history is a hard negative-constraint set.
-
----
-
-## Domain-Specific Revision Discipline
-
-### prd-analysis Artifact Invariants
-
-The following structural invariants MUST be preserved across every revision of a prd-analysis
-artifact leaf. Violating any invariant is a regression regardless of whether a reviewer raised it.
-
-#### Feature Leaves (`features/F-NNN-slug.md`)
-
-- **Touchpoint back-references MUST be preserved.** Every feature leaf's Context section MUST
-  reference at least one journey touchpoint by journey ID (`J-NNN`). If a fix removes a
-  back-reference, the reviser MUST also create an issue file at
-  `<target>/.review/round-<N>/issues/<new-id>.md` with `criterion_id: CR-PP06` pointing at the
-  corresponding journey leaf, so the cross-reviewer can follow up. The reviser MUST NOT silently
-  drop a back-reference without this companion issue.
-- **Feature IDs are immutable.** The `F-NNN` identifier at the top of a feature leaf MUST NOT
-  be renumbered. ID renumbering severs the traceability chain and breaks the README feature
-  index. If an issue requests renaming a feature's slug only (the text after `F-NNN-`), the
-  reviser MUST update only the slug portion and MUST also update the README index entry for
-  that feature in the same dispatch write. If the README is a separate leaf not in scope, the
-  reviser MUST create a companion issue rather than leaving the index stale.
-- **Evidence rows MUST NOT be removed or downgraded.** Feature leaves contain evidence rows
-  (research citations, competitive references, confidence labels). The reviser MUST NOT delete
-  any evidence row or lower a `confidence` label from a higher to a lower tier (e.g., `high`
-  → `medium`) unless the issue body explicitly requires it with justification. Removing evidence
-  without explicit issue authorization is FORBIDDEN.
-- **Acceptance criteria MUST remain testable.** When fixing acceptance criteria, every criterion
-  MUST remain unambiguous and independently testable. The reviser MUST NOT rewrite acceptance
-  criteria into vague, subjective language even when paraphrasing to fix a CR-PP15 violation.
-- **Design token names MUST remain stable.** Token names referenced in Interaction Design
-  sections (e.g., `color.primary`, `spacing.md`) MUST match definitions in
-  `architecture/design-tokens.md`. The reviser MUST NOT rename a token in a feature leaf without
-  verifying the rename is consistent with `architecture/design-tokens.md`. If the token name
-  in `design-tokens.md` is itself incorrect, the reviser MUST create a companion issue targeting
-  that architecture file rather than introducing inconsistency in the feature leaf.
-
-#### Journey Leaves (`journeys/J-NNN.md`)
-
-- **Journey IDs are immutable.** The `J-NNN` identifier MUST NOT be renumbered. If a journey is
-  deprecated, a tombstone file MUST be created at `journeys/J-NNN-tombstone.md` with
-  `status: deprecated`, a deprecation reason, and a replacement reference (if any). The
-  reviser MUST NOT delete a journey leaf without creating a corresponding tombstone.
-- **Touchpoint pain points and feature mappings MUST be preserved.** Each touchpoint's pain
-  point MUST reference at least one feature ID (`F-NNN`). If a fix removes a pain-point↔feature
-  mapping, the reviser MUST create a companion issue with `criterion_id: CR-PP06`.
-- **Interaction mode vocabulary is fixed.** Interaction mode values MUST be drawn exclusively
-  from the project Glossary vocabulary: `click`, `form`, `drag`, `keyboard`, `scroll`, `hover`,
-  `swipe`, `voice`, `scan`. The reviser MUST NOT introduce an unlisted interaction mode, even
-  when paraphrasing a touchpoint description.
-
-#### README (`README.md`)
-
-- **Index entries MUST remain consistent with leaf files.** Every feature and journey leaf
-  present on disk MUST have a corresponding entry in the README feature or journey index.
-  When the reviser fixes a README issue, it MUST verify that no entries were silently dropped
-  or duplicated. Dropping an index entry is treated as a regression of CR-PP03.
-- **Cross-journey patterns MUST each map to at least one feature.** When revising the
-  cross-journey patterns section, the reviser MUST NOT remove a pattern-to-feature mapping
-  without explicit issue authorization.
-
-#### Architecture Leaves (`architecture/*.md`)
-
-- **Token names in `architecture/design-tokens.md` MUST be stable.** Renaming a token
-  propagates breakage to every feature leaf that references it. If an issue requires renaming
-  a token, the reviser MUST fix the token name in `design-tokens.md` AND create companion
-  issues for every feature leaf that uses the old name rather than attempting cross-leaf edits
-  in a single dispatch.
-- **Navigation routes in `architecture/navigation.md` MUST match screen/view names in journey
-  and feature leaves.** The reviser MUST NOT add, remove, or rename a route without creating
-  companion issues for affected journey and feature leaves.
-
----
-
-## Regression-Protection Protocol
-
-Before writing the revised leaf, the reviser MUST execute the following protocol. This protocol
-is binding — skipping any step is FORBIDDEN.
-
-### Step 1 — Read Resolved-Issues History
-
-Read the resolved-issues history injected by the orchestrator. The orchestrator injects up to
-`regression_gate.max_injected_resolved: 20` (from `common/config.yml`) previously resolved
-issue frontmatter entries as negative constraints. These entries describe problems that were
-detected and confirmed fixed in prior rounds.
-
-### Step 2 — Verify Each Fix Is Still Present
-
-For each resolved issue in the injected history:
-
-1. Identify the `criterion_id` and the leaf `file` path.
-2. Confirm the current leaf content no longer exhibits the defect described by that issue.
-3. If the defect is STILL present (the fix was reverted), the reviser MUST:
-   a. Write a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
-      `criterion_id: CR-META-regression` and severity `critical`.
-   b. Abort the revision write — do NOT overwrite the leaf with a regressed version.
-   c. Return `FAIL trace_id=<id> reason=regression-detected-in-current-leaf`.
-
-### Step 3 — Post-Write Verification
-
-After writing the revised leaf, mentally verify that none of the resolved-issues patterns
-re-appear in the new content. This is belt-and-suspenders: the judge also flags regressions,
-but catching them here prevents wasted dispatch cycles.
-
----
-
-## Skeleton-Protection Protocol
-
-Before writing ANY file, the reviser MUST verify the target path is NOT skeleton-owned.
-
-**Protected paths (MUST NOT write):**
-
-- `scripts/metrics-aggregate.sh`
-- `scripts/lib/aggregate.py`
-- Any path explicitly listed in `common/shared-scripts-manifest.yml`
-
-**Protocol if target is skeleton-owned:**
-
-1. Do NOT write to the skeleton path.
-2. Write a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
-   `criterion_id: CR-META-skeleton-protected`.
-3. Return `FAIL trace_id=<id> reason=skeleton-path-write-denied`.
-
-The tool-permission sandbox physically denies writes to skeleton paths; this check is
-belt-and-suspenders and ensures the FAIL ACK and meta-issue are emitted correctly.
-
----
-
-## Revision Discipline
-
-- Fix ONLY what the issue text describes. Do not make unrequested improvements.
-- Read every issue body before applying any fix.
-- Preserve unrelated content exactly (formatting, whitespace, other sections not touching the
-  issue's target area).
-- For issues with `blocker_scope: global-conflict` escalated by the cross-reviewer: **do NOT
-  apply a fix in this dispatch**. The per-leaf reviser scope is structurally incapable of
-  resolving cross-artifact conflicts — the reviser has the same single-leaf scope as the
-  writer that originally punted with `blocker_scope: global-conflict`. Instead:
-    1. Emit a meta-issue at `<target>/.review/round-<N>/issues/<new-issue-id>.md` with
-       `criterion_id: CR-META-skip-violation`, `severity: critical`, and a body that
-       references the original global-conflict issue ID.
-    2. Return `FAIL trace_id=<id> reason=global-conflict-requires-cross-artifact-pass`.
-  Global conflicts are resolved only via HITL escalation or a dedicated cross-artifact
-  resolution pass. Adversarial-reviewer attack angle #6 (CR-L07 reviser-scope-discipline)
-  flags any reviser language that encourages "fixing it anyway" in single-leaf scope.
-
----
-
-## FORBIDDEN (reviser-specific for prd-analysis)
-
-- **FORBIDDEN** to touch skeleton paths (`scripts/metrics-aggregate.sh`,
-  `scripts/lib/aggregate.py`, or any path in `common/shared-scripts-manifest.yml`).
-- **FORBIDDEN** to re-introduce previously resolved issues — treat resolved-issues history as
-  hard negative constraints, not suggestions.
-- **FORBIDDEN** to fabricate fixes without reading the actual issue text. Every fix MUST be
-  traceable to a specific issue body.
-- **FORBIDDEN** to touch any file other than the one target leaf assigned by the orchestrator,
-  except when creating companion issues in `.review/round-<N>/issues/` as required by the
-  domain-specific invariants above.
-- **FORBIDDEN** to renumber Feature IDs (`F-NNN`) or Journey IDs (`J-NNN`) — IDs are
-  immutable.
-- **FORBIDDEN** to remove evidence rows or lower confidence labels without explicit issue
-  authorization.
-- **FORBIDDEN** to delete a journey or feature leaf without creating a corresponding tombstone
-  file in the same bundle directory.
-- **FORBIDDEN** to use soft language (`try to`, `prefer`, `ideally`, `should consider`) for
-  any hard check or domain invariant — all normative requirements use MUST or MUST NOT.
-
----
-
-## ACK Format
-
-```
-OK trace_id=<trace_id> role=reviser linked_issues=<comma-separated IDs of issues being resolved>
-```
-
-Return this ACK as the **single and final line** of the Task return. Nothing after it.
+- Writing HTML-comment IPC envelopes into artifact leaves.
+- Including generation content in the Task return.
+- Multiple ACK lines.
