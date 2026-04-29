@@ -10,6 +10,16 @@ loop the orchestrator follows for round N. Implements
 - §7 — review-revise iteration with phase gates around `state: new` issues.
 - §10 — review artifacts are themselves artifacts and pass formal checks.
 
+Review mode is the **read phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". This file enforces both:
+
+- **Read-phase entry gate** (Step 1 + Step 2): no `state: new` from
+  prior rounds AND bundle passes formal review. If either fails, the
+  read phase does not start — control returns to a write (revise) phase.
+- **Read-phase exit**: judge verdict in Step 8. The read phase produces
+  issues in `state: new`; dispositioning them is the next write
+  (revise) phase's job, gated by `check-revise-completeness.sh`.
+
 This file is **orchestration**, not a sub-agent prompt. It does not carry
 the Snippet D fingerprint.
 

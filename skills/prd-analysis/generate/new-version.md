@@ -6,6 +6,14 @@ version. After Step 7 (writer fan-out) the orchestrator loads
 `review/index.md` and runs the review pipeline — this file does not
 duplicate the review-loop orchestration.
 
+NewVersion is a **write phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". Like FromScratch, only the
+formal review PASS clause applies on first-round exit (state-machine
+clause is vacuous because the prior delivery converged with no open
+issues, and this delivery's first round has not yet produced any).
+Each writer's self-audit (Step 7b) gates leaf-level formal PASS;
+`review/index.md` Step 2 enforces the bundle-level boundary.
+
 This file is **orchestration**, not a sub-agent prompt.
 
 ---

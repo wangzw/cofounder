@@ -22,6 +22,80 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 
 Do NOT load files not listed for the current mode — unused files waste context.
 
+## Phase Contract
+
+The skill operates as an alternating **write → read → write → read …**
+sequence, with hard gates at every phase boundary. A phase MUST NOT
+end until its exit gate passes; the next phase MUST NOT start until
+the prior phase has ended.
+
+### Write phase
+
+- **Modes**: initial `generate` (writers author leaves from a plan) and
+  `revise` (per-issue revisers fix leaves to address issues).
+- **Goal**: produce a PRD bundle that is structurally well-formed and,
+  in the revise case, has no open issues.
+- **Exit gate** (necessary before write phase ends):
+  1. **Formal review PASS** — `scripts/run-checkers.sh <prd-dir>`
+     exits 0. This is the bundle-level structural gate (every per-
+     artifact `check-*.sh` passes). Failures cause the orchestrator to
+     loop the writer / reviser until PASS, never to ACK the phase as
+     done with formal violations outstanding.
+  2. **State-machine PASS (revise only)** —
+     `scripts/check-revise-completeness.sh <prd-dir> <round>` exits 0;
+     i.e. **no issue is left in `state: new`** in the current round.
+     Every issue created during the prior read phase has been
+     dispositioned to `fixed`, `false-positive`, `deferred`, or
+     `superseded` with the appropriate metadata. (Generate's first
+     round has no inbound issues, so this clause is vacuous.)
+- Both gates are short-circuit: if either fails, the write phase loops
+  until both PASS, OR the orchestrator escalates to HITL after the
+  iteration cap (`config.yml convergence.max_iterations`).
+
+### Read phase
+
+- **Mode**: `review`. LLM cross-reviewer (and conditionally adversarial-
+  reviewer) inspect the bundle, emit findings as JSON in
+  `reviewer-output/<trace_id>.json`, and `scripts/create-issues.sh`
+  materializes per-issue files in `state: new`.
+- **Entry gate** (necessary before read phase starts):
+  - `scripts/check-review-readiness.sh <prd-dir>` exits 0 — i.e. **no
+    issue from any prior round is still in `state: new`**. This
+    enforces "the previous write phase finished cleanly" (guide §7.3).
+    Equivalent to verifying the prior write phase's state-machine PASS
+    persists across the boundary.
+- **Exit gate**: judge writes `verdict.yml`. There is no formal/state
+  gate on read phase exit — read phase's job is to produce issues
+  (which are by definition `state: new` until revise acts on them).
+- After read phase ends, **if the verdict is `progressing`, control
+  passes to revise (a write phase) which inherits the open
+  `state: new` issues** and must dispose of them before exiting.
+
+### Cycle invariants
+
+- A `state: new` issue **only** exists during read phase output and
+  the revise (write) phase that follows. It MUST NEVER survive into
+  the next read phase — the readiness gate enforces this.
+- A bundle that fails formal review **never** reaches LLM cross-
+  reviewer dispatch. The Step 2 hard gate in `review/index.md`
+  short-circuits to revise without spending LLM tokens (guide §6).
+- Write phase loops on its own scripts (writer self-audit + reviser
+  self-loop) until formal PASS — it does NOT escape to read phase
+  with formal violations.
+
+The phase-gate scripts (`check-review-readiness.sh`,
+`check-revise-completeness.sh`, `run-checkers.sh`) implement the gates
+above. Orchestration files reference them at the exact boundary they
+guard:
+
+| Boundary | Gate script | Exit gate of | Entry gate of |
+|----------|-------------|--------------|---------------|
+| revise → review | `check-review-readiness.sh` + `run-checkers.sh` | revise (write) | review (read) |
+| review → revise | (none — verdict-driven) | review (read) | revise (write) |
+| revise → revise (loop) | `check-revise-completeness.sh` + `run-checkers.sh` | revise iteration | next revise iteration |
+| generate → review (first delivery) | `run-checkers.sh` | generate (write) | review (read) |
+| converged → delivery | (verdict only) | review (read) | delivery sequence |
+
 ## Bootstrap Precheck
 
 Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (non-zero exit): skill exits; does NOT enter any generate/review/revise mode.

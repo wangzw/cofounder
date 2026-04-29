@@ -11,6 +11,19 @@ Step 2 short-circuits with formal failures. Defines the revise loop. Per
 - §7.5 — recurrence handling per state
 - §7.7 — quality-at-delivery ratio signals
 
+Revise mode is a **write phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". This file enforces the
+write-phase exit gate's two clauses:
+
+1. **State-machine PASS** (Step 4) — no issue is left in `state: new`
+   in the current round; every issue has been dispositioned.
+2. **Formal PASS** (Step 3 self-loop, plus the next read phase's
+   Step 2 hard gate) — the bundle passes `run-checkers.sh`.
+
+If either clause fails, the revise phase loops; it MUST NOT ACK as
+done with violations outstanding. Only when both clauses PASS does
+control pass back to the read phase (review mode) for the next round.
+
 This file is **orchestration**, not a sub-agent prompt.
 
 ---

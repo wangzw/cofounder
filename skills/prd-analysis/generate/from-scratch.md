@@ -5,6 +5,15 @@ provided. Defines Round 0 + Round 1 setup. After Step 7 (writer fan-out)
 the orchestrator loads `review/index.md` and runs the review pipeline —
 this file does not duplicate the review-loop orchestration.
 
+FromScratch is a **write phase** of the alternating write/read cycle
+defined in `SKILL.md` "Phase Contract". The first write phase has no
+inbound issues, so the state-machine clause is vacuous; only the
+**formal review PASS** clause applies as exit gate. Each writer's
+self-audit (Step 7) loops on the per-artifact check script for its
+leaf type until formal PASS for that leaf; review mode's Step 2
+re-runs `run-checkers.sh` over the full bundle as the cross-leaf
+boundary check before any LLM dispatch.
+
 This file is **orchestration**, not a sub-agent prompt. It does not
 carry the Snippet D fingerprint.
 
