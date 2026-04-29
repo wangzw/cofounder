@@ -363,8 +363,7 @@ Every `**METHOD /path**` heading in `api/API-*.md` MUST be followed by all seven
 - id: CR-L1
   name: "api-per-endpoint-blocks"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-api-per-endpoint-blocks.sh
+  checker_type: llm
   severity: critical
   applies_to: ["api/API-*.md"]
   conflicts_with: []
@@ -380,8 +379,7 @@ Placeholder tokens — `"..."`, `/* ... */`, `// ...`, a body that is literally 
 - id: CR-L2
   name: "placeholder-json"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-placeholder-json.sh
+  checker_type: llm
   severity: error
   applies_to: ["api/API-*.md", "modules/M-*.md"]
   conflicts_with: []
@@ -397,8 +395,7 @@ Every `## Boundary Enforcement` table in `modules/M-*.md` MUST have all four col
 - id: CR-L3
   name: "boundary-enforcement-cols"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-boundary-enforcement-cols.sh
+  checker_type: llm
   severity: error
   applies_to: ["modules/M-*.md"]
   conflicts_with: []
@@ -414,8 +411,7 @@ Every `## API Surface` table row in `modules/M-*.md` MUST fill all seven columns
 - id: CR-L4
   name: "api-surface-cols"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-api-surface-cols.sh
+  checker_type: llm
   severity: error
   applies_to: ["modules/M-*.md"]
   conflicts_with: []
@@ -431,8 +427,7 @@ Every type, function, or field referenced in a module's `## Interface Definition
 - id: CR-L5
   name: "module-interface-types"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-module-interface-types.sh
+  checker_type: llm
   severity: critical
   applies_to: ["modules/M-*.md"]
   conflicts_with: []
@@ -450,8 +445,7 @@ Every `(caller, callee)` pair implied by any module's `Deps (direct)` cell MUST 
 - id: CR-X1
   name: "module-deps-vs-protocols"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-module-deps-vs-protocols.sh
+  checker_type: llm
   severity: critical
   applies_to: ["modules/M-*.md", "README.md"]
   conflicts_with: []
@@ -467,8 +461,7 @@ Every HTTP method+path literal (e.g. `POST /v1/tasks`) referenced in any module'
 - id: CR-X2
   name: "endpoint-literal-vs-api"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-endpoint-literal-vs-api.sh
+  checker_type: llm
   severity: critical
   applies_to: ["modules/M-*.md", "api/API-*.md"]
   conflicts_with: []
@@ -484,8 +477,7 @@ Every file under the PRD's `architecture/` directory MUST appear as a row in `RE
 - id: CR-X3
   name: "architecture-coverage"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-architecture-coverage.sh
+  checker_type: llm
   severity: error
   applies_to: ["README.md"]
   conflicts_with: []
@@ -501,8 +493,7 @@ Every PRD analytics event enumerated in any PRD feature file's `## Analytics` bl
 - id: CR-X4
   name: "analytics-coverage"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-analytics-coverage.sh
+  checker_type: llm
   severity: error
   applies_to: ["README.md"]
   conflicts_with: []
@@ -518,8 +509,7 @@ Every PRD `F-NNN` feature MUST appear as a row in `README.md`'s `## Feature-Modu
 - id: CR-X5
   name: "feature-module-traceability"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-feature-module-traceability.sh
+  checker_type: llm
   severity: critical
   applies_to: ["README.md", "modules/M-*.md"]
   conflicts_with: []
@@ -535,8 +525,7 @@ Using the layer assignments in `README.md`'s `## Dependency Layering` table, eve
 - id: CR-X6
   name: "dependency-layering"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-dependency-layering.sh
+  checker_type: llm
   severity: critical
   applies_to: ["modules/M-*.md", "README.md"]
   conflicts_with: []
@@ -552,8 +541,7 @@ For every ID-prefix convention named in any module's Responsibility or Data Mode
 - id: CR-X7
   name: "single-source-of-truth"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-single-source-of-truth.sh
+  checker_type: llm
   severity: critical
   applies_to: ["modules/M-*.md"]
   conflicts_with: []
@@ -569,8 +557,7 @@ Every relative path referenced from `README.md` MUST resolve to an existing file
 - id: CR-X8
   name: "readme-references"
   version: 1.0.0
-  checker_type: script
-  script_path: scripts/check-readme-references.sh
+  checker_type: llm
   severity: error
   applies_to: ["README.md"]
   conflicts_with: []

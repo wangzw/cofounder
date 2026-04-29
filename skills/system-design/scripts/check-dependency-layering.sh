@@ -19,7 +19,7 @@
 #
 #   Step 3 — For each (caller, callee) dep pair:
 #     a. If either module is absent from the Dependency Layering table → emit
-#        LINT-NNN.md (severity=blocker, "missing from Dependency Layering table").
+#        a blocker finding (severity=blocker, "missing from Dependency Layering table").
 #     b. If layer(callee) > layer(caller) → REVERSE IMPORT → blocker (CR-X6).
 #     c. If layer(callee) == layer(caller) → same-layer dep. Blocker unless the
 #        Dependency Layering table row for either module (or an adjacent note)
@@ -105,26 +105,8 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Ensure .reviews/ directory exists; derive next LINT sequence number
+# JSON findings accumulator
 # ---------------------------------------------------------------------------
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
-mkdir -p "$REVIEWS_DIR"
-
-_next_seq() {
-  local max=0 f n base
-  for f in "$REVIEWS_DIR"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    base="$(basename "$f" .md)"
-    n="${base#LINT-}"
-    n=$(expr "${n#"${n%%[1-9]*}"}" + 0 2>/dev/null || echo 0)
-    if [ "$n" -gt "$max" ]; then max="$n"; fi
-  done
-  echo "$max"
-}
-
-SEQ=$(_next_seq)
-
-# ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
@@ -277,11 +259,6 @@ emit_issue() {
   local callee_label="$7"
   local caller_file="$8"
 
-  SEQ=$(( SEQ + 1 ))
-  local seq_str
-  seq_str=$(printf '%03d' "$SEQ")
-  local issue_file="$REVIEWS_DIR/LINT-${seq_str}.md"
-
   local title reasoning suggested_fix files_list
 
   case "$issue_type" in
@@ -305,36 +282,19 @@ emit_issue() {
       ;;
   esac
 
-  cat > "$issue_file" <<ISSUE
-# Lint Issue LINT-${seq_str}
-
-- **Severity**: blocker
-- **CR-id**: CR-X6
-- **Files**: ${files_list}
-- **Pair**: ${caller_id} → ${callee_id}
-
-## Reasoning
-
-${reasoning}
-
-## Suggested Fix
-
-${suggested_fix}
-ISSUE
-
   if [ "$QUIET" -eq 0 ]; then
     case "$issue_type" in
       reverse_import)
-        printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — reverse-layer import → %s\n' \
-          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md" >&2
+        printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — reverse-layer import\n' \
+          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" >&2
         ;;
       same_layer)
-        printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — same-layer, no cross-cutting exemption → %s\n' \
-          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" "LINT-${seq_str}.md" >&2
+        printf '  [CR-X6] blocker: %s (layer %s) → %s (layer %s) — same-layer, no cross-cutting exemption\n' \
+          "$caller_id" "$caller_layer" "$callee_id" "$callee_layer" >&2
         ;;
       missing_from_table)
-        printf '  [CR-X6] blocker: %s missing from Dependency Layering table → %s\n' \
-          "$caller_id" "LINT-${seq_str}.md" >&2
+        printf '  [CR-X6] blocker: %s missing from Dependency Layering table\n' \
+          "$caller_id" >&2
         ;;
     esac
   fi
@@ -455,7 +415,6 @@ if [ "$TOTAL_ISSUES" -eq 0 ]; then
   exit 0
 else
   printf 'CR-X6 FINDINGS — %d violation(s) (all blocker).\n' "$TOTAL_ISSUES" >&2
-  printf '  Issue files written to: %s\n' "$REVIEWS_DIR" >&2
   printf '[%s]\n' "$JSON_FINDINGS"
   if [ "$STRICT" -eq 1 ] || [ "$TOTAL_ISSUES" -gt 0 ]; then
     exit 1

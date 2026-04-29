@@ -1,0 +1,113 @@
+[
+  {
+    "criterion_id": "CR-S12",
+    "file": "scripts/lib/aggregate.py",
+    "severity": "critical",
+    "description": "SHA256 mismatch for 'scripts/lib/aggregate.py': expected ef316d46da7c..., got 659f6abe2158...",
+    "suggested_fix": "Restore the file verbatim from the upstream snapshot or update the manifest pin"
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-api-per-endpoint-blocks.sh",
+    "severity": "error",
+    "description": "CR-L1 declares script_path 'scripts/check-api-per-endpoint-blocks.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-L1.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-L1 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-placeholder-json.sh",
+    "severity": "error",
+    "description": "CR-L2 declares script_path 'scripts/check-placeholder-json.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-L2.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-L2 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-boundary-enforcement-cols.sh",
+    "severity": "error",
+    "description": "CR-L3 declares script_path 'scripts/check-boundary-enforcement-cols.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-L3.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-L3 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-api-surface-cols.sh",
+    "severity": "error",
+    "description": "CR-L4 declares script_path 'scripts/check-api-surface-cols.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-L4.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-L4 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-module-interface-types.sh",
+    "severity": "error",
+    "description": "CR-L5 declares script_path 'scripts/check-module-interface-types.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-L5.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-L5 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-module-deps-vs-protocols.sh",
+    "severity": "error",
+    "description": "CR-X1 declares script_path 'scripts/check-module-deps-vs-protocols.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X1.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X1 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-endpoint-literal-vs-api.sh",
+    "severity": "error",
+    "description": "CR-X2 declares script_path 'scripts/check-endpoint-literal-vs-api.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X2.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X2 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-architecture-coverage.sh",
+    "severity": "error",
+    "description": "CR-X3 declares script_path 'scripts/check-architecture-coverage.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X3.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X3 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-analytics-coverage.sh",
+    "severity": "error",
+    "description": "CR-X4 declares script_path 'scripts/check-analytics-coverage.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X4.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X4 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-feature-module-traceability.sh",
+    "severity": "error",
+    "description": "CR-X5 declares script_path 'scripts/check-feature-module-traceability.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X5.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X5 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-dependency-layering.sh",
+    "severity": "error",
+    "description": "CR-X6 declares script_path 'scripts/check-dependency-layering.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X6.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X6 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-single-source-of-truth.sh",
+    "severity": "error",
+    "description": "CR-X7 declares script_path 'scripts/check-single-source-of-truth.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X7.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X7 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  },
+  {
+    "criterion_id": "CR-META-missing-checker",
+    "file": "common/review-criteria.md",
+    "missing_script_path": "scripts/check-readme-references.sh",
+    "severity": "error",
+    "description": "CR-X8 declares script_path 'scripts/check-readme-references.sh' but no such script exists in the reviewer's scripts/ directory ('/Users/wangzw/workspace/cofounder/skills/skill-forge/scripts'); criterion was not evaluated",
+    "suggested_fix": "Edit common/review-criteria.md: change CR-X8.checker_type to 'llm' if the check genuinely requires LLM judgment, OR add deprecated: true to CR-X8 if the rule is no longer applicable. Authoring new scripts under scripts/ is NOT the reviser's job (skeleton-protected); escalate via HITL if a new script is required."
+  }
+]

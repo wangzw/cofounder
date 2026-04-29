@@ -19,8 +19,7 @@
 #      triggers only with --strict).
 #   2  Usage error or <design-dir> not found / not readable.
 #
-# Issue files are written to <design-dir>/.reviews/LINT-<NNN>.md.
-# NNN is determined by the next unused 3-digit sequence number in that dir.
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 
 set -euo pipefail
 
@@ -67,32 +66,8 @@ if [ ! -d "$MODULES_DIR" ]; then
   exit 0
 fi
 
-# ---------------------------------------------------------------------------
-# Helper: next LINT sequence number in <design-dir>/.reviews/
-# ---------------------------------------------------------------------------
-reviews_dir="${DESIGN_DIR%/}/.reviews"
-mkdir -p "$reviews_dir"
-
 # ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
-
-next_lint_seq() {
-  local max=0
-  local n base f
-  # Glob into an array; if no matches, the glob literal is returned — handle via -e check
-  for f in "$reviews_dir"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    # Extract the numeric portion from LINT-NNN.md
-    base="$(basename "$f" .md)"
-    n="${base#LINT-}"
-    # Convert to decimal; strip leading zeros by using arithmetic expansion
-    n=$(( 10#${n} )) 2>/dev/null || n=0
-    if [ "$n" -gt "$max" ]; then
-      max="$n"
-    fi
-  done
-  printf '%03d' $(( max + 1 ))
-}
 
 # ---------------------------------------------------------------------------
 # Helper: check whether a cell value is forbidden (empty / placeholder)
@@ -141,30 +116,10 @@ write_issue() {
   local col_name="$4"
   local extra_note="$5"
 
-  local issue_file="${reviews_dir}/LINT-${seq}.md"
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq}
-
-- **Severity**: blocker
-- **CR-id**: CR-L3
-- **File**: ${rel_file}
-- **Line**: ${lineno}
-- **Title**: Boundary Enforcement row has empty cell
-- **Reasoning**: Column "${col_name}" is empty or contains a forbidden placeholder${extra_note:+ — ${extra_note}}.
-- **Suggested fix**: Fill the "${col_name}" cell following the module-template.md Boundary Enforcement rules:
-  - **Constraint**: one concrete rule; descriptive English like "code should be clean" is rejected.
-  - **Tool / Lint / Test**: named tool + rule identifier (e.g. \`golangci-lint:errcheck\`, \`eslint:custom-rule-name\`); not "custom lint".
-  - **File Path**: path to the config file or test file that encodes the rule — must resolve to a real file in the repo.
-  - **CI Job**: job name from the CI pipeline that runs the check — must match a job defined in the Development Infrastructure module.
-  If all four columns cannot be filled, move the constraint to **Implementation Constraints** as advisory guidance.
-ISSUE
-
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-L3] blocker  %s:%d — Boundary Enforcement column "%s" is empty or placeholder\n' \
       "$rel_file" "$lineno" "$col_name" >&2
-    printf '  Fix: fill the cell per module-template.md Boundary Enforcement rules (issue written to %s)\n' \
-      "${reviews_dir}/LINT-${seq}.md" >&2
+    printf '  Fix: fill the cell per module-template.md Boundary Enforcement rules\n' >&2
   fi
   _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
   _jcol=$(printf '%s' "$col_name" | sed 's/"/\\"/g')
@@ -233,28 +188,14 @@ while IFS= read -r -d '' module_file; do
         ncols="$(count_cells "$line")"
         if [ "$ncols" -ne 4 ]; then
           # Header column count mismatch — report as a single issue
-          seq="$(next_lint_seq)"
-          issue_file="${reviews_dir}/LINT-${seq}.md"
-          cat > "$issue_file" <<ISSUE
-# LINT-${seq}
-
-- **Severity**: blocker
-- **CR-id**: CR-L3
-- **File**: ${rel_file}
-- **Line**: ${lineno}
-- **Title**: Boundary Enforcement table header has wrong column count
-- **Reasoning**: Expected 4 columns (Constraint | Tool / Lint / Test | File Path | CI Job), found ${ncols}.
-- **Suggested fix**: Rewrite the header row to match the module-template.md Boundary Enforcement table definition.
-ISSUE
           if [ "$QUIET" -eq 0 ]; then
             printf '[CR-L3] blocker  %s:%d — Boundary Enforcement header has %d columns (expected 4)\n' \
               "$rel_file" "$lineno" "$ncols" >&2
-            printf '  Fix: use header "| Constraint | Tool / Lint / Test | File Path | CI Job |\"\n' >&2
           fi
           _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
           _jdesc="Boundary Enforcement table header has ${ncols} columns (expected 4)"
           _jdesc=$(printf '%s' "$_jdesc" | sed 's/"/\\"/g')
-          _jfix="Rewrite the header row to match: | Constraint | Tool / Lint / Test | File Path | CI Job |"
+          _jfix="Rewrite header row to match module-template.md Boundary Enforcement table definition"
           _jfix=$(printf '%s' "$_jfix" | sed 's/"/\\"/g')
           _jentry="{\"criterion_id\":\"CR-L3\",\"file\":\"${_jfile}\",\"severity\":\"blocker\",\"description\":\"${_jdesc}\",\"suggested_fix\":\"${_jfix}\"}"
           if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
@@ -282,8 +223,7 @@ ISSUE
         cell_idx=$(( cell_idx + 1 ))
         if cell_is_forbidden "$cell"; then
           col_name="$(col_name_for_index "$cell_idx")"
-          seq="$(next_lint_seq)"
-          write_issue "$seq" "$rel_file" "$lineno" "$col_name" ""
+          write_issue "$rel_file" "$lineno" "$col_name" ""
           TOTAL_VIOLATIONS=$(( TOTAL_VIOLATIONS + 1 ))
           BLOCKER_COUNT=$(( BLOCKER_COUNT + 1 ))
         fi
@@ -299,9 +239,6 @@ done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' -print0 | sort -z)
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-L3 Boundary Enforcement column fill: %d violation(s) (%d blocker)\n' \
     "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" >&2
-  if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
-  fi
 fi
 
 # ---------------------------------------------------------------------------

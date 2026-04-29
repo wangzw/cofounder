@@ -1,9 +1,33 @@
 # Orchestrator state — written by orchestrator only (skill-forge contract §5.1).
-skill_forge_dir: "/Users/wangzw/.claude/skills/skill-forge"
+skill_forge_dir: "/Users/wangzw/workspace/cofounder/skills/skill-forge"
 target: "skills/system-design"
 delivery_id: 1
-current_round: 1
-mode: "generate-from-scratch"
+current_round: 3
+mode: "review"
+mode_phase: "idle-awaiting-revise-round-3"
+round_3_step_1_result: "exit-1-critical-only"
+round_3_critical_count: 3
+round_3_error_count: 0
+round_3_note: "All 3 criticals point at scripts/lib/aggregate.py SHA mismatch (R3-001 new + R3-002/003 carry-forward of R2-001/015). Skeleton-protected. HITL required."
+round_3_round_2_meta_status: "13 CR-META-missing-checker errors did NOT carry forward → reviser fix in round-2 verified at script-tier"
+round_2_step_1_result: "exit-1-critical-and-errors"
+round_2_critical_count: 1
+round_2_error_count: 13
+round_2_revise_verdict: "progressing"
+round_2_revise_completed_at: "2026-04-28T14:36:00Z"
+round_2_skeleton_protected_meta_issues: ["R2-015"]
+round_2_revise_dispatches:
+  - trace_id: "R2-R-001"
+    role: "reviser"
+    target_leaf: "common/review-criteria.md"
+    linked_issues_count: 13
+    ack_status: "OK"
+  - trace_id: "R2-S-001"
+    role: "summarizer"
+    ack_status: "OK"
+  - trace_id: "R2-J-001"
+    role: "judge"
+    ack_status: "OK"
 no_consultant: true
 clarification_path: ".review/round-0/clarification/2026-04-28T09-08-22Z.yml"
 input_path: ".review/round-0/input.md"

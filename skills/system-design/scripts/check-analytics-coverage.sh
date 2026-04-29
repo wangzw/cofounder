@@ -26,7 +26,7 @@
 #      event names from table rows (Event column). Also detect named sweep
 #      rules of the form "F-NNN..F-NNN ... → channel" that enumerate feature IDs.
 #   4. Build set B = {event_name}.
-#   5. Missing = A.event_names − B. Each gap → LINT-NNN.md.
+#   5. Missing = A.event_names − B. Each gap → JSON finding on stdout.
 #
 # Named sweep rules: a row whose Event cell contains a sweep expression like
 # "F-001..F-042 → audit.Emit → Log Viewer" is considered to cover any event
@@ -45,7 +45,7 @@
 #   1  At least one blocker; or --strict with any violation.
 #   2  Usage error or <design-dir> not found / not readable.
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md  (zero-padded, sequential)
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 
 set -euo pipefail
 
@@ -95,65 +95,22 @@ if [ ! -f "$README" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Helper: next LINT sequence number in <design-dir>/.reviews/
+# JSON findings accumulator
 # ---------------------------------------------------------------------------
-reviews_dir="${DESIGN_DIR}/.reviews"
-mkdir -p "$reviews_dir"
-
-# ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
-next_lint_seq() {
-  local max=0
-  local n base f
-  for f in "$reviews_dir"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    base="$(basename "$f" .md)"
-    n="${base#LINT-}"
-    n=$(( 10#${n} )) 2>/dev/null || n=0
-    [ "$n" -gt "$max" ] && max="$n"
-  done
-  printf '%03d' $(( max + 1 ))
-}
-
 # ---------------------------------------------------------------------------
-# Helper: write a LINT issue file for a missing event
-# Arguments: seq feature_id event_name
+# Helper: emit a finding for a missing event
+# Arguments: feature_id event_name
 # ---------------------------------------------------------------------------
 write_missing_event_issue() {
-  local seq="$1"
-  local feature_id="$2"
-  local event_name="$3"
-  local issue_file="${reviews_dir}/LINT-${seq}.md"
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq}
-
-- **Severity**: blocker
-- **CR-id**: CR-X4
-- **File**: README.md
-- **Title**: PRD analytics event missing from Analytics Coverage
-- **Reasoning**: PRD analytics event \`${event_name}\` from feature \`${feature_id}\`
-  is not listed in the \`## Analytics Coverage\` section of README.md. Every event
-  enumerated in a PRD feature's \`## Analytics\` block MUST appear as an explicit
-  row in the Analytics Coverage table (or in a named sweep rule that lists the
-  feature IDs and the emitting channel).
-- **Suggested fix**: Add a row to the \`## Analytics Coverage\` table in README.md:
-
-  \`\`\`
-  | ${feature_id}: <feature name> | ${event_name} | <trigger> | <emitting channel> | <module ID> |
-  \`\`\`
-
-  The Event column value MUST match \`${event_name}\` exactly (case-sensitive).
-  Alternatively, use a named sweep rule that explicitly lists \`${feature_id}\` and
-  the emitting channel — unnamed blanket rules ("all backend features…") do NOT satisfy coverage.
-ISSUE
+  local feature_id="$1"
+  local event_name="$2"
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X4] blocker  README.md — PRD analytics event `%s` from feature `%s` is missing from Analytics Coverage\n' \
       "$event_name" "$feature_id" >&2
-    printf '  Fix: add a row to ## Analytics Coverage (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq" >&2
+    printf '  Fix: add a row to ## Analytics Coverage\n' >&2
   fi
 
   # Accumulate JSON finding
@@ -168,35 +125,16 @@ ISSUE
 }
 
 # ---------------------------------------------------------------------------
-# Helper: write a LINT issue file for an unnamed sweep rule
-# Arguments: seq row_text
+# Helper: emit a finding for an unnamed sweep rule
+# Arguments: row_text
 # ---------------------------------------------------------------------------
 write_unnamed_sweep_issue() {
-  local seq="$1"
-  local row_text="$2"
-  local issue_file="${reviews_dir}/LINT-${seq}.md"
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq}
-
-- **Severity**: mechanical
-- **CR-id**: CR-X4
-- **File**: README.md
-- **Title**: Unnamed blanket sweep rule in Analytics Coverage
-- **Reasoning**: The Analytics Coverage section contains a sweep rule that does not
-  explicitly list feature IDs or the emitting channel: \`${row_text}\`. Unnamed
-  blanket rules ("all backend features emit audit events" without feature IDs and
-  channel) do NOT satisfy coverage requirements per CR-X4.
-- **Suggested fix**: Replace the blanket rule with explicit rows (one per event), or
-  refine the sweep rule to list feature IDs and the emitting channel, e.g.:
-  \`F-004..F-042 (operational backend) → audit.Emit → Log Viewer\`.
-ISSUE
+  local row_text="$1"
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X4] mechanical  README.md — unnamed sweep rule in Analytics Coverage: `%s`\n' \
       "$row_text" >&2
-    printf '  Fix: list feature IDs and emitting channel (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq" >&2
+    printf '  Fix: list feature IDs and emitting channel\n' >&2
   fi
 
   # Accumulate JSON finding
@@ -593,8 +531,7 @@ is_covered() {
 if [ -n "$UNNAMED_SWEEP_ROWS" ]; then
   while IFS= read -r sweep_row; do
     [ -n "$sweep_row" ] || continue
-    seq="$(next_lint_seq)"
-    write_unnamed_sweep_issue "$seq" "$sweep_row"
+    write_unnamed_sweep_issue "$sweep_row"
     TOTAL_VIOLATIONS=$(( TOTAL_VIOLATIONS + 1 ))
     MECHANICAL_COUNT=$(( MECHANICAL_COUNT + 1 ))
   done <<< "$UNNAMED_SWEEP_ROWS"
@@ -617,8 +554,7 @@ for (( i=0; i<num_events; i++ )); do
   REPORTED_EVENTS["$dedup_key"]=1
 
   if ! is_covered "$fid" "$ename"; then
-    seq="$(next_lint_seq)"
-    write_missing_event_issue "$seq" "$fid" "$ename"
+    write_missing_event_issue "$fid" "$ename"
     TOTAL_VIOLATIONS=$(( TOTAL_VIOLATIONS + 1 ))
     BLOCKER_COUNT=$(( BLOCKER_COUNT + 1 ))
   fi
@@ -630,9 +566,6 @@ done
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-X4 Analytics coverage: %d violation(s) (%d blocker, %d mechanical)\n' \
     "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" "$MECHANICAL_COUNT" >&2
-  if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
-  fi
 fi
 
 # ---------------------------------------------------------------------------

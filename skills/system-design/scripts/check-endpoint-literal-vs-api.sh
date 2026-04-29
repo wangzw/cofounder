@@ -18,9 +18,7 @@
 #
 # Skip entirely if <design-dir>/api/ directory does not exist (project has no APIs).
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md
-#   Each file contains: severity, CR-id, source file, line, offending endpoint,
-#   and a suggested fix.
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes:
 #   0 — no violations (or api/ absent — silent skip)
@@ -86,7 +84,6 @@ fi
 DESIGN_DIR="${DESIGN_DIR%/}"
 API_DIR="$DESIGN_DIR/api"
 MODULES_DIR="$DESIGN_DIR/modules"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 # ── skip if no api/ directory (project has no APIs) ───────────────────────────
 if [ ! -d "$API_DIR" ]; then
@@ -95,30 +92,12 @@ if [ ! -d "$API_DIR" ]; then
   exit 0
 fi
 
-mkdir -p "$REVIEWS_DIR"
-
 # ── helpers ───────────────────────────────────────────────────────────────────
-
-# next_lint_seq: return the next available zero-padded LINT sequence number.
-# Scans existing LINT-NNN.md files; returns max+1 (or 001 if none exist).
-next_lint_seq() {
-  local max=0
-  local base n
-  while IFS= read -r f; do
-    base="$(basename "$f")"
-    if [[ "$base" =~ ^LINT-([0-9]+) ]]; then
-      n="${BASH_REMATCH[1]}"
-      n=$((10#$n))
-      [ "$n" -gt "$max" ] && max="$n"
-    fi
-  done < <(find "$REVIEWS_DIR" -maxdepth 1 -name 'LINT-*.md' 2>/dev/null)
-  printf "%03d" $(( max + 1 ))
-}
 
 VIOLATION_COUNT=0
 JSON_FINDINGS=""
 
-# emit_issue: write a LINT-NNN.md file for one violation.
+# emit_issue: emit one violation as a JSON finding on stdout (accumulated).
 # Args: $1=normalised endpoint  $2=direction ("module-missing"|"api-orphan")
 #       $3=absolute source file  $4=line number
 emit_issue() {
@@ -127,9 +106,6 @@ emit_issue() {
   local source_file="$3"
   local lineno="$4"
 
-  local seq
-  seq="$(next_lint_seq)"
-  local issue_file="$REVIEWS_DIR/LINT-${seq}.md"
   local rel_file="${source_file#"$DESIGN_DIR/"}"
 
   local finding fix
@@ -142,28 +118,6 @@ emit_issue() {
   fi
 
   [ "$QUIET" -eq 0 ] && echo "[CR-X2] blocker  $rel_file:$lineno — $finding" >&2
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq} — CR-X2 endpoint-literal-vs-api
-
-**Severity**: blocker
-**CR-id**: CR-X2
-**File**: $rel_file
-**Line**: $lineno
-**Endpoint**: \`$endpoint\`
-
-## Finding
-
-$finding
-
-## Suggested Fix
-
-$fix
-
-Per \`structural-lint.md\` X2: every endpoint literal in a module's API Surface
-MUST appear as an endpoint heading in \`api/API-*.md\`, and every endpoint in
-\`api/API-*.md\` MUST be claimed by at least one module's API Surface table.
-ISSUE
 
   VIOLATION_COUNT=$(( VIOLATION_COUNT + 1 ))
 
@@ -374,9 +328,6 @@ set -u
 if [ "$QUIET" -eq 0 ]; then
   echo "" >&2
   echo "CR-X2 check complete — ${module_ep_count} endpoint(s) in modules, ${api_ep_count} endpoint(s) in api/, ${VIOLATION_COUNT} violation(s) found." >&2
-  if [ "$VIOLATION_COUNT" -gt 0 ]; then
-    echo "Issue files written to: $REVIEWS_DIR/" >&2
-  fi
 fi
 
 if [ "$VIOLATION_COUNT" -eq 0 ]; then

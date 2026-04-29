@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [Unreleased]
+
+### Changed
+- Deprecate `.reviews/` (with-S) end-user review directory; consolidate all review and revise
+  output to `.review/round-<N>/issues/<issue-id>.md` (no-S) per skill-forge harness convention.
+- `--review` mode now writes issue files to `.review/round-<N>/issues/` instead of `.reviews/`.
+- `--revise` mode now reads open issues from `.review/round-<N>/issues/` (filtering by
+  `status: new | persistent | regressed`) instead of unapplied `.reviews/REVIEW-*.md`/`LINT-*.md`.
+- Remove `.applied.md` rename step from revise flow; issue closure is now tracked via
+  `status: resolved` frontmatter field in the issue file.
+- Remove per-reviser REVISIONS.md append; REVISIONS.md update is now a summarizer concern.
+- Remove direct `.reviews/LINT-NNN.md` file writes from individual check scripts; issue files
+  are written exclusively by `run-checkers.sh` via JSON stdout aggregation.
+
 ## Delivery 1 — 2026-04-28 (In Progress)
 
 - **Verdict**: Round 1 complete; not yet converged

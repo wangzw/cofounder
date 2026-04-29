@@ -7,7 +7,28 @@
 #            depgraph propagation short-circuited. Triggers: criteria major
 #            version bump, new-version first round, converged→first --review,
 #            distance since last full review ≥ N, user --full.
-# Writes: manifest.yml, depgraph.yml, skip-set.yml, issues/round-checker-output.json
+# Writes:
+#   - <round_dir>/manifest.yml
+#   - <round_dir>/depgraph.yml         (via build-depgraph.sh)
+#   - <round_dir>/skip-set.yml
+#   - <round_dir>/issues/round-checker-output.json   (aggregate; machine consumers)
+#   - <round_dir>/issues/R<N>-<NNN>.md               (one per finding; reviser/judge/summarizer)
+#
+# Checker script JSON contract (§12.4):
+#   Each check-*.sh emits a JSON array to stdout; all diagnostics to stderr.
+#   Empty findings  → []
+#   With findings   → list of objects with required fields:
+#     {
+#       "criterion_id": "<string>",          # e.g. "CR-L4"
+#       "file":         "<relative path>",   # path-special chars JSON-escaped by the emitter
+#       "severity":     "blocker|error|warning",
+#       "description":  "<string>",
+#       "suggested_fix": "<string>|null",    # optional
+#       "line":          <int|null>          # optional
+#     }
+#   Non-JSON stdout  → CR-META-checker-contract-violation issue emitted automatically.
+#   Checker exit 2   → CR-META-checker-error meta-issue; criterion marked not evaluated.
+#
 # Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
 set -euo pipefail
 
@@ -575,10 +596,22 @@ for c in criteria:
             "suggested_fix": f"inspect {script_path} for robustness; catch the underlying cause",
         })
 
-# Write output
+# Write aggregate JSON (machine consumers)
 out_path = os.path.join(round_dir, 'issues', 'round-checker-output.json')
 with open(out_path, 'w', encoding='utf-8') as f:
     json.dump(all_issues, f, indent=2)
+# Belt-and-suspenders: verify the written file round-trips through the JSON parser.
+# json.dump should always emit valid JSON, but this catches encoding edge-cases
+# (e.g. a description containing null bytes or surrogate pairs) before they reach
+# downstream consumers that assume a well-formed file.
+try:
+    with open(out_path, 'r', encoding='utf-8') as _vf:
+        json.load(_vf)
+except (json.JSONDecodeError, OSError) as _ve:
+    sys.stderr.write(
+        f"ERROR: round-checker-output.json failed post-write validation: {_ve}\n"
+    )
+    sys.exit(2)
 
 # Expand each issue into an individual <issue-id>.md file so downstream
 # summarizer/judge/reviser (which all read `issues/*.md` frontmatter) can

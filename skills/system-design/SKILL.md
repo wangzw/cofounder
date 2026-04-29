@@ -39,8 +39,8 @@ system-design generates technical design documents as a **multi-file directory**
 |------|------|-------------|-----------|
 | generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/review-criteria.md` | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); structural-lint runs BEFORE semantic review |
 | generate (new version) | `/cofounder:system-design --target <design-dir> "<change>"` | `generate/new-version.md`, `common/review-criteria.md` | Evolve existing design; planner emits delta plan (delete/modify/add/keep); forced full cross-review on first round |
-| review | `/cofounder:system-design --review <design-dir>` | `review/index.md`, `common/review-criteria.md` | Read-only: scripts/run-checkers.sh (structural-lint) runs first; then cross-reviewer + adversarial-reviewer dispatch in parallel; produces LINT-*.md + REVIEW-*.md under `.review/round-<N>/issues/` |
-| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md`, `common/review-criteria.md` | Per-issue revise loop driven by open REVIEW-*.md + LINT-*.md from last review round; re-runs structural-lint gate after batch |
+| review | `/cofounder:system-design --review <design-dir>` | `review/index.md`, `common/review-criteria.md` | Read-only: scripts/run-checkers.sh (structural-lint) runs first; then cross-reviewer + adversarial-reviewer dispatch in parallel; writes per-round issue files to `<design-dir>/.review/round-<N>/issues/<issue-id>.md` |
+| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md`, `common/review-criteria.md` | Per-issue revise loop driven by open issues from `.review/round-<N>/issues/`; re-runs structural-lint gate after batch |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -55,14 +55,22 @@ docs/raw/design/YYYY-MM-DD-{product-name}/
 │   └── M-NNN-{slug}.md    # Self-contained per-module spec (one writer per module in fan-out)
 ├── api/                   # Only generated when project has APIs
 │   └── API-NNN-{slug}.md  # Self-contained API contract
-└── .reviews/              # Transient — not version-controlled
-    ├── REVIEW-*.md / .applied.md   # Semantic findings (LLM reviewers)
-    └── LINT-*.md / .applied.md     # Mechanical findings (structural-lint scripts)
+└── .review/               # Review/revise harness directory — transient, not version-controlled
+    ├── state.yml                        # Orchestrator bookkeeping (skill-root, round number)
+    ├── traces/round-<N>/
+    │   └── dispatch-log.jsonl           # Per-dispatch launched/completed events
+    ├── round-<N>/
+    │   ├── issues/                      # Reviewer-written issue files (REVIEW-*.md, LINT-*.md)
+    │   ├── self-reviews/                # Writer self-review archives
+    │   ├── plan.md                      # Planner output
+    │   └── verdict.yml                  # Judge convergence verdict
+    ├── metrics/                         # --diagnose output
+    └── versions/                        # Summarizer snapshots
 ```
 
 **Agent consumption:** read `README.md` (overview + Feature-Module mapping matrix) → read one `modules/M-NNN-{slug}.md` → implement. The module file alone is sufficient for a coding agent to start working.
 
-**gitignore:** add `docs/raw/design/*/.reviews/` to `.gitignore` (transient review artefacts are not version-controlled).
+**gitignore:** add `docs/raw/design/*/.review/` to `.gitignore` (the review harness directory is transient and not version-controlled).
 
 ## Output Path
 
@@ -237,6 +245,12 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
    | 3 | JOIN coverage < 50% | Report output path; **relay verbatim** every entry under `warnings:` in the output YAML (copy exact text, no rewriting, no interpreting, no summarizing); suggest user verify orchestrator is injecting `trace_id: R3-W-007` (canonical format) as first line of each dispatch prompt |
 
 5. **No LLM post-processing**: do not rewrite, summarize, or embellish script output. The `.review/metrics/<scope>.metrics.yml` file is the machine-readable source of truth.
+
+6. **Scaffold drift recovery**: `scripts/metrics-aggregate.sh` and `scripts/lib/aggregate.py` are managed by skill-forge and MUST NOT be edited in-place. If `scripts/check-scaffold-sha.sh` reports SHA drift (CR-S12 block), run:
+   ```bash
+   scripts/scaffold.sh --refresh
+   ```
+   This re-pulls both files from skill-forge canonical and regenerates `common/shared-scripts-manifest.yml` atomically. A fresh `git clone` (CI) gets correct file content from git but without hardlinks — the SHA check still passes because content is identical; drift only occurs when either side is edited after divergence. If `scripts/scaffold.sh --refresh` is unavailable, restore the files manually from `skills/skill-forge/common/skeleton/scripts/`.
 
 ## Model Tiers
 

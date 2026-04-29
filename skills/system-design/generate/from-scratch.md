@@ -8,12 +8,12 @@ generating a fresh system design from a PRD (or draft input).
 
 ## Round 0 Sequence
 
-The orchestrator executes these steps in order. Step 4 is conditional; Step 8 fans out in parallel.
-All script calls are deterministic (no LLM dispatch). Only steps 4, 5, 8, 10, 11, 12 involve
+The orchestrator executes these steps in order. Step 4 is conditional; Step 7 fans out in parallel.
+All script calls are deterministic (no LLM dispatch). Only steps 4, 5, 7, 9, 10, 11 involve
 sub-agent dispatch.
 
-**Hard rule (system-design override):** Step 9 (structural lint) MUST complete and report zero
-failures before Step 10 (LLM review) is dispatched. Mechanical findings — placeholder JSON,
+**Hard rule (system-design override):** Step 8 (structural lint) MUST complete and report zero
+failures before Step 9 (LLM review) is dispatched. Mechanical findings — placeholder JSON,
 missing per-endpoint blocks, unfilled Boundary Enforcement columns, dangling endpoint references,
 reverse-layer imports — are never forwarded to the LLM reviewers.
 
@@ -123,45 +123,37 @@ Wait for user response:
 - **revise** (or `/revise <feedback>`) → re-dispatch planner with feedback appended; loop Step 5–6
 - **abort** (or `/abort`) → exit this skill
 
-### Step 7 — Scaffold (script)
-
-```bash
-scripts/scaffold.sh <target>/ <target>/.review/round-0/clarification/<ts>.yml
-```
-
-- **Trigger condition**: immediately after user approves the plan in Step 6.
-- **Inputs**: target directory, clarification.yml (or synthesized stub if consultant was skipped)
-- **Outputs**: full skeleton tree at `<target>/` (copied from `common/skeleton/document/`)
-- **Orchestrator action**: if exit non-zero → report error to user; halt.
-
-### Step 8 — Writer Fan-out (parallel sub-agent dispatch)
+### Step 7 — Writer Fan-out (parallel sub-agent dispatch)
 
 Fan-out one writer sub-agent per file listed in `round-1/plan.md` `plan.add` list (typically
 one entry per module + one per API file + one README; often 8–14 files total). All dispatched
 in parallel.
 
-- **Trigger condition**: immediately after Step 7 exits 0.
+- **Trigger condition**: immediately after user approves the plan in Step 6.
 - **Dispatches**: `generate/writer-subagent.md` (N instances, one per file)
 - **Inputs consumed by each sub-agent**:
   - `round-0/clarification/<ts>.yml` (most recent; or synthesized stub)
   - `round-1/plan.md`
   - Corresponding template from `common/templates/` (determined by target file type:
-    `module-template.md`, `api-template.md`, or `readme-template.md`)
+    `module-template.md`, `api-template.md`, or `design-readme-template.md`)
   - PRD source files (read-only) as specified in `plan.md` per-entry context
 - **Outputs written by each sub-agent**:
   1. Target artifact file at `<target>/<relative-path>`
   2. `<target>/.review/round-1/self-reviews/<trace_id>.md`
 - **Orchestrator action on all ACKs received**: collect `self_review_status` and `fail_count` per
-  ACK. Proceed to Step 9 only after ALL writers have ACK'd (no partial fan-out).
+  ACK. Proceed to Step 8 only after ALL writers have ACK'd (no partial fan-out).
+- **Retry semantic**: on a `FAIL` ACK retry, the orchestrator MUST rename the prior self-review
+  file from `<trace_id>.md` to `<trace_id>.failed-1.md` before re-dispatching, to avoid
+  overwriting the failure record.
 
-### Step 9 — Structural Lint Pre-pass (script)
+### Step 8 — Structural Lint Pre-pass (script)
 
 ```bash
 scripts/run-checkers.sh <target>/ round-1
 ```
 
-- **Trigger condition**: after ALL writer ACKs received in Step 8. MUST run before any LLM review
-  dispatch (Step 10). This ordering is a hard system-design override — mechanical findings never
+- **Trigger condition**: after ALL writer ACKs received in Step 7. MUST run before any LLM review
+  dispatch (Step 9). This ordering is a hard system-design override — mechanical findings never
   reach the LLM reviewers.
 - **Inputs**: all artifact files in `<target>/` (script reads directly)
 - **Checks run**: per-file checks L1–L5 (file structure, required sections, placeholder detection,
@@ -174,34 +166,43 @@ scripts/run-checkers.sh <target>/ round-1
   severity: `blocker` | `warning`)
 - **Orchestrator action**:
   - If any `blocker` issues found → spawn reviser sub-agents (one per affected file, from
-    `revise/reviser-subagent.md`), re-run `scripts/run-checkers.sh`, re-loop until zero blockers.
-  - If only `warning` issues remain → proceed to Step 10.
-  - `warning` issues are forwarded to Step 10 reviewers as context (not suppressed).
+    `revise/per-issue-reviser-subagent.md`), re-run `scripts/run-checkers.sh`, re-loop until zero blockers.
+  - If only `warning` issues remain → proceed to Step 9.
+  - `warning` issues are forwarded to Step 9 reviewers as context (not suppressed).
 
-### Step 10 — Cross-Reviewer + Adversarial-Reviewer (parallel sub-agent dispatch)
+### Step 9 — Cross-Reviewer + Adversarial-Reviewer (parallel sub-agent dispatch)
 
-Both reviewers are dispatched simultaneously after Step 9 reports zero blocker issues.
+Both reviewers are dispatched simultaneously after Step 8 reports zero blocker issues.
+
+**Issue ID pre-allocation (collision prevention)**: The orchestrator MUST pre-allocate
+non-overlapping issue ID sequence ranges for the two parallel reviewer dispatches and include
+them in each dispatch header. Sub-agents MUST use only their assigned range and MUST NOT glob
+the issues directory to determine the next ID:
+- Cross-Reviewer: `id_seq_start: 1`, `id_seq_end: 50`
+- Adversarial-Reviewer: `id_seq_start: 51`, `id_seq_end: 100`
+
+If a future round adds a third parallel reviewer, extend the range table here.
 
 **Cross-Reviewer**:
 - **Dispatches**: `review/cross-reviewer-subagent.md`
-- **Inputs consumed**: all target artifact leaves + non-blocker issue files from Step 9
+- **Inputs consumed**: all target artifact leaves + non-blocker issue files from Step 8
 - **Outputs**: additional semantic issue files under `<target>/.review/round-1/issues/`
 - **Scope**: semantic correctness only — responsibility scoping, error-handling depth, NFR
   decomposition correctness, risk coverage, testability, interface completeness. Script-type
-  findings (L1–L5, X1–X8) that Step 9 has already resolved are filtered from scope.
+  findings (L1–L5, X1–X8) that Step 8 has already resolved are filtered from scope.
 
 **Adversarial-Reviewer**:
 - **Dispatches**: `review/adversarial-reviewer-subagent.md`
-- **Inputs consumed**: all target artifact leaves + non-blocker issue files from Step 9
+- **Inputs consumed**: all target artifact leaves + non-blocker issue files from Step 8
 - **Outputs**: additional adversarial issue files under `<target>/.review/round-1/issues/`
 - **Scope**: failure modes, security edge cases, scalability cliffs, hidden coupling, unstated
   assumptions that could invalidate the design under adversarial or high-load conditions.
 
-- **Orchestrator action on both ACKs received**: proceed to Step 11.
+- **Orchestrator action on both ACKs received**: proceed to Step 10.
 
-### Step 11 — Summarizer (sub-agent dispatch)
+### Step 10 — Summarizer (sub-agent dispatch)
 
-- **Trigger condition**: after both Step 10 reviewer ACKs received.
+- **Trigger condition**: after both Step 9 reviewer ACKs received.
 - **Dispatches**: `shared/summarizer-subagent.md`
 - **Inputs consumed**: all issue files from `round-1/issues/`, all self-reviews from
   `round-1/self-reviews/`
@@ -209,9 +210,9 @@ Both reviewers are dispatched simultaneously after Step 9 reports zero blocker i
   - `<target>/.review/round-1/index.md` — aggregated review summary
   - `CHANGELOG.md` entry for round-1
   - `<target>/.review/versions/<N>.md` — snapshot of round-1 state
-- **Orchestrator action on ACK**: proceed to Step 12.
+- **Orchestrator action on ACK**: proceed to Step 11.
 
-### Step 12 — Judge (sub-agent dispatch)
+### Step 11 — Judge (sub-agent dispatch)
 
 - **Trigger condition**: after Summarizer ACK received.
 - **Dispatches**: `shared/judge-subagent.md`
@@ -219,7 +220,7 @@ Both reviewers are dispatched simultaneously after Step 9 reports zero blocker i
 - **Outputs written by sub-agent**: `<target>/.review/round-1/verdict.yml`
 - **Orchestrator action on ACK** (read `verdict.yml`):
   - `verdict: converged` → proceed to Delivery Commit (below)
-  - `verdict: progressing` → increment round counter; loop from Step 8 (writer fan-out on
+  - `verdict: progressing` → increment round counter; loop from Step 7 (writer fan-out on
     changed files only, as listed in `verdict.yml` `changed_files`)
   - `verdict: oscillating` → surface oscillation report to user; request human guidance before
     next round
@@ -245,9 +246,9 @@ scripts/commit-delivery.sh <target>/ <delivery-id> <slug>
 - **Round numbers** are cross-delivery monotonic. Round 1 in delivery 1 is round 1 globally;
   round numbers never reset between deliveries.
 - **Orchestrator read discipline**: the orchestrator MUST NOT read any artifact leaf other than
-  `round-1/plan.md` (Step 6) and `round-N/verdict.yml` (Step 12). For all other routing
+  `round-1/plan.md` (Step 6) and `round-N/verdict.yml` (Step 11). For all other routing
   decisions, rely on ACK fields and exit codes alone.
-- **Lint-before-review invariant**: the ordering Step 9 → Step 10 is a system-design-specific
+- **Lint-before-review invariant**: the ordering Step 8 → Step 9 is a system-design-specific
   hard override of the generic skill-forge from-scratch sequence. It is never relaxed — not
   during re-loops, not during round-N iterations.
 - **`from-scratch.md` is not a sub-agent prompt** — it does not carry the Snippet D fingerprint

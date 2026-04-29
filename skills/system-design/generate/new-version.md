@@ -49,8 +49,8 @@ The change description can be:
   technology decision changes, NFR reallocations).
 - A pointer to an evolved PRD produced by `/cofounder:prd-analysis --evolve`, in which case the
   planner reads the evolved PRD's feature diff to derive the module delta.
-- A review-driven fix pass: if `.reviews/REVIEW-*.md` or `.review/round-*/issues/REVIEW-*.md`
-  exist from a previous `--review` run, the planner consumes them as part of the change input.
+- A review-driven fix pass: if `.review/round-*/issues/` has open issues from a previous
+  `--review` run, the planner consumes them as part of the change input.
 
 ---
 
@@ -233,8 +233,8 @@ a Module Interaction Protocols row in README.md still referencing a deleted modu
 cross-check failing because a modified api/ file changed an endpoint literal that another module
 still references under the old name).
 
-- **Outputs**: issue files under `<design-dir>/.review/round-<K+1>/issues/LINT-NNN.md` per
-  structural failure (13 domain lint checks: L1..L5 + X1..X8).
+- **Outputs**: issue files under `<design-dir>/.review/round-<K+1>/issues/<issue-id>.md` per
+  structural failure (13 domain lint checks: L1..L5 + X1..X8). Issue IDs follow `R<K+1>-<seq>`.
 - **Orchestrator**: if critical/error LINT issues found → dispatch per-issue revisers
   (`revise/per-issue-reviser-subagent.md`) before proceeding to Step 11. Re-run
   `scripts/run-checkers.sh` until clean. Proceed to Step 11 only when the lint gate passes.
@@ -257,7 +257,7 @@ Subsequent rounds within the same delivery scope review to modified/added files 
 - **Dispatches**: `review/cross-reviewer-subagent.md`
 - Applies LLM-type CRs from `common/review-criteria.md` (script-type CRs are already handled by
   Step 10 and are NOT re-applied by the cross-reviewer).
-- **Outputs**: `round-<K+1>/issues/REVIEW-NNN.md` per issue found.
+- **Outputs**: `round-<K+1>/issues/<issue-id>.md` per issue found (issue IDs follow `R<K+1>-V-<seq>`).
 
 **Adversarial-Reviewer** (dispatched in parallel with cross-reviewer):
 - **Dispatches**: `review/adversarial-reviewer-subagent.md`
@@ -265,7 +265,7 @@ Subsequent rounds within the same delivery scope review to modified/added files 
   missing failure modes, security holes (authz boundaries, secret-handling), missing
   observability, untested error paths, and regressions introduced by the delta (e.g., an added
   module that bypasses an existing Boundary Enforcement rule).
-- **Outputs**: `round-<K+1>/issues/REVIEW-NNN-ADV.md` per adversarial finding.
+- **Outputs**: `round-<K+1>/issues/<issue-id>.md` per adversarial finding (issue IDs follow `R<K+1>-V-<seq>-ADV`).
 
 ### Step 12 — Summarizer (sub-agent dispatch)
 

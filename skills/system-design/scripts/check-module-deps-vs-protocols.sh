@@ -16,7 +16,7 @@
 #   Step 3 — Parse <design-dir>/README.md "## Module Interaction Protocols"
 #     table: extract Caller → Callee column (format "M-NNN ... → M-NNN ...").
 #   Step 4 — Build set B = {(caller_id, callee_id)} from README rows.
-#   Step 5 — Findings = (A − B) ∪ (B − A). Each finding emits one LINT-NNN.md.
+#   Step 5 — Findings = (A − B) ∪ (B − A). Each finding is emitted as one JSON entry on stdout.
 #
 #   Both missing-from-README and missing-from-Deps directions are blockers
 #   (CR-X1 severity: blocker).
@@ -104,31 +104,8 @@ if [ ! -f "$README_FILE" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Ensure .reviews/ directory exists and get next LINT sequence number
+# JSON findings accumulator
 # ---------------------------------------------------------------------------
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
-mkdir -p "$REVIEWS_DIR"
-
-_next_seq() {
-  local max=0
-  local f n base
-  for f in "$REVIEWS_DIR"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    base="$(basename "$f" .md)"
-    n="${base#LINT-}"
-    # Strip leading zeros to avoid octal interpretation
-    n=$(printf '%d' "0x$(printf '%s' "$n" | sed 's/^0*//' | grep . || echo 0)" 2>/dev/null) || \
-      n=$(echo "$n" | sed 's/^0*//' | grep -E '^[0-9]+$' || echo 0)
-    # Safer arithmetic: use expr to avoid octal
-    n=$(expr "$n" + 0 2>/dev/null || echo 0)
-    if [ "$n" -gt "$max" ]; then max="$n"; fi
-  done
-  echo "$max"
-}
-
-SEQ=$(_next_seq)
-
-# ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
@@ -149,11 +126,6 @@ emit_issue() {
   local caller_file="$4"
   local callee_file="$5"
 
-  SEQ=$(( SEQ + 1 ))
-  local seq_str
-  seq_str=$(printf '%03d' "$SEQ")
-  local issue_file="$REVIEWS_DIR/LINT-${seq_str}.md"
-
   local reasoning suggested_fix files_list
 
   if [ "$direction" = "A_not_B" ]; then
@@ -166,34 +138,13 @@ emit_issue() {
     files_list="${caller_file}, README.md"
   fi
 
-  cat > "$issue_file" <<ISSUE
-# Lint Issue LINT-${seq_str}
-
-- **Severity**: blocker
-- **CR-id**: CR-X1
-- **Files**: ${files_list}
-- **Pair**: ${caller_id} → ${callee_id}
-- **Direction**: ${direction}
-
-## Reasoning
-
-${reasoning}
-
-Per design-template.md Module Interaction Protocols sync rule:
-> "every (caller, callee) pair that appears in any module's Deps (direct) cell MUST have a corresponding row here, and vice versa. Bidirectional sync is enforced at review time."
-
-## Suggested Fix
-
-${suggested_fix}
-ISSUE
-
   if [ "$QUIET" -eq 0 ]; then
     if [ "$direction" = "A_not_B" ]; then
-      printf '  [CR-X1] blocker: %s → %s  in Deps but missing from README Protocols → %s\n' \
-        "$caller_id" "$callee_id" "LINT-${seq_str}.md" >&2
+      printf '  [CR-X1] blocker: %s → %s  in Deps but missing from README Protocols\n' \
+        "$caller_id" "$callee_id" >&2
     else
-      printf '  [CR-X1] blocker: %s → %s  in README Protocols but no module declares this dep → %s\n' \
-        "$caller_id" "$callee_id" "LINT-${seq_str}.md" >&2
+      printf '  [CR-X1] blocker: %s → %s  in README Protocols but no module declares this dep\n' \
+        "$caller_id" "$callee_id" >&2
     fi
   fi
 
@@ -390,7 +341,6 @@ if [ "$TOTAL_ISSUES" -eq 0 ]; then
   exit 0
 else
   printf 'CR-X1 FINDINGS — %d bidirectional sync violation(s) (all blocker).\n' "$TOTAL_ISSUES" >&2
-  printf '  Issue files written to: %s\n' "$REVIEWS_DIR" >&2
   printf '[%s]\n' "$JSON_FINDINGS"
   exit 1
 fi

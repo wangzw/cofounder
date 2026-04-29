@@ -19,7 +19,7 @@
 #   3. For each architecture file: verify (a) its basename or a relative path
 #      containing the basename appears in a table cell or N/A note, OR (b) a
 #      row exists whose Category or PRD Policy cell references the basename.
-#   4. Missing → emit LINT-NNN.md (severity=blocker, CR-id=CR-X3).
+#   4. Missing → emit JSON finding on stdout (severity=blocker, CR-id=CR-X3).
 #
 # Usage:
 #   check-architecture-coverage.sh <design-dir> [--quiet] [--strict]
@@ -33,7 +33,7 @@
 #   1  At least one blocker found; or at least one mechanical + --strict.
 #   2  Usage error or <design-dir> not found / not readable.
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md  (zero-padded, sequential)
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 
 set -euo pipefail
 
@@ -82,62 +82,19 @@ if [ ! -f "$README" ]; then
   exit 0
 fi
 
-# ---------------------------------------------------------------------------
-# Helper: next LINT sequence number in <design-dir>/.reviews/
-# ---------------------------------------------------------------------------
-reviews_dir="${DESIGN_DIR}/.reviews"
-mkdir -p "$reviews_dir"
-
 # ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
-next_lint_seq() {
-  local max=0
-  local n base f
-  for f in "$reviews_dir"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    base="$(basename "$f" .md)"
-    n="${base#LINT-}"
-    n=$(( 10#${n} )) 2>/dev/null || n=0
-    [ "$n" -gt "$max" ] && max="$n"
-  done
-  printf '%03d' $(( max + 1 ))
-}
-
 # ---------------------------------------------------------------------------
 # Helper: write a LINT issue file and (unless --quiet) print to stdout.
-# Arguments: seq basename_of_arch_file
+# Arguments: basename_of_arch_file
 # ---------------------------------------------------------------------------
 write_issue() {
-  local seq="$1"
-  local arch_basename="$2"
-
-  local issue_file="${reviews_dir}/LINT-${seq}.md"
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq}
-
-- **Severity**: blocker
-- **CR-id**: CR-X3
-- **File**: README.md
-- **Title**: PRD architecture file silently dropped from Implementation Conventions
-- **Reasoning**: PRD architecture file \`${arch_basename}\` is not referenced in
-  the \`## Implementation Conventions\` table of README.md and has no \`N/A — {reason}\`
-  note. Silent omission means the stack-specific translation of that convention
-  policy is undefined, which leaves implementing modules without guidance.
-- **Suggested fix**: Add one of the following to the \`## Implementation Conventions\`
-  section of README.md:
-  - A table row whose "PRD Policy" column (col 2) references \`${arch_basename}\`
-    (e.g. \`[${arch_basename}](...)\` or the bare filename), **or**
-  - A dedicated row whose Translation cell reads \`N/A — {reason}\` and whose
-    Category or PRD Policy cell names \`${arch_basename}\`.
-ISSUE
+  local arch_basename="$1"
 
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X3] blocker  README.md — PRD architecture file `%s` is silently dropped from Implementation Conventions\n' \
       "$arch_basename" >&2
-    printf '  Fix: add a row referencing this file or add a row with Translation = `N/A — {reason}` (issue: %s/LINT-%s.md)\n' \
-      "$reviews_dir" "$seq" >&2
   fi
 
   # Accumulate JSON finding
@@ -333,8 +290,7 @@ BLOCKER_COUNT=0
 
 for bname in "${ARCH_BASENAMES[@]}"; do
   if ! basename_covered "$bname"; then
-    seq="$(next_lint_seq)"
-    write_issue "$seq" "$bname"
+    write_issue "$bname"
     TOTAL_VIOLATIONS=$(( TOTAL_VIOLATIONS + 1 ))
     BLOCKER_COUNT=$(( BLOCKER_COUNT + 1 ))
   fi
@@ -346,9 +302,6 @@ done
 if [ "$QUIET" -eq 0 ] || [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
   printf '\nCR-X3 Architecture coverage: %d violation(s) (%d blocker)\n' \
     "$TOTAL_VIOLATIONS" "$BLOCKER_COUNT" >&2
-  if [ "$TOTAL_VIOLATIONS" -gt 0 ]; then
-    printf 'Issue files: %s/LINT-*.md\n' "$reviews_dir" >&2
-  fi
 fi
 
 # ---------------------------------------------------------------------------

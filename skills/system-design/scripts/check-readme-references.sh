@@ -24,9 +24,7 @@
 #   - all other relative paths → blocker
 #   - Anchor-only (#...)       → skip (no file to resolve)
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md
-#   Each file contains: severity, CR-id, source file, line, offending path,
-#   reasoning, and a suggested fix.
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes:
 #   0 — no violations found
@@ -85,7 +83,6 @@ fi
 
 DESIGN_DIR="${DESIGN_DIR%/}"
 README="$DESIGN_DIR/README.md"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -f "$README" ]; then
   printf 'SKIP: README.md not found in: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
@@ -93,65 +90,23 @@ if [ ! -f "$README" ]; then
   exit 0
 fi
 
-mkdir -p "$REVIEWS_DIR"
-
 # ── helpers ───────────────────────────────────────────────────────────────────
-
-# next_lint_seq: return next available zero-padded (3-digit) LINT sequence number.
-next_lint_seq() {
-  local max=0
-  local n
-  for f in "$REVIEWS_DIR"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    n=$(basename "$f" | sed 's/^LINT-\([0-9][0-9]*\).*/\1/')
-    if [ "$n" -gt "$max" ] 2>/dev/null; then
-      max="$n"
-    fi
-  done
-  printf '%03d' $(( max + 1 ))
-}
 
 VIOLATION_COUNT=0
 HAS_BLOCKER=0
 JSON_FINDINGS=""
 
-# emit_issue: write one LINT-NNN.md for a broken link.
+# emit_issue: emit one finding as a JSON entry on stdout (accumulated).
 # Args: $1=severity  $2=raw-link-target  $3=lineno
 emit_issue() {
   local severity="$1"
   local raw_target="$2"
   local lineno="$3"
 
-  local seq
-  seq="$(next_lint_seq)"
-  local issue_file="$REVIEWS_DIR/LINT-${seq}.md"
-
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X8] %s  README.md:%s — broken link `%s`\n' \
       "$severity" "$lineno" "$raw_target" >&2
   fi
-
-  cat > "$issue_file" << ISSUE_EOF
-# LINT-${seq} — CR-X8 readme-references
-
-**Severity**: ${severity}
-**CR-id**: CR-X8
-**File**: README.md
-**Line**: ${lineno}
-**Target**: \`${raw_target}\`
-
-## Reasoning
-
-Relative path \`${raw_target}\` referenced from README does not exist.
-
-Per \`structural-lint.md\` X8: every relative path in \`README.md\` markdown links
-MUST resolve to an existing file. Broken links prevent navigation and signal that
-the design is incomplete or was partially renamed.
-
-## Suggested Fix
-
-Either fix the path, remove the broken link, or create the referenced file.
-ISSUE_EOF
 
   VIOLATION_COUNT=$(( VIOLATION_COUNT + 1 ))
   if [ "$severity" = "blocker" ]; then
@@ -287,9 +242,6 @@ done < "$README"
 if [ "$QUIET" -eq 0 ]; then
   printf '\nCR-X8 check complete — %d link(s) parsed, %d violation(s) found.\n' \
     "$link_count" "$VIOLATION_COUNT" >&2
-  if [ "$VIOLATION_COUNT" -gt 0 ]; then
-    printf 'Issue files written to: %s/\n' "$REVIEWS_DIR" >&2
-  fi
 fi
 
 if [ "$VIOLATION_COUNT" -eq 0 ]; then

@@ -27,7 +27,7 @@
 #   1  At least one violation found AND (blocker present OR --strict set)
 #   2  Usage error or <design-dir> not found
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md (severity/CR-id/fix inline).
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 
 set -euo pipefail
 
@@ -72,7 +72,6 @@ fi
 DESIGN_DIR="${DESIGN_DIR%/}"
 README="$DESIGN_DIR/README.md"
 MODULES_DIR="$DESIGN_DIR/modules"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -f "$README" ]; then
   printf 'SKIP: README.md not found in design dir: %s — no artifact to lint\n' "$DESIGN_DIR" >&2
@@ -80,29 +79,11 @@ if [ ! -f "$README" ]; then
   exit 0
 fi
 
-mkdir -p "$REVIEWS_DIR"
-
 # ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
-# Helper: allocate next LINT sequence number (zero-padded to 3 digits)
-# ---------------------------------------------------------------------------
-next_lint_id() {
-  local max=0
-  local n
-  for f in "$REVIEWS_DIR"/LINT-*.md; do
-    [ -e "$f" ] || continue
-    n=$(basename "$f" | sed 's/^LINT-\([0-9][0-9]*\).*/\1/')
-    if [ "$n" -gt "$max" ] 2>/dev/null; then
-      max="$n"
-    fi
-  done
-  echo $((max + 1))
-}
-
-# ---------------------------------------------------------------------------
-# Helper: emit a LINT-NNN.md file
+# Helper: emit a finding as a JSON entry on stdout (accumulated)
 # Arguments: severity cr_id rel_file anchor title reasoning fix
 # ---------------------------------------------------------------------------
 emit_lint() {
@@ -114,34 +95,9 @@ emit_lint() {
   local reasoning="$6"
   local fix="$7"
 
-  local lint_id
-  lint_id=$(next_lint_id)
-  local lint_id_padded
-  lint_id_padded=$(printf '%03d' "$lint_id")
-  local lint_file="$REVIEWS_DIR/LINT-${lint_id_padded}.md"
-
-  cat > "$lint_file" << LINT_EOF
-# LINT-${lint_id_padded}
-
-**ID**: LINT-${lint_id_padded}
-**Severity**: ${severity}
-**CR-id**: ${cr_id}
-**File**: ${rel_file}
-**Anchor**: ${anchor}
-**Title**: ${title}
-
-## Reasoning
-
-${reasoning}
-
-## Suggested Fix
-
-${fix}
-LINT_EOF
-
   if [ "$QUIET" -eq 0 ]; then
-    printf '[%s] %s: %s — %s → %s\n' \
-      "$cr_id" "$severity" "${rel_file}:${anchor}" "$title" "$(basename "$lint_file")" >&2
+    printf '[%s] %s: %s — %s\n' \
+      "$cr_id" "$severity" "${rel_file}:${anchor}" "$title" >&2
   fi
 
   # Accumulate JSON finding

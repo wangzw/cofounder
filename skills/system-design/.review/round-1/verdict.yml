@@ -1,17 +1,15 @@
 round: 1
 delivery_id: 1
+phase: post-revise
 verdict: progressing
 next_action: revise
 evidence:
   open_issues: 30
-  blocker: 6
-  important: 20
-  suggestion: 4
-  critical_count: 0
-  error_count: 0
+  critical_count: 6
+  error_count: 20
   regressed_count: 0
-  coverage_percent: 0
+  coverage_percent: 100
   writer_fail_count_sum: 0
   rounds_elapsed: 1
-oscillating_pairs: []
-notes: Round 1 delivered 30 writer artifacts; all pass internal self-review. Cross-reviewer and adversarial-reviewer surface 30 unaddressed issues (6 blockers, 20 important, 4 suggestions). No oscillation/divergence yet (round 1 baseline). Recommend reviser dispatch on blocker+important issues, then round 2 reviewers.
+  oscillating_pairs: []
+notes: "Post-revise: 12 reviser dispatches completed successfully, addressing all 30 linked issues (6 blockers, 20 important, 4 suggestions). Artifact leaves updated on disk. Issue statuses remain 'new' — convergence awaits cross-reviewer re-evaluation in next round. Fixes applied but not yet verified."

@@ -27,7 +27,7 @@ The IPC model is **Direct Write + ACK**:
 |------|-------------|-------------|
 | `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
 | `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
-| `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
+| `reviser` | 1–2 writes | 1) `<artifact-path>` (updated artifact leaf); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (only when a global-conflict FAIL row is recorded) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
 | `summarizer` | N writes | One index file + `changelog` entry + `versions/<N>.md` |
 | `judge` | 1 write | `.review/round-<N>/verdict.yml` |
@@ -89,9 +89,9 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 
 ## Issue Sources
 
-Each dispatch targets ONE issue file from `<design-dir>/.reviews/`:
+Each dispatch targets ONE issue file from `<design-dir>/.review/round-<N>/issues/<issue-id>.md`:
 
-### REVIEW-NNN.md (semantic issues)
+### Semantic issues (R<N>-V-<seq>[-ADV])
 
 Produced by cross-reviewer or adversarial reviewer. Contains a structured criterion violation
 for one module spec, API spec, or README section. The reviser:
@@ -100,10 +100,8 @@ for one module spec, API spec, or README section. The reviser:
 2. Opens the ONE affected artifact file (module spec, API spec, or README) — path is stated
    in the issue's `file:` frontmatter field.
 3. Applies the minimal fix via **Edit** (NOT Write — preserve all unchanged content).
-4. Appends an entry to `<design-dir>/REVISIONS.md` (template: `common/templates/revision-entry-template.md`).
-5. Renames the issue file via `git mv .reviews/REVIEW-NNN.md .reviews/REVIEW-NNN.applied.md`.
 
-### LINT-NNN.md (mechanical issues)
+### Mechanical issues (R<N>-<seq>)
 
 Produced by `scripts/run-checkers.sh` or the structural-lint gate. Contains a deterministic
 fix prescription (e.g., "add missing column", "replace placeholder JSON"). The reviser:
@@ -112,9 +110,7 @@ fix prescription (e.g., "add missing column", "replace placeholder JSON"). The r
 2. Opens the ONE affected artifact file.
 3. Applies the deterministic fix via **Edit**.
 4. Re-runs the originating `check_script` and confirms clean output.
-   - If clean: proceed to REVISIONS.md append and rename.
-   - If still failing: append REVISIONS.md entry, rename to `.applied.md`, but return
-     `OK ... self_review_status=PARTIAL` with a FAIL row carrying
+   - If still failing: return `OK ... self_review_status=PARTIAL` with a FAIL row carrying
      `blocker_scope=needs-human-decision` in the self-review archive.
 
 ---
@@ -134,28 +130,26 @@ fix prescription (e.g., "add missing column", "replace placeholder JSON"). The r
 - For issues with `blocker_scope: global-conflict` escalated to the reviser by the
   cross-reviewer: **do NOT apply a fix in this dispatch**. The per-leaf reviser scope is
   structurally incapable of resolving cross-artifact conflicts. Instead:
-    1. Emit a meta-issue at `<design-dir>/.reviews/issues/<new-issue-id>.md` with
-       `criterion_id: CR-META-skip-violation`, `severity: critical`, and a body that
-       references the original global-conflict issue ID.
-    2. Return `FAIL trace_id=R3-R-002 reason=global-conflict-requires-cross-artifact-pass`.
-  Global conflicts are resolved only via HITL escalation or a dedicated cross-artifact
-  resolution pass.
+    1. Write a self-review archive at
+       `<design-dir>/.review/round-<N>/self-reviews/<trace_id>.md` with a FAIL row:
+       `- CR-<id>: FAIL — blocker_scope: global-conflict — note: <one-line summary>`
+    2. Return `OK trace_id=<id> role=reviser linked_issues=<original-issue-id> self_review_status=PARTIAL fail_count=1`
+  The orchestrator will surface the unresolved global-conflict issue to HITL. Global
+  conflicts are resolved only via HITL escalation or a dedicated cross-artifact resolution
+  pass — never by this reviser in single-leaf scope.
 
 ---
 
-## Post-Fix Bookkeeping (mandatory after every successful fix)
+## Post-Fix Bookkeeping
 
-1. **Append to REVISIONS.md** — add one entry per the revision-entry template. Fields:
-   - `issue_id`: the REVIEW-NNN or LINT-NNN being closed
-   - `file`: target-relative path of the artifact edited
-   - `change_type`: `in-place edit`
-   - `summary`: one-line description of what was changed
+The reviser's responsibility is limited to applying the fix and returning the ACK. The
+orchestrator/summarizer handles:
 
-2. **Rename the issue file** via `git mv`:
-   ```
-   git mv <design-dir>/.reviews/REVIEW-NNN.md <design-dir>/.reviews/REVIEW-NNN.applied.md
-   ```
-   (or `LINT-NNN.md` → `LINT-NNN.applied.md` for lint issues)
+- Updating the issue file's frontmatter `status: resolved` (in
+  `<design-dir>/.review/round-<N>/issues/<issue-id>.md`).
+- Appending to `<design-dir>/REVISIONS.md`.
+
+The reviser MUST NOT modify issue files, perform `git mv` renames, or append to REVISIONS.md.
 
 ---
 
@@ -179,8 +173,8 @@ OK trace_id=R3-R-002 role=reviser linked_issues=<the issue ID closed>
   traceable to a specific issue body.
 - **FORBIDDEN** to re-introduce previously resolved issues — treat resolved-issues history
   injected by the orchestrator as hard negative constraints.
-- **FORBIDDEN** to skip the REVISIONS.md append or the `.applied.md` rename — both are
-  required for every successfully closed issue, without exception.
+- **FORBIDDEN** to modify issue files, append to REVISIONS.md, or perform `git mv` renames —
+  these are summarizer responsibilities, not reviser responsibilities.
 - **FORBIDDEN** to touch skeleton paths (`scripts/metrics-aggregate.sh`,
   `scripts/lib/aggregate.py`, any path in `shared-scripts-manifest.yml`).
 

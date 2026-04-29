@@ -108,27 +108,6 @@ Read these files before writing:
 The `trace_id` (injected as the first line of this sub-session by the orchestrator) identifies
 which file in `plan.add` or `plan.modify` this writer instance is responsible for.
 
-### Mandatory cross-skill carryovers (writer-of-meta-files only)
-
-Two artifacts in the standard FromScratch `add:` set carry MANDATORY content that
-must propagate across every generated skill regardless of artifact domain. Writers
-of these specific paths MUST include the carryover content verbatim from the
-template:
-
-- **`SKILL.md`** — MUST include `## Model Tiers` + `### Per-dispatch model override`
-  (with the role→tier→Agent-tool-`model` mapping table) + `## CLI Flags` (with rows
-  for `--full`, `--no-consultant`, `--tier <role>=<tier>`, `--max-iterations N`).
-  Enforced by **CR-S15 skill-md-cost-control-sections**.
-- **`common/review-criteria.md`** — MUST register the meta-CR
-  `skill-md-cost-control-sections` (you may number it CR-S<N> in your local
-  scheme; the `name:` field MUST be `skill-md-cost-control-sections` and
-  `script_path:` MUST be `scripts/check-skill-md-sections.sh`). Without this,
-  the generated skill's own self-review will not enforce its SKILL.md
-  cost-control invariants when it self-hosts a `--review` cycle.
-
-Skipping these carryovers silently regresses Tier 1.1 (per-dispatch model override)
-and Tier 3.7 (--no-consultant flag) every time skill-forge generates a new skill.
-
 ---
 
 ## Domain-Specific Generation Guidance
@@ -402,14 +381,23 @@ Content structure:
 
 ## Checklist
 
-See `generate/in-generate-review.md` for CR applicability table.
+Apply only the CRs marked **applies** for your file type in the table below:
+
+| CR / Lint Check                         | Module Spec | API Contract | Design README |
+|-----------------------------------------|:-----------:|:------------:|:-------------:|
+| CR-S08 ipc-footer-present               | applies     | applies      | applies       |
+| CR-L02 self-contained-file              | applies     | applies      | applies       |
+| CR-L11 cross-skill domain targeting     | applies     | applies      | applies       |
+| L2 lint (no placeholder JSON)           | applies     | applies      | N/A           |
+| Boundary Enforcement fill               | applies     | N/A          | N/A           |
+| 7-subsection completeness               | N/A         | applies      | N/A           |
+| X1 lint (module interaction protocols)  | N/A         | N/A          | applies       |
+| X3 lint (implementation conventions)   | N/A         | N/A          | applies       |
+| X4 lint (analytics coverage)           | N/A         | N/A          | applies       |
+| X5 lint (feature-module matrix)        | N/A         | N/A          | applies       |
 
 - CR-S08 ipc-footer-present: PASS | FAIL — blocker_scope: <value> — note: <reason>
 - CR-L02 self-contained-file: PASS | FAIL — ...
-# (include only CRs applicable to this file type — see in-generate-review.md table)
-# For module specs: also check L2 lint (no placeholder JSON) and Boundary Enforcement fill
-# For API contracts: check all 7 per-endpoint subsections present, L2 lint
-# For README: check X1/X3/X4/X5 lint coverage
 
 ## Summary
 
@@ -424,7 +412,7 @@ Each applicable CR gets exactly one line: `- <CR-ID> <name>: PASS` or
 ### Self-Review Discipline
 
 1. After writing the artifact, perform an honest CR-by-CR check against `common/review-criteria.md`.
-2. Apply only the CRs relevant to this file type (see `generate/in-generate-review.md` table).
+2. Apply only the CRs marked **applies** for this file type (see the applicability table in Write 2 above).
 3. For PASS: brief evidence is sufficient ("all 7 endpoint subsections present").
 4. For FAIL: MUST specify exactly one `blocker_scope` from the taxonomy above.
 5. **PARTIAL ACK trigger: if ANY FAIL row exists in the self-review file, set

@@ -100,12 +100,24 @@ cross-reviewer has already filed it; a distinct attack angle warrants a separate
 
 ### Trigger Condition
 
-Dispatched by orchestrator ONLY when `config.yml adversarial_review.triggered_by` threshold is
-met (default: any in-generate critical or error issue). MUST check `state.yml` for the
-`adversarial_review_triggered: true` flag before beginning — if absent, emit a no-op ACK and
-return immediately (do not file false issues).
+**Step 1 — determine mode**: read `state.yml` and check `mode`.
 
-No-op ACK form (when trigger flag absent in `state.yml`):
+**Step 2 — apply mode-specific trigger rule**:
+
+| `state.yml.mode` | Rule |
+|------------------|------|
+| `review` | Fire unconditionally. The orchestrator dispatches adversarial in parallel with cross-reviewer for all `--review` runs; no flag check is required. Proceed directly to the Input Contract. |
+| `generate-from-scratch` or `generate-new-version` | MUST check `state.yml` for `adversarial_review_triggered: true`. If absent or false, emit the no-op ACK below and return immediately — do not file false issues. |
+| absent / unrecognised | Treat as `generate-from-scratch` (conservative default: check the flag). |
+
+The flag `adversarial_review_triggered: true` is written to `state.yml` by the orchestrator in
+generate modes when the `config.yml adversarial_review.triggered_by` threshold is met (default:
+any in-generate critical or error issue from the preceding cross-reviewer dispatch). It MUST be
+set before this sub-agent is dispatched; if it is missing in a generate-mode run, the
+orchestration flow has a bug — the no-op ACK surfaces the gap rather than silently wasting a
+heavy-tier dispatch.
+
+No-op ACK form (when trigger flag absent in generate mode):
 
 ```
 OK trace_id=R3-V-003 role=reviewer linked_issues=
@@ -265,9 +277,10 @@ Same schema as cross-reviewer. Use `source: adversarial-reviewer` and
 `reviewer_variant: adversarial`.
 
 For each finding, write ONE file:
-`<design-dir>/.reviews/REVIEW-<NNN>-ADV.md`
+`<design-dir>/.review/round-<N>/issues/<issue-id>.md`
 
-Note: the `-ADV` suffix distinguishes adversarial findings from cross-reviewer issues.
+where `<issue-id>` is `R<N>-V-<seq>-ADV`. The `-ADV` suffix distinguishes adversarial findings
+from cross-reviewer issues.
 
 Issue IDs continue the same sequence started by cross-reviewer for this round (check the
 highest existing `<seq>` in `round-<N>/issues/` and increment from there).

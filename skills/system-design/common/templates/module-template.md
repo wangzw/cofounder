@@ -2,12 +2,17 @@
 
 <!-- Header: Module ID (M-NNN) is stable across iterations. Name must match the README module index row exactly. -->
 
-> **Status:** NotStarted | InProgress | Done  
+> **Doc Status:** Draft | Finalized | Implementing | Implemented  
+> **Impl Status:** NotStarted | InProgress | Done  
 > **Assignee:** {{assignee or "unassigned"}}  
 > **Source Features:** {{F-001, F-003 — space-separated list of PRD feature IDs}}  
 > **Complexity:** S | M | L | XL
 
-<!-- Status uses the Impl tri-state: NotStarted = not yet coded; InProgress = work underway; Done = merged to main. -->
+<!-- Doc Status tracks the design document's lifecycle (Draft = in progress; Finalized = approved for
+     implementation; Implementing = coding underway; Implemented = shipped and merged).
+     Impl Status tracks code progress (NotStarted = not yet coded; InProgress = work underway;
+     Done = merged to main). The two are independent — a module can be
+     Doc Status: Finalized and Impl Status: NotStarted. -->
 
 ---
 
@@ -88,18 +93,20 @@ graph LR
      If THIS module IS the canonical owner, prefix each definition with a comment: "// source of truth". -->
 
 ```typescript
-// {{EntityName}} — owned by this module
+// REPLACE this entire block with your module's real types — do not keep the example.
 // source of truth  ← include this comment only when THIS module is the designated owner
 
-export interface {{EntityName}} {
-  id: string;              // format: "{{prefix}}_" + ULID, e.g. "{{prefix}}_01ARZ3NDEKTSV4RRFFQ69G5FAV"
-  {{fieldName}}: {{FieldType}};  // {{constraint or description}}
-  {{fieldName}}: {{FieldType}} | null;  // optional — {{when null}}
+export interface Task {
+  id: string;              // format: "task_" + ULID, e.g. "task_01ARZ3NDEKTSV4RRFFQ69G5FAV"
+  title: string;           // max 255 characters; required
+  description: string | null;  // optional — null when not provided
+  status: TaskStatus;      // current lifecycle state
+  assigneeId: string | null;   // optional — null when unassigned
   createdAt: string;       // ISO 8601 UTC
   updatedAt: string;       // ISO 8601 UTC
 }
 
-export type {{EnumName}} = "{{VALUE_A}}" | "{{VALUE_B}}" | "{{VALUE_C}}";
+export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled";
 ```
 
 **Database schema (when applicable):**
@@ -130,35 +137,42 @@ export type {{EnumName}} = "{{VALUE_A}}" | "{{VALUE_B}}" | "{{VALUE_C}}";
 ### Outbound (this module exposes)
 
 ```typescript
-// Inbound interface — callers depend on this signature; changes here are breaking.
+// REPLACE this entire block with your module's real interface — do not keep the example.
+// Outbound interface — callers depend on this signature; changes here are breaking.
 
-export interface {{ModuleName}}Service {
+export interface TaskService {
   /**
-   * {{one-line description of what this method does}}
-   * @param {{paramName}} {{description}}
-   * @returns {{description of success value}}
-   * @throws {{ErrorType}} when {{condition}}
-   * @throws {{ErrorType}} when {{condition}}
+   * Retrieve a task by its ID.
+   * @param id task ULID (e.g. "task_01ARZ3NDEKTSV4RRFFQ69G5FAV")
+   * @returns Task if found, null if not found
+   * @throws AuthorizationError when caller lacks read permission
    */
-  {{methodName}}({{paramName}}: {{ParamType}}): Promise<{{ReturnType}}>;
+  getById(id: string): Promise<Task | null>;
 
   /**
-   * {{one-line description}}
+   * Create a new task and persist it.
+   * @param input validated creation payload
+   * @param actorId ID of the authenticated user performing the action
+   * @returns newly created Task
+   * @throws ValidationError when input fails schema check
+   * @throws AuthorizationError when actor lacks create permission
    */
-  {{methodName}}({{paramName}}: {{ParamType}}, options?: {{OptionsType}}): Promise<{{ReturnType}} | null>;
+  create(input: CreateTaskInput, actorId: string): Promise<Task>;
 }
 
 // Supporting types — inline definitions so callers do not need to open a second file.
-export interface {{ParamType}} {
-  {{fieldName}}: {{FieldType}};
+export interface CreateTaskInput {
+  title: string;
+  description?: string;
 }
 
-export interface {{ReturnType}} {
-  {{fieldName}}: {{FieldType}};
+export interface TaskResult {
+  task: Task;
+  created: boolean;
 }
 
-export class {{ErrorType}} extends Error {
-  constructor(public readonly code: "{{ERROR_CODE_A}}" | "{{ERROR_CODE_B}}", message: string) {
+export class AuthorizationError extends Error {
+  constructor(public readonly code: "forbidden" | "unauthenticated", message: string) {
     super(message);
   }
 }
@@ -167,15 +181,17 @@ export class {{ErrorType}} extends Error {
 ### Inbound (this module calls on dependencies)
 
 ```typescript
-// Imported from {{M-NNN-dep}} — do NOT redefine, only import in implementation.
-import type { {{DepService}} } from "{{module-path}}";
+// REPLACE this block with your module's real dependency imports — do not keep the example.
+
+// Imported from M-006-auth — do NOT redefine, only import in implementation.
+import type { AuthService } from "../m-006-auth";
 
 // Constructor signature — dependency injection pattern used by this module.
-// Callers use {{ModuleName}}Service; the factory/DI container supplies concrete impls.
-export function create{{ModuleName}}Service(deps: {
-  {{depName}}: {{DepService}};
-  {{depName}}: {{DepService}};
-}): {{ModuleName}}Service;
+// Callers use TaskService; the factory/DI container supplies concrete impls.
+export function createTaskService(deps: {
+  auth: AuthService;
+  db: DatabaseService;
+}): TaskService;
 ```
 
 ---
@@ -191,27 +207,33 @@ export function create{{ModuleName}}Service(deps: {
      inline content; {} placeholders or "TBD" do not.
 
      L4 lint (check-api-surface-cols.sh) enforces EXACTLY 7 columns per row.
-     Column order MUST be: Method | Path | Auth | Roles | Rate | Idempotency | Owner
+     Column order MUST be: Method+Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints
 
-     For internal-only endpoints with no external caller, set Auth = "internal-only" and
-     Roles = "—" (em-dash, not empty cell). -->
+     For internal-only endpoints with no external caller, set Auth & Role = "internal-only" and
+     omit anchor links — use inline descriptions instead. -->
 
-| Method | Path | Auth | Roles | Rate | Idempotency | Owner |
-|--------|------|------|-------|------|-------------|-------|
-| `{{METHOD}}` | `{{/v1/resource/:id}}` | `{{header name or "bearer JWT" or "x-api-key"}}` | `{{role-a,role-b or "all"}}` | `{{N req/s/key or "—"}}` | `{{Idempotent on Idempotency-Key / Not idempotent / N/A}}` | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#{{anchor}}) |
-| `{{METHOD}}` | `{{/v1/resource}}` | `{{auth scheme}}` | `{{roles}}` | `{{rate limit}}` | `{{idempotency}}` | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#{{anchor}}) |
+| Method+Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints |
+|-------------|-------------|---------|-------------|-----------------|-----------------|-------------|
+| `{{METHOD}} {{/v1/resource/:id}}` | `{{scheme — e.g. "bearer JWT"; roles — e.g. "developer,org-admin" or "all"}}` | `{{200 + response shape, e.g. "200 Task"}}` | `{{400 invalid_request_error, 401 unauthenticated_error, 404 not_found_error}}` | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#request-{{anchor}}) | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#response-{{anchor}}) | `{{e.g. "body ≤ 1 MB; rate: 10 req/s/key; Idempotent on Idempotency-Key header"}}` |
+| `{{METHOD}} {{/v1/resource}}` | `{{auth scheme; roles}}` | `{{201 + shape}}` | `{{400 validation_error, 409 conflict_error}}` | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#request-{{anchor}}) | [API-{{NNN}}](../api/API-{{NNN}}-{{slug}}.md#response-{{anchor}}) | `{{constraints}}` |
 
 <!-- Column definitions (copied inline per self-contained principle):
-     Method      — full HTTP verb: GET, POST, PUT, PATCH, DELETE
-     Path        — full versioned path including path params (e.g. /v1/tasks/:id)
-     Auth        — required header + scheme (e.g. "x-api-key", "Authorization: Bearer JWT")
-     Roles       — comma-separated roles that may call this endpoint (e.g. "developer,org-admin")
-                   or "all" for unauthenticated / public; "internal-only" for no external surface
-     Rate        — requests per second per key/user (e.g. "10 req/s/key"); "—" for internal
-     Idempotency — "Idempotent on Idempotency-Key header" | "Not idempotent" | "N/A — GET/DELETE"
-     Owner       — anchor link to the populated JSON block in the owning api/API-NNN-slug.md file
-                   Format: [API-NNN](../api/API-NNN-slug.md#method-path-slug)
-                   FORBIDDEN: literal "{}", "TBD", "see API-NNN" without anchor -->
+     Method+Path      — combined: full HTTP verb + full versioned path (e.g. "POST /v1/tasks/:id")
+     Auth & Role      — auth scheme + eligible roles, combined
+                        (e.g. "Authorization: Bearer JWT; roles: developer,org-admin")
+                        use "none; roles: all" for unauthenticated public endpoints
+                        use "internal-only" for endpoints with no external surface
+     Success          — success HTTP status + brief response shape (e.g. "200 Task", "201 Task")
+     Error Codes      — at least one status code + error-type string per distinct error path
+                        (e.g. "400 invalid_request_error, 401 unauthenticated_error, 404 not_found_error")
+     Request Example  — anchor link to the populated JSON request block in the owning api/API-NNN-slug.md
+                        Format: [API-NNN](../api/API-NNN-slug.md#request-anchor)
+                        FORBIDDEN: literal "{}", "TBD", "see API-NNN" without anchor
+     Response Example — anchor link to the populated JSON response block in the owning api/API-NNN-slug.md
+                        Format: [API-NNN](../api/API-NNN-slug.md#response-anchor)
+                        FORBIDDEN: literal "{}", "TBD", "see API-NNN" without anchor
+     Constraints      — rate limits, payload size, idempotency, and other per-endpoint constraints
+                        (e.g. "body ≤ 1 MB; 10 req/s/key; Idempotent on Idempotency-Key header") -->
 
 <!-- X2 lint (check-endpoint-literal-vs-api.sh) verifies every Method+Path literal here has a
      matching endpoint heading in the referenced api/API-NNN-slug.md file, and that no api/*.md
@@ -221,30 +243,33 @@ export function create{{ModuleName}}Service(deps: {
 
 ## Boundary Enforcement
 
-<!-- Lint rules, structural tests, or CI checks that mechanically guard this module's boundaries.
+<!-- Lint rules, structural tests, or CI checks that mechanically guard this module’s boundaries.
      An agent whose changes violate these will have its build rejected.
 
      L3 lint (check-boundary-enforcement-cols.sh) enforces EXACTLY 4 columns per row.
-     Column order MUST be: Operation | Authorization | Validation | Error response
+     Column order MUST be: Constraint | Tool / Lint / Test | File Path | CI Job
 
-     If you cannot fill all four columns with concrete grep-able identifiers, the constraint
-     is advisory — move it to Implementation Constraints instead. "custom lint" or "code review"
-     without a named rule is NOT acceptable in this table.
+     If you cannot fill all four columns with concrete named identifiers and repo-relative paths,
+     the constraint is advisory — move it to Implementation Constraints instead. “custom lint”
+     or “code review” without a named rule is NOT acceptable in this table.
 
      Omit this section only for trivial S-complexity modules with no CI infrastructure. -->
 
-| Operation | Authorization | Validation | Error response |
-|-----------|--------------|------------|----------------|
-| `{{operation description, e.g. "Create resource"}}` | `{{tool:rule, e.g. "middleware:auth-guard"}}` | `{{tool:rule, e.g. "zod schema: CreateResourceSchema"}}` | `{{HTTP status + error type, e.g. "401 unauthorized_error / 400 validation_error"}}` |
-| `{{operation description}}` | `{{tool:rule}}` | `{{tool:rule}}` | `{{HTTP status + error type}}` |
+| Constraint | Tool / Lint / Test | File Path | CI Job |
+|------------|-------------------|-----------|--------|
+| `{{concrete boundary rule, e.g. "Only authenticated users may create resources"}}` | `{{named rule identifier, e.g. "middleware:auth-guard" or "eslint:no-restricted-paths" or "zod:CreateResourceSchema"}}` | `{{repo-relative path to the rule implementation, e.g. "src/middleware/auth-guard.ts"}}` | `{{CI job name that runs this check, e.g. "lint" or "test:integration"}}` |
+| `{{concrete boundary rule}}` | `{{named rule identifier}}` | `{{repo-relative file path}}` | `{{CI job name}}` |
 
 <!-- Column definitions (from structural-lint.md L3):
-     Operation       — one concrete rule in descriptive English; "code should be clean" is rejected
-     Authorization   — named tool + rule identifier (e.g. middleware:require-role('admin'),
-                       golangci-lint:errcheck, eslint:no-restricted-paths:repo-no-service)
-     Validation      — named schema or validator (e.g. zod:CreateTaskSchema, class-validator:@IsUUID)
-     Error response  — HTTP status code + error-type string (e.g. "422 validation_error",
-                       "401 unauthenticated_error"); must match API Surface Error Codes column -->
+     Constraint       — one concrete boundary rule in precise language; “code should be clean” is
+                        rejected; must be testable / machine-checkable
+     Tool / Lint / Test — named rule identifier, NOT descriptive English
+                        (e.g. middleware:auth-guard, golangci-lint:errcheck,
+                        eslint:no-restricted-paths:repo-no-service, zod:CreateResourceSchema)
+     File Path        — repo-relative path that resolves to the actual rule implementation file
+                        (e.g. src/middleware/auth-guard.ts, scripts/check-boundary.sh)
+     CI Job           — exact CI job name that executes this check; must match a job defined in
+                        the Development Infrastructure module’s CI pipeline definition -->
 
 ---
 
@@ -283,6 +308,11 @@ export function create{{ModuleName}}Service(deps: {
      reference; copy, so the module file is self-contained.
      Derive test scenarios from: Interface Definition (public contract), Error Handling (failure
      paths), and Internal Design (complex logic branches).
+
+     STACK SOURCE: test framework, runner, and coverage tooling MUST be taken from
+     clarification.yml `stack.testing` key (if present) or from README Implementation Conventions.
+     Do not invent a test stack ad-hoc — inconsistent choices across modules break shared
+     test infrastructure.
 
      Omit this section only for S-complexity modules with no dependencies and no error paths. -->
 
@@ -409,7 +439,12 @@ stateDiagram-v2
 ## UI Architecture
 
 <!-- Omit this section for backend and shared library modules.
-     Required for frontend modules (Type = frontend). -->
+     Required for frontend modules (Type = frontend).
+
+     STACK SOURCE: component framework, state management library, routing, and i18n library MUST
+     be taken from clarification.yml `stack.frontend` key (if present) or from README
+     Implementation Conventions. Do not make ad-hoc framework choices — inconsistent choices
+     across frontend modules produce conflicting stack signals for coding agents. -->
 
 **Views owned:** {{list of views from README's View / Screen Index that this module implements}}
 
@@ -491,7 +526,11 @@ stateDiagram-v2
 ## Backend i18n Implementation
 
 <!-- Run through the trigger checklist — if any answer is YES this section is mandatory.
-     Omit only when ALL answers are NO (or backend is single-language with no user-facing text). -->
+     Omit only when ALL answers are NO (or backend is single-language with no user-facing text).
+
+     STACK SOURCE: locale resolution middleware, message catalog library, and namespace
+     conventions MUST be taken from clarification.yml `stack.i18n` key (if present) or from
+     README Implementation Conventions. Do not invent an i18n strategy per-module. -->
 
 **Trigger checklist** (answer YES/NO for this module):
 
@@ -533,6 +572,7 @@ stateDiagram-v2
 - **API format:** {{e.g. "JSON over REST; cursor-based pagination — only if this module exposes or consumes APIs"}}
 - **Error format:** {{e.g. "RFC 7807 Problem Details with application/problem+json — only if this module produces error responses"}}
 - **Backend i18n:** {{N/A note here if all trigger-checklist boxes are unticked — mandatory explicit opt-out for HTTP-facing modules}}
+- **Stack context:** {{copy verbatim from clarification.yml `stack:` block — include `stack.frontend`, `stack.backend`, `stack.testing`, and `stack.i18n` keys applicable to this module; if clarification.yml has no `stack:` block, derive from README Implementation Conventions and note the source}}
 
 ---
 

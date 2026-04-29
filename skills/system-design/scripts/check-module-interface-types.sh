@@ -18,9 +18,8 @@
 #        "## Module Deps" section (or "## Dependencies") — detected by grepping for
 #        the type definition in sibling M-*.md files that appear in the Deps listing.
 #
-#   Unresolved types → issue files at <design-dir>/.reviews/LINT-<NNN>.md
-#   (three-digit zero-padded, sequential within this run; continues from the
-#   highest existing LINT-NNN.md in .reviews/).
+#   Unresolved types → findings emitted as JSON on stdout; run-checkers.sh writes
+#   per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Flags:
 #   --quiet   Suppress per-issue stdout progress lines; only final summary.
@@ -142,35 +141,12 @@ if [ ! -d "$MODULES_DIR" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Ensure .reviews/ directory exists
+# JSON findings accumulator
 # ---------------------------------------------------------------------------
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
-mkdir -p "$REVIEWS_DIR"
-
-# Determine starting sequence number (continue from highest existing LINT-NNN.md)
-_next_seq() {
-  local max=0
-  local f seq
-  # Nullglob-safe: test each match with -f
-  for f in "$REVIEWS_DIR"/LINT-*.md; do
-    [ -f "$f" ] || continue
-    seq="${f##*/LINT-}"
-    seq="${seq%.md}"
-    # Strip leading zeros to avoid octal interpretation in arithmetic
-    seq=$(echo "$seq" | sed 's/^0*//')
-    seq="${seq:-0}"
-    if [ "$seq" -gt "$max" ]; then max="$seq"; fi
-  done
-  echo "$max"
-}
-
-SEQ=$(_next_seq)
-
-# ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
 
 # ---------------------------------------------------------------------------
-# Helper: emit one LINT issue file
+# Helper: emit one finding as a JSON entry on stdout (accumulated)
 # ---------------------------------------------------------------------------
 # Args: module_file  line_hint  type_name  severity  suggested_fix
 emit_issue() {
@@ -180,55 +156,11 @@ emit_issue() {
   local severity="$4"
   local suggested_fix="$5"
 
-  SEQ=$(( SEQ + 1 ))
-  local seq_str
-  seq_str=$(printf '%03d' "$SEQ")
-  local issue_file="$REVIEWS_DIR/LINT-${seq_str}.md"
   local rel_module
   rel_module="${module_file#"$DESIGN_DIR/"}"
 
-  cat > "$issue_file" <<ISSUE
-# Lint Issue LINT-${seq_str}
-
-**CR-id:** CR-L5
-**Severity:** ${severity}
-**File:** ${rel_module}
-**Line (approx):** ${line_hint}
-**Unresolved type:** \`${type_name}\`
-
-## Description
-
-Type \`${type_name}\` is referenced in the \`## Interface Definition\` (or
-\`## Interfaces\`) section of \`${rel_module}\` but could not be resolved to:
-
-1. A primitive / built-in type in the exemption set, OR
-2. An inline definition in the same file (i.e. \`interface ${type_name}\`,
-   \`type ${type_name}\`, \`class ${type_name}\`, or \`enum ${type_name}\`), OR
-3. A definition in an explicitly-imported sibling module listed in this
-   module's \`## Module Deps\` (or \`## Dependencies\`) section.
-
-## Suggested Fix
-
-- **Option A — define inline:** Add a \`## Data Models\` section (or extend
-  the existing one) in \`${rel_module}\` and declare:
-  \`\`\`ts
-  interface ${type_name} { /* fields */ }
-  // or
-  type ${type_name} = /* … */;
-  \`\`\`
-- **Option B — import from sibling:** Add the owning module to this module's
-  \`## Module Deps\` section, then add an inline comment in the Interface
-  Definition block:
-  \`\`\`
-  // Imported from M-XXX: ${type_name}
-  \`\`\`
-  so the source module name is explicitly recorded in this file.
-
-${suggested_fix}
-ISSUE
-
   if [ "$QUIET" = false ]; then
-    echo "  [CR-L5] ${severity}: ${rel_module}:${line_hint} — unresolved type \`${type_name}\` → ${issue_file##*/}" >&2
+    echo "  [CR-L5] ${severity}: ${rel_module}:${line_hint} — unresolved type \`${type_name}\`" >&2
   fi
 
   # Accumulate JSON finding
@@ -441,7 +373,6 @@ if [ "$TOTAL_ISSUES" -eq 0 ]; then
   exit 0
 else
   [ "$QUIET" = false ] && echo "CR-L5 FINDINGS — ${TOTAL_ISSUES} unresolved type reference(s) across ${#MODULE_FILES[@]} modules." >&2
-  [ "$QUIET" = false ] && echo "  Issue files written to: $REVIEWS_DIR" >&2
   printf '[%s]\n' "$JSON_FINDINGS"
   if [ "$STRICT" = true ]; then
     exit 1

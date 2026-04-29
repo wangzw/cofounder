@@ -12,7 +12,7 @@
 #   6. Response example         (**Response example:**)
 #   7. Constraints              (**Constraints:**)
 #
-# Missing subsection → emits <design-dir>/.reviews/LINT-<NNN>.md per violation.
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 # Output: "OK 0 findings" or "FAIL <N> findings" to stdout.
 # Exit codes: 0 = no findings; 1 = findings (only fatal with --strict); 2 = invalid args.
 set -euo pipefail
@@ -55,31 +55,9 @@ fi
 
 DESIGN_DIR="${DESIGN_DIR%/}"
 API_DIR="$DESIGN_DIR/api"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
-
-# ── ensure .reviews/ exists ───────────────────────────────────────────────────
-mkdir -p "$REVIEWS_DIR"
 
 # ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
-
-# ── determine next LINT sequence number ───────────────────────────────────────
-# Scan for existing LINT-NNN.md files; next id = max + 1 (or 1 if none).
-next_lint_id() {
-  local max=0
-  local n
-  if [ -d "$REVIEWS_DIR" ]; then
-    for f in "$REVIEWS_DIR"/LINT-*.md; do
-      [ -e "$f" ] || continue
-      # Extract numeric part from filename LINT-NNN.md or LINT-NNN-*.md
-      n=$(basename "$f" | sed 's/^LINT-\([0-9][0-9]*\).*/\1/')
-      if [ "$n" -gt "$max" ] 2>/dev/null; then
-        max="$n"
-      fi
-    done
-  fi
-  echo $((max + 1))
-}
 
 # ── seven required subsection patterns (grep -i friendly) ────────────────────
 # Each entry: "label|grep_pattern"
@@ -200,11 +178,6 @@ for api_file in $API_FILES; do
           *)   severity="mechanical" ;;
         esac
 
-        # Allocate LINT id
-        lint_id=$(next_lint_id)
-        lint_id_padded=$(printf '%03d' "$lint_id")
-        lint_file="$REVIEWS_DIR/LINT-${lint_id_padded}.md"
-
         FINDING_COUNT=$((FINDING_COUNT + 1))
 
         # Accumulate JSON finding
@@ -222,47 +195,8 @@ for api_file in $API_FILES; do
           JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"
         fi
 
-        # Emit LINT-NNN.md
-        cat > "$lint_file" << LINT_EOF
-# LINT-${lint_id_padded}
-
-**ID**: LINT-${lint_id_padded}
-**Severity**: ${severity}
-**CR-id**: CR-L1
-**File**: ${rel_file}
-**Line**: ${ep_lineno}
-**Title**: Endpoint ${ep_heading} missing required subsection: ${label}
-
-## Reasoning
-
-The endpoint \`${ep_heading}\` (line ${ep_lineno}) in \`${rel_file}\` does not contain
-a \`**${label}:**\` subsection block before the next endpoint heading or end of file.
-
-Per the CR-L1 rule (structural-lint.md §L1), every REST endpoint defined in \`api/API-*.md\`
-MUST carry all seven required subsections inline:
-
-1. \`**Description:**\`
-2. \`**Authentication & Permissions:**\`
-3. \`**Request:**\`
-4. \`**Request example:**\`
-5. \`**Response:**\`
-6. \`**Response example:**\`
-7. \`**Constraints:**\`
-
-Missing subsection: **${label}**
-
-## Suggested Fix
-
-Add the missing \`**${label}:**\` subsection to the endpoint block for
-\`${ep_heading}\` in \`${rel_file}\`, following the format defined in
-\`common/templates/api-template.md\` (REST Endpoints section).
-
-A reader opening a single endpoint must see all contract fields inline;
-file-level notes do not substitute for per-endpoint subsections.
-LINT_EOF
-
         if [ "$QUIET" -eq 0 ]; then
-          echo "[CR-L1] ${severity}: ${rel_file}:${ep_lineno} — endpoint '${ep_heading}' missing subsection '${label}' → $(basename "$lint_file")" >&2
+          echo "[CR-L1] ${severity}: ${rel_file}:${ep_lineno} — endpoint '${ep_heading}' missing subsection '${label}'" >&2
         fi
       fi
     done

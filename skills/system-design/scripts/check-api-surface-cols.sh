@@ -9,7 +9,7 @@
 #   2. Every data row must have exactly 7 non-empty cells (not in: "", "—", "TBD",
 #      "...", "TODO", "FIXME").
 #
-# Each violation is written to <design-dir>/.reviews/LINT-<NNN>.md as a blocker issue.
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes:
 #   0  — no violations found
@@ -60,7 +60,6 @@ fi
 
 DESIGN_DIR="${DESIGN_DIR%/}"
 MODULES_DIR="$DESIGN_DIR/modules"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
 
 if [ ! -d "$MODULES_DIR" ]; then
   [ "$QUIET" -eq 0 ] && echo "INFO: no modules/ directory found in $DESIGN_DIR — nothing to check." >&2
@@ -71,25 +70,6 @@ fi
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-# next_lint_seq: return the next available LINT-NNN sequence number
-next_lint_seq() {
-  local dir="$1"
-  local max=0
-  if [ -d "$dir" ]; then
-    while IFS= read -r f; do
-      local base
-      base="$(basename "$f")"
-      if [[ "$base" =~ ^LINT-([0-9]+)\.md$ ]]; then
-        local n="${BASH_REMATCH[1]}"
-        # strip leading zeros for arithmetic
-        n=$((10#$n))
-        [ "$n" -gt "$max" ] && max="$n"
-      fi
-    done < <(find "$dir" -maxdepth 1 -name 'LINT-*.md' 2>/dev/null)
-  fi
-  printf "%03d" $(( max + 1 ))
-}
 
 # is_empty_cell: returns 0 (true) if the cell value counts as empty/forbidden
 is_empty_cell() {
@@ -152,8 +132,6 @@ REQUIRED_COLS=7
 # ---------------------------------------------------------------------------
 # Main scan
 # ---------------------------------------------------------------------------
-mkdir -p "$REVIEWS_DIR"
-
 violation_count=0
 total_files=0
 JSON_FINDINGS=""
@@ -207,34 +185,10 @@ while IFS= read -r module_file; do
       header_checked=1
 
       if [ "$col_count" -ne "$REQUIRED_COLS" ]; then
-        seq=$(next_lint_seq "$REVIEWS_DIR")
-        issue_file="$REVIEWS_DIR/LINT-${seq}.md"
-
         msg="Header has $col_count column(s) instead of $REQUIRED_COLS in API Surface table."
         fix="Add or remove columns so the header matches: | Method + Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints |"
 
         [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
-
-        cat > "$issue_file" <<ISSUE
-# LINT-${seq} — CR-L4 API Surface column count
-
-**Severity**: blocker
-**CR-id**: CR-L4
-**File**: $rel_file
-**Line**: $lineno
-
-## Finding
-
-$msg
-
-Expected 7 columns: Method + Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints
-
-## Suggested Fix
-
-$fix
-
-Per \`module-template.md\`: every API Surface row must fill all 7 columns (no blanks, no "see API-XXX" cross-references without anchor links).
-ISSUE
 
         _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
         _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
@@ -251,35 +205,10 @@ ISSUE
     expected_cols="$REQUIRED_COLS"
 
     if [ "$col_count" -ne "$expected_cols" ]; then
-      seq=$(next_lint_seq "$REVIEWS_DIR")
-      issue_file="$REVIEWS_DIR/LINT-${seq}.md"
-
       msg="Data row has $col_count column(s) instead of $expected_cols in API Surface table."
       fix="Ensure all 7 cells are present: Method + Path | Auth & Role | Success | Error Codes | Request Example | Response Example | Constraints"
 
       [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
-
-      cat > "$issue_file" <<ISSUE
-# LINT-${seq} — CR-L4 API Surface column count (data row)
-
-**Severity**: blocker
-**CR-id**: CR-L4
-**File**: $rel_file
-**Line**: $lineno
-
-## Finding
-
-$msg
-
-Row content:
-\`$line\`
-
-## Suggested Fix
-
-$fix
-
-Per \`module-template.md\` Rules: "every column must be filled (no blanks, no 'see API-XXX' cross-references)".
-ISSUE
 
       _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
       _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
@@ -297,9 +226,6 @@ ISSUE
       [ "$col_idx" -gt "$REQUIRED_COLS" ] && break
 
       if is_empty_cell "$cell"; then
-        seq=$(next_lint_seq "$REVIEWS_DIR")
-        issue_file="$REVIEWS_DIR/LINT-${seq}.md"
-
         col_name="${COL_NAMES[$col_idx]}"
         trimmed_cell="$(echo "$cell" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
@@ -307,36 +233,6 @@ ISSUE
         fix="Fill column '$col_name' with a concrete value. See module-template.md for the expected content per column."
 
         [ "$QUIET" -eq 0 ] && echo "[CR-L4] blocker  $rel_file:$lineno — $msg" >&2
-
-        cat > "$issue_file" <<ISSUE
-# LINT-${seq} — CR-L4 API Surface empty cell
-
-**Severity**: blocker
-**CR-id**: CR-L4
-**File**: $rel_file
-**Line**: $lineno
-**Column**: $col_idx — $col_name
-
-## Finding
-
-$msg
-
-Row content:
-\`$line\`
-
-## Suggested Fix
-
-$fix
-
-Required column content per \`module-template.md\`:
-- **Method + Path**: full HTTP verb + path (e.g. \`POST /v1/tasks\`)
-- **Auth & Role**: required headers + role matrix, or \`internal-only\`
-- **Success**: HTTP status code for the happy path (e.g. \`200\`, \`201\`)
-- **Error Codes**: all triggerable codes with error-type strings (e.g. \`400 invalid_request_error\`)
-- **Request Example**: anchor link \`[API-NNN](../api/API-NNN-slug.md#anchor)\`; \`{}\` is not acceptable
-- **Response Example**: anchor link \`[API-NNN](../api/API-NNN-slug.md#anchor)\`; \`{}\` is not acceptable
-- **Constraints**: rate limits, size caps, idempotency; \`—\` only for pure internal endpoints
-ISSUE
 
         _jfile=$(printf '%s' "$rel_file" | sed 's/"/\\"/g')
         _jdesc=$(printf '%s' "$msg" | sed 's/"/\\"/g')
@@ -357,9 +253,6 @@ done < <(find "$MODULES_DIR" -maxdepth 1 -name 'M-*.md' | sort)
 if [ "$QUIET" -eq 0 ]; then
   echo "" >&2
   echo "CR-L4 check complete — $total_files module(s) scanned, $violation_count violation(s) found." >&2
-  if [ "$violation_count" -gt 0 ]; then
-    echo "Issue files written to: $REVIEWS_DIR/" >&2
-  fi
 fi
 
 if [ "$violation_count" -eq 0 ]; then

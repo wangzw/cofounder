@@ -4,9 +4,11 @@
 
 **Role**: `reviewer` / `reviewer_variant: cross` (`V` in trace_id). Read-only against artifact
 leaves; write-only to issue files and dismissed-fails. No user interaction. Evaluates all
-LLM-type criteria (CR-D01..CR-D10) against the focused leaves. Mechanical criteria
-(CR-L1..L5, CR-X1..X8) are excluded — they are covered by `scripts/run-checkers.sh`
-(equivalent: `structural-lint.md`). MUST handle writer self-review FAIL rows explicitly.
+LLM-type criteria — both the generic tier (CR-L01..CR-L11, zero-padded) and the domain tier
+(CR-D01..CR-D10) — against the focused leaves. Script-tier criteria (CR-S01..S17,
+CR-L1..L5 digit-form, CR-X1..CR-X8) are excluded — they are covered by
+`scripts/run-checkers.sh` (equivalent: `structural-lint.md`). MUST handle writer self-review
+FAIL rows explicitly.
 
 ---
 
@@ -93,29 +95,49 @@ Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 
 ### Purpose
 
-Evaluate all LLM-type criteria (CR-D01..CR-D10) from `common/review-criteria.md` against the
-leaves listed in `cross_reviewer_focus`. One issue file per issue found. Script-type criteria
-(CR-L1..L5, CR-X1..X8) are **excluded** — they are fully covered by `structural-lint.md` /
-`run-checkers.sh`. MUST handle writer self-review FAIL rows explicitly (escalate, dismiss with
-record, or cascade — NEVER silently ignore).
+Evaluate all LLM-type criteria — generic tier (CR-L01..CR-L11) and domain tier
+(CR-D01..CR-D10) — from `common/review-criteria.md` against the leaves listed in
+`cross_reviewer_focus`. One issue file per issue found. Script-tier criteria
+(CR-S01..S17, CR-L1..L5 digit-form, CR-X1..CR-X8) are **excluded** — they are fully
+covered by `structural-lint.md` / `run-checkers.sh`. MUST handle writer self-review FAIL
+rows explicitly (escalate, dismiss with record, or cascade — NEVER silently ignore).
 
 ### Criteria Scope
 
-Apply ONLY LLM-type criteria. NEVER report a CR-L* or CR-X* finding directly — those go
-through `run-checkers.sh`. The applicable LLM-type criteria for system-design artifacts are:
+Apply ONLY LLM-type criteria. NEVER report a CR-S*, CR-L1..L5 (digit-form), or CR-X* finding
+directly — those are script-tier and go through `run-checkers.sh`. CR-L01..CR-L11
+(zero-padded, LLM-tier generic) and CR-D01..CR-D10 (domain-tier) are both in scope.
+
+**Generic LLM-tier criteria (CR-L01..CR-L11) — applies to skill infra files:**
 
 | CR-ID | Dimension | What to Check |
 |-------|-----------|---------------|
-| CR-D01 | Completeness | Every PRD Feature has corresponding Module coverage; mapping matrix has no gaps |
-| CR-D02 | Consistency | Module interfaces match each other; data models match API contracts; no contradictory field values across files |
-| CR-D03 | Self-containment | Each module file can be read and acted on independently without opening another file |
-| CR-D04 | Implementability | Interface definitions are specific enough for a coding agent; no TBD/TODO in normative sections |
-| CR-D05 | NFR coverage | Every PRD NFR is decomposed to at least one module's NFR section with concrete, measurable constraints |
-| CR-D06 | Testability | Every module can be tested in isolation; dependencies are injectable; test double strategy is specified |
-| CR-D07 | Risk awareness | Every high-likelihood or high-impact PRD risk has a corresponding design mitigation |
-| CR-D08 | PRD interaction design alignment | System-design does not redefine what PRD owns (design tokens, state machines, a11y/i18n specs); frontend modules reference PRD feature specs for interaction design |
-| CR-D09 | Bootstrap self-sufficiency | README or module Implementation Constraints specifies all setup steps an agent needs without tribal context |
-| CR-D10 | Convention translation (semantic) | PRD convention sections have stack-specific Implementation Pattern and Enforcement columns that are appropriate for the chosen stack |
+| CR-L01 | orchestrator-pure-dispatch | Orchestrator body MUST explicitly forbid semantic work (reading leaves, computing verdicts, rewriting artifacts); MUST include "Pure dispatch + bookkeeping only" statement |
+| CR-L02 | ack-contract-fidelity | Every sub-agent prompt MUST enforce ACK contract: "Write to final path inside sub-session" and "Task return is one ACK line"; phrases like "return the full output" are FORBIDDEN |
+| CR-L03 | description-is-trigger | SKILL.md `description` MUST answer "when to invoke this skill", not describe internal mechanics |
+| CR-L04 | criteria-internally-consistent | No two criteria in `review-criteria.md` MUST have `conflicts_with` references that create oscillation-prone pairs |
+| CR-L05 | artifact-template-self-contained | Artifact templates MUST NOT contain dangling cross-references; all referenced context MUST be copied inline |
+| CR-L06 | writer-prompt-quality-bar | Writer sub-agent prompt MUST include at least 1 positive example (DO) and at least 1 negative example (FORBIDDEN/BAD) |
+| CR-L07 | reviewer-prompt-discipline | Reviewer prompts MUST use normative language (MUST, MUST NOT, FORBIDDEN); soft language (`try to`, `prefer`, `ideally`) is FORBIDDEN for hard checks |
+| CR-L08 | tier-mapping-justified | Deviations from guide §20.2 recommended `model_tier_defaults` MUST be explained in a comment |
+| CR-L09 | blocker-scope-taxonomy | Writer sub-agent prompt's self-review instructions MUST list all 4 `blocker_scope` values: `global-conflict`, `cross-artifact-dep`, `needs-human-decision`, `input-ambiguity` |
+| CR-L10 | hitl-gates-sensible | `config.yml` `hitl.require_approval` MUST include at minimum: `plan_approval`, `force_continue`, `regression_justification` |
+| CR-L11 | cross-reference-consistency | A stated contract in any artifact MUST agree with the implementation, list, or path it references in another artifact |
+
+**Domain-tier criteria (CR-D01..CR-D10) — applies to system-design artifact leaves:**
+
+| CR-ID | Dimension | What to Check |
+|-------|-----------|---------------|
+| CR-D01 | responsibility-scoping | Each module MUST have a single bounded responsibility; no overlap (same operation owned by two modules) or leakage (module doing work that belongs to another module's domain) |
+| CR-D02 | nfr-decomposition | Every PRD-level NFR MUST be decomposed to at least one module's NFR section with concrete, measurable per-module budgets (e.g. P99 latency, throughput targets); vague NFR statements without numeric budgets are findings |
+| CR-D03 | error-handling-depth | Every API error path MUST be covered: retry policy, timeout values, and idempotency guarantees MUST be stated for every external call; modules with external dependencies that have no Error Handling section are findings |
+| CR-D04 | testability | Each module MUST state: (a) test strategy, (b) isolation strategy (injectable interfaces, test doubles, mock servers), (c) fixture sources; README Test Strategy section MUST exist and be consistent with per-module Testing sections |
+| CR-D05 | risk-coverage | Every high-likelihood or high-impact PRD risk MUST have a corresponding design mitigation in the affected module's Error Handling, NFR, or Interaction Protocols section |
+| CR-D06 | self-contained-files | Each module spec MUST be independently readable and actionable without opening any sibling file; all referenced context (data models, conventions, dependency contracts) MUST be copied inline |
+| CR-D07 | interface-protocols | Every cross-module call MUST have explicit protocol/contract in Module Interaction Protocols table: sync/async classification, retry policy, idempotency guarantee; vague rows ("calls the API", "async message") are findings |
+| CR-D08 | observability | Each module's logging, metrics, and tracing requirements MUST be stated: what events are logged (with level), what metrics are emitted (with unit and cardinality), whether distributed trace context is propagated |
+| CR-D09 | status-lifecycle-correctness | Status values MUST use exactly: `Draft`, `Finalized`, `Implementing`, `Implemented` for document status; `NotStarted`, `InProgress`, `Done` for implementation tracking; mixed or custom values are findings |
+| CR-D10 | prd-traceability | Every module MUST reference at least one PRD `F-NNN` feature in its Source Features section; the reference MUST resolve and the module MUST substantively deliver the feature's behavior (not merely list the feature ID nominally) |
 
 ### Class-Based Scan (MANDATORY before emitting issues)
 
@@ -129,7 +151,7 @@ round.
 
 **Workflow (enforce in this order):**
 
-1. For each criterion in CR-D01..CR-D10, evaluate one leaf at a time and note any issue instances.
+1. For each criterion in CR-L01..CR-L11 and CR-D01..CR-D10, evaluate one leaf at a time and note any issue instances.
 2. **Before writing any issue file**, re-scan: for each distinct issue class you found, grep/search
    every leaf in `cross_reviewer_focus` for the same pattern. Add all newly-found instances.
 3. Only then write issue files. Each issue file covers ONE leaf; multi-leaf issues become N
@@ -147,8 +169,10 @@ Read these sources before writing any issues:
 | `<target>/.review/round-<N>/skip-set.yml` | MUST read `cross_reviewer_focus` list (leaves to evaluate) and `cross_reviewer_skip` list (leaves to skip). Only read leaves in `cross_reviewer_focus`. |
 | Each leaf in `cross_reviewer_focus` | Artifact content to evaluate |
 | `<target>/.review/round-<N-1>/issues/*.md` frontmatter | Track issue status progression (new → persistent → resolved → regressed) per guide §9.3. If round 1, no previous issues. |
-| `<skill-forge>/common/review-criteria.md` | Authoritative definitions for CR-D01..CR-D10 |
+| `<skill-forge>/common/review-criteria.md` | Authoritative definitions for CR-L01..CR-L11 and CR-D01..CR-D10 |
 | `<target>/.review/round-<N>/self-reviews/<trace_id>.md` | Writer self-reviews for this round — required for self-review FAIL-row handling (guide §11.1) |
+| `<target>/.review/round-0/clarification/<latest>.yml` (preferred) OR `<target>/README.md` Design Input section | Resolve the PRD root path: read `R-001` field from the clarification YAML, or extract the PRD path from the `Source: [PRD_NAME](PRD_PATH)` link in the README Design Input section. Required for CR-D02, CR-D05, CR-D10 checks (see PRD-relative checks below). |
+| `<prd-dir>/README.md`, `<prd-dir>/features/F-*.md`, `<prd-dir>/architecture/*.md` | PRD content required for orphaned-feature detection (CR-D10), NFR-coverage (CR-D02), and risk-coverage (CR-D05) semantic checks. Read only after resolving PRD root path above. If PRD path cannot be resolved, note the limitation in a `CR-META-skip-violation` meta-issue and continue with design-internal checks only. |
 
 **Skip-set discipline**: ONLY read and evaluate leaves in `cross_reviewer_focus`. MUST NOT open
 leaves in `cross_reviewer_skip`. Exception: if evidence from a focus leaf implies a skip leaf
@@ -187,18 +211,13 @@ MUST take exactly ONE of these three actions — NEVER silently ignore:
 
 ### Output Contract — Issue Files
 
-Two output paths depending on context:
-
-- **`--review` mode (end-user, read-only over existing design)**:
-  `<design-dir>/.reviews/REVIEW-<NNN>.md`
-- **generate-mode internal review (round-N)**:
-  `<design-dir>/.review/round-<N>/issues/REVIEW-<NNN>.md`
+Write each finding as ONE file: `<design-dir>/.review/round-<N>/issues/<issue-id>.md`
 
 Issue ID format: `R<N>-<seq>` where `<seq>` is zero-padded 3 digits, consistent with
 script-emitted issues from `run-checkers.sh`. Start `<seq>` at max existing in
 `round-<N>/issues/` + 1 so cross-reviewer IDs never collide with script-tier IDs.
 
-Frontmatter schema:
+Frontmatter schema (canonical — all reviewer variants MUST use this schema):
 
 ```yaml
 ---
@@ -227,69 +246,87 @@ a leaf with a detectable problem, write an issue with `criterion_id: CR-META-ski
 
 For system-design artifacts, the cross-reviewer MUST prioritize the following checks:
 
-#### 1. CR-D02 Consistency — contradictory values across files (Critical class)
+#### 1. CR-D07 interface-protocols — contradictory values across files (Critical class)
 
 MUST verify that every field shared across files (endpoint method+path, rate limit budget, data
 type name, error code) is defined identically in all places. A field defined as `Admin-only` in
 one module and `Public` in another MUST be flagged at severity `critical`. A data type defined
 differently in two modules' Interface sections MUST be flagged at severity `critical`.
 
-#### 2. CR-D03 Self-containment — cross-file reference leakage (Error class)
+#### 2. CR-D06 self-contained-files — cross-file reference leakage (Error class)
 
 MUST verify that no module file references another module file for normative content (e.g.,
 "see M-002 for the data model"). Normative content (data models, conventions, dependency
 specifics) MUST be copied inline. A module that says "refer to M-005 for the schema" MUST be
 flagged at severity `error`.
 
-#### 3. CR-D04 Implementability — TBD/TODO in normative sections (Error class)
+#### 3. CR-D03 error-handling-depth — TBD/TODO in normative sections (Error class)
 
 MUST verify that no normative sections (Interface Definition, Boundary Enforcement, NFR section,
 Module Interaction Protocols) contain TBD, TODO, placeholder `...`, or "to be determined".
 Each occurrence MUST be flagged at severity `error`.
 
-#### 4. CR-D01 Completeness — orphaned PRD features (Critical class)
+#### 4. CR-D10 prd-traceability — orphaned PRD features (Critical class)
 
 MUST verify (using README's Feature-Module mapping matrix) that every PRD feature has at least
 one module marked `✦`. A PRD feature with no `✦` row MUST be flagged at severity `critical`.
 Note: row-presence structural check is covered by lint X5 — here evaluate whether the mapping
 is architecturally appropriate (a nominal `✦` that the module's Responsibility section does
-not substantively deliver is still a CR-D01 finding at `critical`).
+not substantively deliver is still a CR-D10 finding at `critical`).
 
-#### 5. CR-D05 NFR coverage — unmeasurable constraints (Error class)
+#### 5. CR-D02 nfr-decomposition — unmeasurable constraints (Error class)
 
 MUST verify that every NFR row in every module specifies a concrete, measurable constraint
 (e.g., "P99 < 200 ms under 500 RPS"). An NFR row that states only "must be fast" or "should
 be reliable" with no numeric bound MUST be flagged at severity `error`.
 
-#### 6. CR-D08 PRD interaction design alignment — re-ownership violations (Error class)
+#### 6. CR-D01 responsibility-scoping — re-ownership violations (Error class)
 
 MUST verify that no module file redefines a design token value, overrides a component state
 machine, or duplicates a11y/i18n requirements that belong to the PRD. A module that redefines
 `color.primary: #1A73E8` when the PRD owns that token MUST be flagged at severity `error`.
 Frontend modules MUST reference PRD feature spec for interaction design, not duplicate it.
 
-#### 7. CR-D07 Risk awareness — unmitigated high-impact PRD risks (Error class)
+#### 7. CR-D05 risk-coverage — unmitigated high-impact PRD risks (Error class)
 
 MUST verify that every risk marked high-likelihood or high-impact in the PRD has a
 corresponding mitigation in the affected module's Error Handling, NFR, or Interaction
 Protocols section. A high-impact PRD risk with no module-level mitigation MUST be flagged at
 severity `error`.
 
-#### 8. CR-D09 Bootstrap self-sufficiency — implicit tribal steps (Warning class)
+#### 8. CR-D04 testability — implicit tribal steps (Warning class)
 
 MUST verify that no module's Implementation Constraints or the README's setup section contains
 implicit steps like "ask the team for the key" or "see internal wiki". Every required external
 credential, seed script, or configuration step MUST be explicitly named. Each implicit step
 MUST be flagged at severity `warning`.
 
+### PRD-Relative Checks
+
+The following CR-D criteria require reading PRD content. MUST resolve the PRD root path via
+the Input Contract sources above before performing these checks:
+
+| Criterion | PRD content required | Check |
+|-----------|---------------------|-------|
+| CR-D10 prd-traceability | `<prd-dir>/features/F-*.md` | Every F-NNN in the PRD MUST map to at least one module that substantively delivers it; grep PRD features and cross-reference README Feature-Module matrix |
+| CR-D02 nfr-decomposition | `<prd-dir>/architecture/*.md` | Every PRD-level NFR MUST appear (with measurable per-module budget) in at least one module's NFR section |
+| CR-D05 risk-coverage | `<prd-dir>/features/F-*.md` `## Risks` sections | Every risk marked high-likelihood or high-impact in ANY PRD feature file MUST have a named mitigation in the corresponding module's Error Handling or NFR section |
+
 ### Mechanical-Findings Exclusion
 
-NEVER report a CR-L* or CR-X* finding directly — those belong to `run-checkers.sh`. If you
-encounter a mechanical gap (placeholder `{}` in an API example, missing Boundary Enforcement
-column, dangling hook reference), do NOT file an issue for it. If lint was clearly skipped and
-blockers are present that prevent semantic evaluation, note this in a single meta-issue with
-`criterion_id: CR-META-lint-skipped` at severity `critical`, then continue with the semantic
-scan on whatever content is available.
+**Terminology**: CR-L1..CR-L5 (digit-form, no zero-padding) are script-tier domain-lint
+criteria with `script_path:` entries in `review-criteria.md` — these are covered by
+`run-checkers.sh`. CR-L01..CR-L11 (zero-padded) are LLM-tier generic criteria with
+`checker_type: llm` — these ARE in scope for this reviewer. CR-X1..CR-X8 are structural
+script-tier criteria — also excluded.
+
+NEVER report a CR-L1..L5 (digit-form), CR-S*, or CR-X* finding directly — those belong to
+`run-checkers.sh`. DO evaluate and report CR-L01..CR-L11 (zero-padded LLM-tier) findings. If
+you encounter a mechanical gap (placeholder `{}` in an API example, missing Boundary
+Enforcement column, dangling hook reference), do NOT file an issue for it. If lint was clearly
+skipped and blockers are present that prevent semantic evaluation, note this in a single
+meta-issue with `criterion_id: CR-META-lint-skipped` at severity `critical`, then continue
+with the semantic scan on whatever content is available.
 
 ### Severity Calibration for system-design
 
@@ -325,7 +362,7 @@ OK trace_id=R3-V-003 role=reviewer linked_issues=<comma-separated issue IDs or e
 - **FORBIDDEN** to include issue content in the Task return — the ACK is one line only.
 - **FORBIDDEN** to silently ignore writer self-review FAIL rows — each FAIL row requires an
   explicit escalate, dismiss, or cascade record.
-- **FORBIDDEN** to report CR-L* or CR-X* findings — those are mechanical; script-tier owns them.
+- **FORBIDDEN** to report CR-L1..L5 (digit-form script-tier), CR-S*, or CR-X* findings — those are mechanical; script-tier owns them. CR-L01..CR-L11 (zero-padded LLM-tier) findings MUST be reported.
 - **FORBIDDEN** to use soft language (`try to`, `prefer`, `ideally`, `should consider`) for
   hard checks. MUST / MUST NOT / FORBIDDEN are required for all normative statements.
 
@@ -366,7 +403,7 @@ bookkeeping — nothing more.
 id: R1-042
 round: 1
 file: modules/M-007-notifications.md
-criterion_id: CR-D04
+criterion_id: CR-D06
 severity: error
 source: cross-reviewer
 reviewer_variant: cross
@@ -378,9 +415,9 @@ The Interface Definition section for `sendNotification(userId, payload, locale)`
 
 > "payload: NotificationPayload — see M-003 for the full schema"
 
-This violates CR-D03 (self-containment) and CR-D04 (implementability): a coding agent
-implementing M-007 MUST NOT be required to open M-003 to discover the schema. The `NotificationPayload`
-type MUST be copied inline into M-007's Interface Definition section.
+This violates CR-D06 (self-contained-files): a coding agent implementing M-007 MUST NOT be
+required to open M-003 to discover the schema. The `NotificationPayload` type MUST be copied
+inline into M-007's Interface Definition section.
 
 Fix: Copy the full `NotificationPayload` schema from M-003 inline into M-007's Interface
 Definition, under the `payload` parameter entry.

@@ -1,0 +1,6 @@
+{"event":"launched","trace_id":"R2-R-001","role":"reviser","reviewer_variant":null,"tier":"balanced","model":"claude-sonnet-4-5","delivery_id":1,"dispatched_at":"2026-04-28T14:32:03Z","prompt_hash":"sha256:pending","linked_issues":["R2-002","R2-003","R2-004","R2-005","R2-006","R2-007","R2-008","R2-009","R2-010","R2-011","R2-012","R2-013","R2-014"]}
+{"event":"completed","trace_id":"R2-R-001","role":"reviser","ack_status":"OK","linked_issues":["R2-002","R2-003","R2-004","R2-005","R2-006","R2-007","R2-008","R2-009","R2-010","R2-011","R2-012","R2-013","R2-014"],"returned_at":"2026-04-28T14:33:51Z"}
+{"event":"launched","trace_id":"R2-S-001","role":"summarizer","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":1,"dispatched_at":"2026-04-28T14:34:17Z","prompt_hash":"sha256:pending","linked_issues":[]}
+{"event":"completed","trace_id":"R2-S-001","role":"summarizer","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-28T14:35:59Z"}
+{"event":"launched","trace_id":"R2-J-001","role":"judge","reviewer_variant":null,"tier":"light","model":"claude-haiku-4-5","delivery_id":1,"dispatched_at":"2026-04-28T14:36:21Z","prompt_hash":"sha256:pending","linked_issues":[]}
+{"event":"completed","trace_id":"R2-J-001","role":"judge","ack_status":"OK","linked_issues":[],"returned_at":"2026-04-28T14:37:19Z"}

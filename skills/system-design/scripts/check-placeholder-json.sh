@@ -13,10 +13,7 @@
 # Forbidden tokens (case-insensitive) inside ```json blocks:
 #   TODO  FIXME  ...  <...>  XXX  PLACEHOLDER  TBD
 #
-# Each finding → issue file at <design-dir>/.reviews/LINT-<NNN>.md
-#   Severity: blocker
-#   CR-id:    CR-L2
-#   Fields:   file, line, offending token, suggested fix
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes:
 #   0  No findings (or findings present but --strict not set)
@@ -66,25 +63,6 @@ fi
 
 # Normalise: strip trailing slash
 DESIGN_DIR="${DESIGN_DIR%/}"
-
-# ─── Issue-file sequencing ────────────────────────────────────────────────────
-
-REVIEWS_DIR="${DESIGN_DIR}/.reviews"
-mkdir -p "$REVIEWS_DIR"
-
-# Determine the next LINT sequence number by scanning existing LINT-NNN.md files.
-_next_seq() {
-  local max=0 n f
-  while IFS= read -r f; do
-    [ -f "$f" ] || continue
-    # Extract the NNN from LINT-NNN.md (or LINT-NNN.applied.md etc.)
-    n=$(basename "$f" | grep -Eo 'LINT-[0-9]+' | grep -Eo '[0-9]+' || true)
-    [ -n "$n" ] && [ "$n" -gt "$max" ] && max="$n"
-  done < <(find "${REVIEWS_DIR}" -maxdepth 1 -name 'LINT-*.md' 2>/dev/null || true)
-  printf '%d' $((max + 1))
-}
-
-NEXT_SEQ=$(_next_seq)
 
 # ── JSON findings accumulator ─────────────────────────────────────────────────
 JSON_FINDINGS=""
@@ -146,13 +124,7 @@ FINDING_COUNT=0
 
 _emit_finding() {
   local rel_file="$1" lineno="$2" token_label="$3" offending_line="$4"
-  local seq_padded seq_num
-  seq_num=$NEXT_SEQ
-  seq_padded=$(printf '%03d' "$seq_num")
-  NEXT_SEQ=$((NEXT_SEQ + 1))
   FINDING_COUNT=$((FINDING_COUNT + 1))
-
-  local issue_file="${REVIEWS_DIR}/LINT-${seq_padded}.md"
 
   # Print to stderr unless --quiet
   if [ "$QUIET" -eq 0 ]; then
@@ -174,46 +146,6 @@ _emit_finding() {
   else
     JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"
   fi
-
-  # Write the issue file
-  cat > "$issue_file" <<ISSUE_EOF
----
-id: LINT-${seq_padded}
-status: new
-severity: blocker
-criterion_id: CR-L2
-file: "${rel_file}"
-line: ${lineno}
-token: "${token_label}"
-source: script
----
-
-# CR-L2 — Forbidden placeholder in \`\`\`json block
-
-**File**: \`${rel_file}\`
-**Line**: ${lineno}
-**Token**: \`${token_label}\`
-
-Forbidden placeholder token found inside a fenced \`\`\`json\`\`\` block.
-
-Offending line:
-\`\`\`
-${offending_line}
-\`\`\`
-
-## Suggested Fix
-
-Replace the placeholder token with a realistic example value derived from
-the surrounding Request/Response table and field constraints.
-
-Examples:
-- \`"TODO"\` / \`"TBD"\` → actual example string e.g. \`"active"\`, \`"user@example.com"\`
-- \`"..."\` / \`...\` → populated object/array e.g. \`{"key": "value"}\`, \`[1, 2, 3]\`
-- \`<field_name>\` → typed example value e.g. \`"my-value"\`, \`42\`, \`true\`
-- \`PLACEHOLDER\` → the actual value the field would hold in a realistic scenario
-- \`XXX\` → a concrete representative value
-- \`FIXME\` → fill with the correct value per the API contract
-ISSUE_EOF
 }
 
 # Scan a single file.  Pure-bash line-by-line; no external grep inside the
@@ -300,7 +232,7 @@ if [ "$QUIET" -eq 0 ]; then
     printf 'CR-L2: PASS — no placeholder tokens found in ```json blocks (%d file(s) scanned)\n' \
       "${#TARGET_FILES[@]}" >&2
   else
-    printf 'CR-L2: %d finding(s) written to %s\n' "$FINDING_COUNT" "$REVIEWS_DIR" >&2
+    printf 'CR-L2: %d finding(s)\n' "$FINDING_COUNT" >&2
   fi
 fi
 

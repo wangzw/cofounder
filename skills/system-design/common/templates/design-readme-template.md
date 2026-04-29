@@ -14,8 +14,12 @@
 
 <!-- COMMENTARY:
      {{PRD_NAME}}     = human-readable PRD title (e.g. "TaskFlow PRD").
-     {{PRD_PATH}}     = relative path from this README to the PRD README.md
-                        (e.g. "../../prd/2026-01-15-taskflow/README.md").
+     {{PRD_PATH}}     = relative path from this README to the PRD README.md.
+                        Canonical depth from docs/raw/design/<date>-<slug>/README.md:
+                          "../../prd/<date>-<slug>/README.md"  (two ".." levels)
+                        WARNING: module specs (modules/M-NNN.md) use THREE ".." levels.
+                        Do NOT copy the ../../../prd/... pattern from module-template.md
+                        into this README — the README is one level shallower.
      {{INPUT_MODE}}   = one of: "PRD-based" | "draft-based" | "Interactive".
      {{DESIGN_DATE}}  = ISO-8601 date this document was generated (YYYY-MM-DD).
      {{DESIGN_STATUS}} = one of: "Draft" | "Finalized" | "Implementing" | "Implemented".
@@ -260,27 +264,29 @@ graph LR
      annotate the Deps cell as "M-007 (+ M-022 via consumer-side interface)" and add a row
      here with Method = "consumer-side interface (Wire-injected)". -->
 
-| Interaction | Caller → Callee | Protocol | Idempotency | Retry Policy | Notes |
-|-------------|----------------|----------|-------------|--------------|-------|
-| {{INTERACTION_NAME_1}} | {{CALLER_1}} → {{CALLEE_1}} | {{PROTOCOL_1}} | {{IDEMPOTENCY_1}} | {{RETRY_POLICY_1}} | {{INTERACTION_NOTES_1}} |
-| {{INTERACTION_NAME_2}} | {{CALLER_2}} → {{CALLEE_2}} | {{PROTOCOL_2}} | {{IDEMPOTENCY_2}} | {{RETRY_POLICY_2}} | {{INTERACTION_NOTES_2}} |
+| Interaction | Caller → Callee | Sync/Async | Idempotency | Retry Policy | Contract Test |
+|-------------|----------------|------------|-------------|--------------|---------------|
+| {{INTERACTION_NAME_1}} | {{CALLER_1}} → {{CALLEE_1}} | {{SYNC_ASYNC_1}} | {{IDEMPOTENCY_1}} | {{RETRY_POLICY_1}} | {{CONTRACT_TEST_1}} |
+| {{INTERACTION_NAME_2}} | {{CALLER_2}} → {{CALLEE_2}} | {{SYNC_ASYNC_2}} | {{IDEMPOTENCY_2}} | {{RETRY_POLICY_2}} | {{CONTRACT_TEST_2}} |
 
 <!-- COMMENTARY:
      {{INTERACTION_NAME_N}} = short human label (e.g. "Task ingestion", "Status notification").
      {{CALLER_N}}           = module ID and name of the caller (e.g. "M-001 Parser").
      {{CALLEE_N}}           = module ID and name of the callee (e.g. "M-002 Ingester").
-     {{PROTOCOL_N}}         = one of:
-                               "sync function call"
-                               "async event / message queue"
+     {{SYNC_ASYNC_N}}       = one of:
+                               "sync" (synchronous function call / in-process)
+                               "async" (event / message queue / background job)
                                "HTTP REST"
                                "gRPC"
                                "consumer-side interface (Wire-injected)"
+                              This column satisfies CR-D07's sync/async classification requirement.
      {{IDEMPOTENCY_N}}      = "idempotent" | "non-idempotent" | "at-least-once safe".
      {{RETRY_POLICY_N}}     = retry behaviour (e.g. "caller retries 3×, then fails with
                                ErrXxx" or "dead-letter queue after 5 failures").
-     {{INTERACTION_NOTES_N}} = contract test specification or cross-cutting note
+     {{CONTRACT_TEST_N}}    = shared fixture or contract test reference
                                (e.g. "shared fixture: valid/invalid Task payloads; both sides
-                               test against same fixtures"). -->
+                               test against same fixtures" or "Pact consumer contract in
+                               contracts/m001-m002.json"). -->
 
 <!-- COMMENTARY: For complex multi-step interactions, include a sequence diagram below the
      table to clarify message ordering. Use mermaid sequenceDiagram syntax.

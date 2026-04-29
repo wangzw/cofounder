@@ -129,6 +129,11 @@ All six conditions must be simultaneously true. If any is non-zero, `converged` 
 - Detection: compare issue frontmatter across the window rounds — look for criterion+file
   pairs that were resolved in round N-1 but re-appear in round N (status `regressed`), and
   that pattern has repeated at least twice in the window.
+- **Round-1 bootstrapping rule**: When `rounds_elapsed` == 1 (no prior round exists),
+  `oscillating` CANNOT be true — skip the cross-round cycling check entirely. A `regressed`
+  status on round-1 issues may arise from within-round reviser passes but cross-round cycling
+  requires at least 2 completed rounds in the window. Do NOT treat a missing N-1 round as
+  evidence of oscillation; silently skip the check and proceed to `diverging` / `progressing`.
 
 **`diverging`**:
 - `regressed_count` >= `config.yml regression_gate.diverging_threshold` (default: 3).

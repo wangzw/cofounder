@@ -44,7 +44,7 @@
 #       If the marker is absent → MECHANICAL (missing excerpt marker).
 #
 # 3. REPORT PHASE
-#    Emit one LINT-NNN.md per finding; print summary.
+#    Emit one JSON finding per violation on stdout; print summary on stderr.
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # TODO (endpoint-signature drift — case 2):
@@ -64,7 +64,7 @@
 #   1  At least one violation found AND (blocker present OR --strict set)
 #   2  Usage error or <design-dir> not found
 #
-# Issue files: <design-dir>/.reviews/LINT-<NNN>.md
+# Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 
 set -euo pipefail
 
@@ -108,31 +108,14 @@ DESIGN_DIR="${DESIGN_DIR%/}"
 MODULES_DIR="$DESIGN_DIR/modules"
 API_DIR="$DESIGN_DIR/api"
 README="$DESIGN_DIR/README.md"
-REVIEWS_DIR="$DESIGN_DIR/.reviews"
-
-mkdir -p "$REVIEWS_DIR"
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
-
-# next_lint_seq: return next zero-padded 3-digit LINT sequence number.
-next_lint_seq() {
-  local max=0 base n
-  while IFS= read -r f; do
-    base="$(basename "$f")"
-    if [[ "$base" =~ ^LINT-([0-9]+) ]]; then
-      n="${BASH_REMATCH[1]}"
-      n=$((10#$n))
-      [ "$n" -gt "$max" ] && max="$n"
-    fi
-  done < <(find "$REVIEWS_DIR" -maxdepth 1 -name 'LINT-*.md' 2>/dev/null)
-  printf "%03d" $(( max + 1 ))
-}
 
 VIOLATION_COUNT=0
 HAS_BLOCKER=0
 JSON_FINDINGS=""
 
-# emit_issue: write a LINT-NNN.md for one violation.
+# emit_issue: emit one finding as a JSON entry on stdout (accumulated).
 # Args:
 #   $1 severity   (blocker | mechanical)
 #   $2 primary    relative path of canonical file
@@ -150,10 +133,6 @@ emit_issue() {
   local reasoning="$6"
   local fix="$7"
 
-  local seq
-  seq="$(next_lint_seq)"
-  local issue_file="$REVIEWS_DIR/LINT-${seq}.md"
-
   if [ "$QUIET" -eq 0 ]; then
     printf '[CR-X7] %s  %s — %s\n' "$severity" "$dup_rel" "$title" >&2
   fi
@@ -164,27 +143,6 @@ emit_issue() {
   _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g; s/\n/ /g')
   _jentry="{\"criterion_id\":\"CR-X7\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jtitle}\",\"suggested_fix\":\"${_jfix}\"}"
   if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
-
-  cat > "$issue_file" <<ISSUE
-# LINT-${seq} — CR-X7 single-source-of-truth
-
-**Severity**: ${severity}
-**CR-id**: CR-X7
-**Files**: [primary] ${primary_rel}, [duplicate] ${dup_rel}
-**Type**: \`${type_name}\`
-
-## Finding
-
-${title}
-
-## Reasoning
-
-${reasoning}
-
-## Suggested Fix
-
-${fix}
-ISSUE
 
   VIOLATION_COUNT=$(( VIOLATION_COUNT + 1 ))
   if [ "$severity" = "blocker" ]; then
