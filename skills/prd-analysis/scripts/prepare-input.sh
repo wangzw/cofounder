@@ -48,6 +48,9 @@ while [ $# -gt 0 ]; do
       sed -n '/^# Usage:/,/^# No external/p' "$0" | sed 's/^# //'
       exit 0
       ;;
+    -)
+      # bare '-' is the documented stdin-sentinel positional, not a flag
+      POSITIONAL+=("$1"); shift ;;
     -*) echo "ERROR: unknown flag: $1" >&2; exit 1 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac

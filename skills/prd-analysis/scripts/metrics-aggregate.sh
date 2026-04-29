@@ -57,12 +57,22 @@ CONFIG_PATH="common/config.yml"
 CRITERION_EXTRACTOR=""
 DRY_RUN=""
 
+_set_scope() {
+  local new_key="$1"
+  if [[ -n "$SCOPE_KEY" && "$SCOPE_KEY" != "$new_key" ]]; then
+    echo "error: scope flags are mutually exclusive; got --${SCOPE_KEY} and --${new_key}" >&2
+    usage >&2
+    exit 1
+  fi
+  SCOPE_KEY="$new_key"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --diagnose) MODE="diagnose"; shift ;;
-    --round) SCOPE_KEY="round"; SCOPE_VAL="${2:-}"; shift 2 ;;
-    --delivery) SCOPE_KEY="delivery"; SCOPE_VAL="${2:-}"; shift 2 ;;
-    --since) SCOPE_KEY="since"; SCOPE_VAL="${2:-}"; shift 2 ;;
+    --round)    _set_scope "round";    SCOPE_VAL="${2:-}"; shift 2 ;;
+    --delivery) _set_scope "delivery"; SCOPE_VAL="${2:-}"; shift 2 ;;
+    --since)    _set_scope "since";    SCOPE_VAL="${2:-}"; shift 2 ;;
     --review-dir) REVIEW_DIR="${2:-}"; shift 2 ;;
     --harness-dir) HARNESS_DIR="${2:-}"; shift 2 ;;
     --config) CONFIG_PATH="${2:-}"; shift 2 ;;
