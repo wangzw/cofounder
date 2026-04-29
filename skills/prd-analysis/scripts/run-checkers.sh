@@ -1,784 +1,96 @@
 #!/usr/bin/env bash
-# run-checkers.sh — master checker runner §12.5 Phase A + Phase B
-# Usage: run-checkers.sh [--full] <target-skill-dir> round-<N>
-# Flags:
-#   --full   forced-full review (guide §8.6): skip-set includes every leaf in
-#            single_file_focus AND cross_reviewer_focus; skip lists empty;
-#            depgraph propagation short-circuited. Triggers: criteria major
-#            version bump, new-version first round, converged→first --review,
-#            distance since last full review ≥ N, user --full.
-# Writes: manifest.yml, depgraph.yml, skip-set.yml, issues/round-checker-output.json
-# Exit: 0=no critical/error issues, 1=has critical/error issues, 2=script error
+# run-checkers.sh — formal-review aggregator (guide §1.1 + §10)
+#
+# Runs every formal-review script against a PRD bundle and concatenates
+# their JSON output into one document on stdout. Convenience wrapper for
+# writer self-audit (guide §4) and review-mode formal hard gate (guide §5).
+#
+# Usage: run-checkers.sh <prd-dir>
+#
+# Sub-checks invoked (in order):
+#   scripts/check-prd-formal.sh    — PRD-shape structural / format checks
+#   scripts/check-issue-schema.sh  — review-artifact self-closure (§10)
+#
+# Returncode (per guide §9.1):
+#   0  every sub-check passed
+#   1  one or more sub-checks reported issues — JSON document on stdout
+#   2  script-level error in one of the sub-checks
+#
+# Stdout (per guide §9.2): always restates the meaning. On exit 1 the
+# document has shape `{"issues": [...]}`, the same shape that
+# `create-issues.sh` consumes.
+
 set -euo pipefail
 
+PRD_ROOT="${1:-}"
+if [ -z "$PRD_ROOT" ] || [ ! -d "$PRD_ROOT" ]; then
+  echo "ERROR: PRD root not found: ${PRD_ROOT:-<empty>}" >&2
+  echo "Usage: run-checkers.sh <prd-dir>" >&2
+  exit 2
+fi
+PRD_ROOT="${PRD_ROOT%/}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-FORCED_FULL=0
-POSITIONAL=()
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --full) FORCED_FULL=1; shift ;;
-    --) shift; while [ $# -gt 0 ]; do POSITIONAL+=("$1"); shift; done ;;
-    -*) echo "ERROR: unknown flag: $1" >&2; exit 2 ;;
-    *) POSITIONAL+=("$1"); shift ;;
-  esac
-done
-set -- "${POSITIONAL[@]}"
+python3 - "$PRD_ROOT" "$SCRIPT_DIR" <<'PYEOF'
+import os, sys, json, subprocess
 
-TARGET="${1:-}"
-ROUND="${2:-}"
+prd_root = sys.argv[1]
+script_dir = sys.argv[2]
 
-if [ -z "$TARGET" ] || [ ! -d "$TARGET" ]; then
-  echo "ERROR: target skill dir not found: ${TARGET}" >&2
-  exit 2
-fi
-if [ -z "$ROUND" ]; then
-  echo "ERROR: round argument required (e.g. round-1)" >&2
-  exit 2
-fi
+CHECKERS = [
+    ("check-prd-formal.sh", [prd_root]),
+    ("check-issue-schema.sh", [prd_root]),
+]
 
-TARGET="${TARGET%/}"
+aggregated = []
+worst = 'info'
+order = {'info': 0, 'warning': 1, 'error': 2, 'critical': 3}
+script_error = False
 
-if ! echo "$ROUND" | grep -qE '^round-[0-9]+$'; then
-  echo "ERROR: round must be 'round-N' format; got '$ROUND'" >&2
-  exit 2
-fi
-
-# Auto-force-full when the scaffolder (the generator that produced this skill)
-# has bumped version since the last recorded round.
-#
-# Why we read scaffold-provenance.yml, not $SCRIPT_DIR/../SKILL.md:
-#   run-checkers.sh is COPIED into every scaffolded skill, so $SCRIPT_DIR/..
-#   resolves to the target itself — yielding the target's own version, not
-#   the scaffolder's. The target's version doesn't change when the scaffolder
-#   bumps (e.g. skill-forge 0.2.1 → 0.2.2 propagates new scripts into
-#   prd-analysis without touching prd-analysis's SKILL.md), so a comparison
-#   against state.yml never detects criteria-bundle drift. The 0.2.1 release
-#   of skill-forge had this exact bug; this 0.2.2 logic fixes it.
-#
-# Source of truth: scaffold-provenance.yml carries `scaffolder_version`,
-# written by the scaffolder (e.g. skill-forge/scripts/scaffold.sh) at scaffold
-# time AND on every re-scaffold. When the scaffolder's logic / criteria / prompts
-# evolve, propagation rewrites scaffold-provenance.yml with the new version,
-# this comparison detects it, and force-full overrides the incremental
-# skip-set so reviewer changes don't silently miss leaves.
-#
-# Self-review fallback: a generator (e.g. skill-forge reviewing skill-forge)
-# is not scaffolded, so it has no scaffold-provenance.yml. In that case we
-# read $TARGET/SKILL.md directly — for self-review, target IS the scaffolder.
-#
-# This concept recurses: if prd-analysis ever generates a sub-skill, the
-# sub-skill's scaffold-provenance.yml records prd-analysis's version (since
-# prd-analysis owns scaffold.sh in that case). The same logic applies.
-#
-# After a successful round, state.yml's `reviewer_version_seen` is updated to
-# the current scaffolder_version so the next round has a baseline.
-STATE_YML="$TARGET/.review/state.yml"
-PROVENANCE_YML="$TARGET/common/scaffold-provenance.yml"
-LAST_SEEN_VERSION=""
-if [ -f "$STATE_YML" ]; then
-  LAST_SEEN_VERSION=$(grep -E '^reviewer_version_seen:' "$STATE_YML" | head -1 \
-    | sed -E 's/^reviewer_version_seen:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
-fi
-CURRENT_REVIEWER_VERSION=""
-if [ -f "$PROVENANCE_YML" ]; then
-  CURRENT_REVIEWER_VERSION=$(grep -E '^scaffolder_version:' "$PROVENANCE_YML" | head -1 \
-    | sed -E 's/^scaffolder_version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
-fi
-# Self-review fallback: TARGET IS the scaffolder (generators aren't scaffolded
-# themselves, so there is no provenance file). Read its own SKILL.md.
-if [ -z "$CURRENT_REVIEWER_VERSION" ] && [ -f "$TARGET/SKILL.md" ]; then
-  CURRENT_REVIEWER_VERSION=$(grep -E '^version:' "$TARGET/SKILL.md" | head -1 \
-    | sed -E 's/^version:[[:space:]]*//' | sed -E 's/^["'"'"']//; s/["'"'"']$//' || true)
-fi
-if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -n "$LAST_SEEN_VERSION" ] \
-   && [ "$CURRENT_REVIEWER_VERSION" != "$LAST_SEEN_VERSION" ] \
-   && [ "$FORCED_FULL" = "0" ]; then
-  echo "INFO: scaffolder version changed (${LAST_SEEN_VERSION} → ${CURRENT_REVIEWER_VERSION}); auto-forcing full review (incremental skip-set would miss leaves that pass under old criteria but fail under new)" >&2
-  FORCED_FULL=1
-fi
-
-ROUND_NUM="${ROUND#round-}"
-PREV_ROUND_NUM=$((ROUND_NUM - 1))
-ROUND_DIR="${TARGET}/.review/${ROUND}"
-PREV_ROUND_DIR="${TARGET}/.review/round-${PREV_ROUND_NUM}"
-
-mkdir -p "${ROUND_DIR}/issues"
-
-# ─────────────────────────────────────────────
-# Phase A: manifest + depgraph + skip-set
-# ─────────────────────────────────────────────
-
-FORCED_FULL="$FORCED_FULL" python3 - "$TARGET" "$ROUND_DIR" "$PREV_ROUND_DIR" <<'PYEOF'
-import sys, os, hashlib, json
-from datetime import datetime, timezone
-
-target = sys.argv[1]
-round_dir = sys.argv[2]
-forced_full = os.environ.get('FORCED_FULL', '0') == '1'
-prev_round_dir = sys.argv[3]
-
-def should_exclude(rel_path):
-    parts = rel_path.replace('\\', '/').split('/')
-    if parts[0] == '.review':
-        return True
-    if len(parts) >= 2 and parts[0] == 'common' and parts[1] == 'skeleton':
-        return True
-    return False
-
-def sha256_file(path):
-    h = hashlib.sha256()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
-            h.update(chunk)
-    return h.hexdigest()
-
-# Build manifest
-leaves = {}
-for dirpath, dirnames, filenames in os.walk(target):
-    rel_dir = os.path.relpath(dirpath, target)
-    if should_exclude(rel_dir):
-        dirnames.clear()
-        continue
-    dirnames[:] = [d for d in dirnames if not d.startswith('.') and
-                   not should_exclude(os.path.join(rel_dir, d).lstrip('./'))]
-    for fname in filenames:
-        fpath = os.path.join(dirpath, fname)
-        rel_file = os.path.relpath(fpath, target).replace('\\', '/')
-        if should_exclude(rel_file):
-            continue
-        try:
-            sha = sha256_file(fpath)
-            line_count = sum(1 for _ in open(fpath, 'rb'))
-            leaves[rel_file] = {'sha256': sha, 'line_count': line_count}
-        except OSError:
-            pass
-
-now_iso = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-
-# Write manifest.yml
-manifest_path = os.path.join(round_dir, 'manifest.yml')
-with open(manifest_path, 'w', encoding='utf-8') as f:
-    f.write(f"generated_at: {now_iso}\n")
-    f.write("leaves:\n")
-    for rel_file in sorted(leaves.keys()):
-        info = leaves[rel_file]
-        f.write(f'  "{rel_file}":\n')
-        f.write(f'    sha256: "{info["sha256"]}"\n')
-        f.write(f'    line_count: {info["line_count"]}\n')
-
-# Load previous manifest if exists
-prev_manifest_path = os.path.join(prev_round_dir, 'manifest.yml') if prev_round_dir != os.path.join(os.path.dirname(round_dir), 'round-0') else ''
-prev_leaves = {}
-if os.path.isfile(prev_manifest_path):
-    import re
-    current_file = None
-    with open(prev_manifest_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            m_file = re.match(r'^\s+"([^"]+)":\s*$', line)
-            m_sha = re.match(r'^\s+sha256:\s+"([^"]+)"', line)
-            if m_file:
-                current_file = m_file.group(1)
-            elif m_sha and current_file:
-                prev_leaves[current_file] = m_sha.group(1)
-
-# Write unchanged files to skip-set
-# (skip-set used by Phase B for per_file criteria)
-# Forced-full (§8.6) short-circuits: no leaf is "unchanged" for skip purposes even if
-# hash matches — the whole target gets re-reviewed.
-if forced_full:
-    unchanged = []
-else:
-    unchanged = [f for f, info in leaves.items() if prev_leaves.get(f) == info['sha256']]
-
-# We'll write skip-set after loading criteria (Phase B will use it)
-# For now, emit as JSON for the Phase B python to read
-state = {
-    'leaves': leaves,
-    'unchanged': unchanged,
-    'manifest_path': manifest_path,
-    'round_dir': round_dir,
-    'now_iso': now_iso,
-    'forced_full': forced_full,
-}
-state_path = os.path.join(round_dir, '_phase_a_state.json')
-with open(state_path, 'w') as f:
-    json.dump(state, f)
-print(f"OK manifest written: {manifest_path}")
-PYEOF
-
-# Run depgraph
-"${SCRIPT_DIR}/build-depgraph.sh" "$TARGET" "$ROUND" >/dev/null 2>&1 || true
-
-# ─────────────────────────────────────────────
-# Phase B: extract criteria, run script checkers
-# ─────────────────────────────────────────────
-
-CRITERIA_JSON=$("${SCRIPT_DIR}/extract-criteria.sh" "$TARGET" 2>/dev/null) || {
-  echo "ERROR: failed to extract criteria from target" >&2
-  exit 2
-}
-
-set +e
-CHECKER_SCRIPTS_DIR="$SCRIPT_DIR" python3 - "$TARGET" "$ROUND_DIR" "$CRITERIA_JSON" <<'PYEOF'
-import sys, os, json, subprocess, re, hashlib
-from typing import Dict
-
-target = sys.argv[1]
-round_dir = sys.argv[2]
-criteria_json = sys.argv[3]
-
-try:
-    criteria = json.loads(criteria_json)
-except json.JSONDecodeError as e:
-    sys.stderr.write(f"ERROR: bad criteria JSON: {e}\n")
-    sys.exit(2)
-
-# Load phase A state
-state_path = os.path.join(round_dir, '_phase_a_state.json')
-with open(state_path, 'r') as f:
-    state = json.load(f)
-leaves = state['leaves']
-unchanged = state['unchanged']
-now_iso = state.get('now_iso', '')
-forced_full = state.get('forced_full', False)
-
-# Build skip-set
-# Per guide §8.5 / §12.5.1, skip-set has two granularities:
-#   (a) single_file_focus/skip: per-file hash unchanged → safe for single-file checkers
-#   (b) cross_reviewer_focus/skip: hash AND transitive dependencies unchanged → safe for
-#       cross-reviewer LLM (else a dependency change leaves stale cross-refs unchecked)
-
-all_leaves = set(leaves.keys())
-unchanged_set = set(unchanged)
-changed_set = all_leaves - unchanged_set
-
-# Load depgraph if available (built by build-depgraph.sh between Phase A and Phase B)
-depgraph_path = os.path.join(round_dir, 'depgraph.yml')
-depgraph = {}
-depgraph_available = False
-if os.path.isfile(depgraph_path):
+for name, args in CHECKERS:
+    path = os.path.join(script_dir, name)
+    if not os.path.isfile(path):
+        print(f"ERROR: missing checker: {name}", file=sys.stderr)
+        sys.exit(2)
     try:
-        with open(depgraph_path, 'r', encoding='utf-8') as f:
-            dep_txt = f.read()
-        in_graph = False
-        current_file = None
-        current_deps = []
-        for line in dep_txt.split('\n'):
-            if line.strip() == 'graph:':
-                in_graph = True
-                continue
-            if not in_graph:
-                continue
-            m_file = re.match(r'^\s{2}"([^"]+)":\s*\[\]', line)
-            if m_file:
-                # Inline empty list
-                depgraph[m_file.group(1)] = []
-                continue
-            m_file_open = re.match(r'^\s{2}"([^"]+)":\s*$', line)
-            if m_file_open:
-                current_file = m_file_open.group(1)
-                depgraph[current_file] = []
-                continue
-            m_dep = re.match(r'^\s+-\s+"([^"]+)"', line)
-            if m_dep and current_file:
-                depgraph[current_file].append(m_dep.group(1))
-        depgraph_available = True
-    except Exception:
-        depgraph_available = False
-
-# Build reverse deps: for each file, who references it
-reverse_deps = {f: set() for f in all_leaves}
-for src, deps in depgraph.items():
-    for dep in deps:
-        if dep in reverse_deps:
-            reverse_deps[dep].add(src)
-
-# Compute transitive closure of "tainted" files for cross-reviewer:
-# A file is tainted if it changed, OR any file it references changed, OR any file
-# that references it changed. Tainted files go to cross_reviewer_focus; untainted to skip.
-tainted = set(changed_set)
-# Propagate both directions via BFS
-frontier = set(changed_set)
-while frontier:
-    next_frontier = set()
-    for f in frontier:
-        # Files this file depends on (if they're our problem we already know)
-        for dep in depgraph.get(f, []):
-            if dep in all_leaves and dep not in tainted:
-                tainted.add(dep)
-                next_frontier.add(dep)
-        # Files that depend on this file (changes here could invalidate them)
-        for rev in reverse_deps.get(f, set()):
-            if rev not in tainted:
-                tainted.add(rev)
-                next_frontier.add(rev)
-    frontier = next_frontier
-
-cross_reviewer_focus = sorted(tainted)
-cross_reviewer_skip  = sorted(all_leaves - tainted)
-
-# ────────────────────────────────────────────────────────────────────────────
-# Scaffold-provenance skip: leaves whose current sha matches the manifest at
-# common/scaffold-provenance.yml are "still pure scaffold content" — the writer
-# / reviser never touched them. LLM cross-reviewer auditing such leaves is
-# pure waste (the skeleton has been reviewed at the generator level; the
-# target's copy is byte-identical). Move them unconditionally to skip unless
-# forced-full is on. Writer / reviser mutations drift the sha → auto-demoted
-# out of the skip-set.
-# ────────────────────────────────────────────────────────────────────────────
-scaffold_skip_set: set = set()
-if not forced_full:
-    provenance_path = os.path.join(target, "common", "scaffold-provenance.yml")
-    scaffold_shas: Dict[str, str] = {}
-    if os.path.isfile(provenance_path):
-        in_files = False
-        for line in open(provenance_path, encoding="utf-8"):
-            s = line.rstrip("\n")
-            if s.startswith("files:"):
-                in_files = True
-                continue
-            if not in_files or not s.strip() or s.lstrip().startswith("#"):
-                continue
-            m = re.match(r'^  (.+?):\s+([0-9a-f]{64})$', s)
-            if m:
-                scaffold_shas[m.group(1)] = m.group(2)
-    if scaffold_shas:
-        # Walk every leaf — focus AND skip — to identify scaffold-pure leaves.
-        for leaf in sorted(set(cross_reviewer_focus) | set(cross_reviewer_skip)):
-            expected = scaffold_shas.get(leaf)
-            if not expected:
-                continue
-            try:
-                actual = hashlib.sha256(
-                    open(os.path.join(target, leaf), "rb").read()).hexdigest()
-            except OSError:
-                continue
-            if actual == expected:
-                scaffold_skip_set.add(leaf)
-        if scaffold_skip_set:
-            cross_reviewer_focus = sorted(set(cross_reviewer_focus) - scaffold_skip_set)
-            cross_reviewer_skip  = sorted(set(cross_reviewer_skip) | scaffold_skip_set)
-scaffold_skip = sorted(scaffold_skip_set)
-
-single_file_focus = sorted(changed_set)
-single_file_skip  = sorted(unchanged_set)
-
-# Back-compat per_file_skips: per-CR list (same as before). Script checkers
-# still consume this rather than single_file_*. Identical semantics for per_file CRs.
-per_file_skips = {}
-for c in criteria:
-    cid = c.get('id', '')
-    skip = c.get('incremental_skip', 'full_scan')
-    if skip == 'per_file':
-        per_file_skips[cid] = single_file_skip
-
-# Helper: write a YAML list field, inline `[]` when empty
-def write_list(f, key, values):
-    if not values:
-        f.write(f"{key}: []\n")
-    else:
-        f.write(f"{key}:\n")
-        for v in values:
-            f.write(f'  - "{v}"\n')
-
-# Write skip-set.yml per guide §12.5.1 schema
-skip_set_path = os.path.join(round_dir, 'skip-set.yml')
-round_num = int(round_dir.rstrip('/').split('round-')[-1])
-total_leaves = len(all_leaves)
-
-with open(skip_set_path, 'w', encoding='utf-8') as f:
-    f.write(f"round: {round_num}\n")
-    f.write(f"generated_at: {now_iso}\n")
-    f.write(f"depgraph_available: {'true' if depgraph_available else 'false'}\n")
-    f.write(f"forced_full: {'true' if forced_full else 'false'}\n")
-    write_list(f, "single_file_focus", single_file_focus)
-    write_list(f, "single_file_skip",  single_file_skip)
-    write_list(f, "cross_reviewer_focus", cross_reviewer_focus)
-    write_list(f, "cross_reviewer_skip",  cross_reviewer_skip)
-    # Subset of cross_reviewer_skip whose skip reason is "scaffold-pure"
-    # (sha matches scaffold-provenance manifest, never modified by writer/
-    # reviser). Summarizer counts these as PRESUMED-COVERED for the
-    # coverage_percent metric — otherwise Tier 2.4 narrowing of focus would
-    # be punished by coverage falling below the converged-verdict gate of 100%.
-    write_list(f, "scaffold_skip", scaffold_skip)
-    # coverage check sums — union must equal total_leaves for each granularity
-    f.write("coverage_check:\n")
-    f.write(f"  total_leaves: {total_leaves}\n")
-    f.write(f"  single_file_focus_count: {len(single_file_focus)}\n")
-    f.write(f"  single_file_skip_count: {len(single_file_skip)}\n")
-    f.write(f"  single_file_union_complete: {str(len(single_file_focus) + len(single_file_skip) == total_leaves).lower()}\n")
-    f.write(f"  cross_reviewer_focus_count: {len(cross_reviewer_focus)}\n")
-    f.write(f"  cross_reviewer_skip_count: {len(cross_reviewer_skip)}\n")
-    f.write(f"  cross_reviewer_union_complete: {str(len(cross_reviewer_focus) + len(cross_reviewer_skip) == total_leaves).lower()}\n")
-    f.write(f"  scaffold_skip_count: {len(scaffold_skip)}\n")
-    # Coverage = leaves accounted for / total. A leaf is "accounted for" when
-    # it lives in cross_reviewer_focus (re-evaluated this round) OR in
-    # cross_reviewer_skip (which by skip-set semantics means it is unchanged
-    # vs. a prior covered round, OR it is scaffold-pure). The union is
-    # asserted complete by the cross_reviewer_union_complete check above; in
-    # that case coverage is 100% and the converged-verdict gate is never
-    # falsely blocked by Tier-2.4 narrowing or by depgraph-driven incremental
-    # skipping.
-    cross_total = len(cross_reviewer_focus) + len(cross_reviewer_skip)
-    if cross_total == total_leaves:
-        cov_pct = 100
-    else:
-        cov_pct = int(round(100.0 * cross_total / max(1, total_leaves)))
-    f.write(f"  effective_coverage_percent: {cov_pct}\n")
-    # Per-criterion skip lists (back-compat for script checkers).
-    # Script checkers that care about per_file granularity consume this; LLM reviewers
-    # should consume cross_reviewer_focus instead.
-    f.write("per_file_skips:\n")
-    for cid in sorted(per_file_skips.keys()):
-        skipped = per_file_skips[cid]
-        if skipped:
-            f.write(f'  "{cid}":\n')
-            for sf in sorted(skipped):
-                f.write(f'    - "{sf}"\n')
-        else:
-            f.write(f'  "{cid}": []\n')
-
-# Run script-type checkers
-all_issues = []
-# Resolve the scripts dir that holds the checker implementations.
-# Hard invariant: checker scripts are the REVIEWER's, never the artifact's.
-# A scaffolded skill carries copies of these scripts under <target>/scripts/,
-# but those copies serve the target's own --review of ITS artifacts — never
-# reviewing the target itself. Letting <target>/scripts/ audit <target> means
-# the artifact's writer/reviser can silently weaken the checks against its
-# own changes, and CR-S17 drift detection would be the only line of defence
-# (post-hoc, easy to regress). Source of truth: CHECKER_SCRIPTS_DIR, exported
-# by the running run-checkers.sh as its SCRIPT_DIR — i.e. the reviewer's scripts/.
-scripts_dir = os.environ.get('CHECKER_SCRIPTS_DIR', '')
-if not scripts_dir or not os.path.isdir(scripts_dir):
-    sys.stderr.write(
-        "ERROR: CHECKER_SCRIPTS_DIR must be set to the reviewer's scripts/ "
-        "directory; refusing to fall back to <target>/scripts/ (would let the "
-        "artifact's own scripts review itself). Invoke run-checkers.sh via its "
-        "bash wrapper so SCRIPT_DIR is exported.\n"
-    )
-    sys.exit(2)
-
-# Refuse to run when scripts_dir lives inside <target>: that is the
-# artifact-audits-itself case (e.g. someone invoked the target's own
-# run-checkers.sh on the target). Generated skills always review their own
-# artifacts (output dirs), never themselves — so scripts_dir and target are
-# disjoint trees in legitimate usage.
-target_abs = os.path.abspath(target)
-scripts_dir_abs = os.path.abspath(scripts_dir)
-if scripts_dir_abs == target_abs or scripts_dir_abs.startswith(target_abs + os.sep):
-    sys.stderr.write(
-        f"ERROR: CHECKER_SCRIPTS_DIR ({scripts_dir_abs}) is inside <target> "
-        f"({target_abs}); refusing to use the artifact's own scripts to "
-        f"review itself. Invoke the reviewer skill's run-checkers.sh, not "
-        f"the target's copy.\n"
-    )
-    sys.exit(2)
-
-for c in criteria:
-    cid = c.get('id', '')
-    checker_type = c.get('checker_type', '')
-    script_path = c.get('script_path', '')
-    incr_skip = c.get('incremental_skip', 'full_scan')
-
-    # Only run script-type criteria
-    if checker_type != 'script':
+        proc = subprocess.run([path, *args], capture_output=True, text=True, check=False)
+    except OSError as e:
+        print(f"ERROR: cannot invoke {name}: {e}", file=sys.stderr)
+        sys.exit(2)
+    if proc.returncode == 2:
+        sys.stderr.write(proc.stderr)
+        print(f"ERROR: sub-checker {name} reported a script error", file=sys.stderr)
+        script_error = True
         continue
-
-    if not script_path:
+    if proc.returncode == 0:
         continue
-
-    # Resolve script strictly via scripts_dir (the reviewer's scripts/).
-    # Never fall back to <target>/scripts/ — see scripts_dir invariant above.
-    full_script = os.path.join(scripts_dir, os.path.basename(script_path))
-    if not os.path.isfile(full_script):
-        # Missing checker => structured meta-issue so it surfaces in review loop
-        # and the judge sees a real 'error' until the script is authored or the CR is
-        # re-classified / deprecated. (Previously this only emitted a stderr WARNING
-        # that was silently skipped — allowing converged verdicts despite unchecked CRs.)
-        all_issues.append({
-            "criterion_id": "CR-META-missing-checker",
-            # The revisable artifact is the criteria file where the CR is declared,
-            # NOT the missing script path (scripts/ is skeleton-protected — reviser
-            # cannot author new scripts). Carry the missing script path as a separate
-            # field so the reviser can surface it in the rewrite rationale.
-            "file": "common/review-criteria.md",
-            "missing_script_path": script_path,
-            "severity": "error",
-            "description": (
-                f"{cid} declares script_path {script_path!r} but no such script exists "
-                f"in the reviewer's scripts/ directory ({scripts_dir!r}); "
-                f"criterion was not evaluated"
-            ),
-            "suggested_fix": (
-                f"Edit common/review-criteria.md: change {cid}.checker_type to 'llm' if the "
-                f"check genuinely requires LLM judgment, OR add deprecated: true to {cid} if the "
-                f"rule is no longer applicable. Authoring new scripts under scripts/ is NOT the "
-                f"reviser's job (skeleton-protected); escalate via HITL if a new script is required."
-            ),
-        })
-        continue
-
+    if proc.returncode != 1:
+        print(f"ERROR: {name} returned unexpected code {proc.returncode}", file=sys.stderr)
+        sys.exit(2)
+    # exit 1 — issues found. The first stdout line is "FOUND ...:"; the rest is JSON.
+    body = proc.stdout
+    nl = body.find('\n')
+    json_body = body[nl + 1:] if nl >= 0 else body
     try:
-        result = subprocess.run(
-            [full_script, target],
-            capture_output=True, timeout=60
-        )
-        if result.returncode == 2:
-            stderr_snippet = result.stderr.decode("utf-8", errors="replace").strip()[:200]
-            all_issues.append({
-                "criterion_id": cid,
-                "file": "scripts/" + script_path.rsplit("/", 1)[-1],
-                "severity": "error",
-                "description": f"{cid} checker script exited 2 (internal error); criterion not evaluated: {stderr_snippet}",
-                "suggested_fix": f"inspect script {script_path} stderr for root cause"
-            })
-            continue
-        stdout = result.stdout.decode("utf-8", errors="replace").strip()
-        if stdout:
-            try:
-                checker_issues = json.loads(stdout)
-                if isinstance(checker_issues, list):
-                    all_issues.extend(checker_issues)
-            except json.JSONDecodeError:
-                # Non-JSON stdout is a contract violation — emit meta-issue
-                # instead of silent warning, so it's visible to judge + revise loop.
-                all_issues.append({
-                    "criterion_id": "CR-META-checker-contract-violation",
-                    "file": script_path,
-                    "severity": "error",
-                    "description": (
-                        f"{cid} checker stdout is not valid JSON (first 100 chars: "
-                        f"{stdout[:100]!r}); expected JSON array per §12.4"
-                    ),
-                    "suggested_fix": (
-                        f"fix {script_path} to emit JSON array on stdout (empty list [] on pass, "
-                        f"list of issue dicts on findings); all diagnostic output must go to stderr"
-                    ),
-                })
-    except subprocess.TimeoutExpired:
-        all_issues.append({
-            "criterion_id": "CR-META-checker-timeout",
-            "file": script_path,
-            "severity": "error",
-            "description": f"{cid} checker timed out after 60s; criterion not evaluated",
-            "suggested_fix": f"profile {script_path} and optimize, or split into per-file invocations",
-        })
-    except Exception as e:
-        all_issues.append({
-            "criterion_id": "CR-META-checker-error",
-            "file": script_path,
-            "severity": "error",
-            "description": f"{cid} checker raised unexpected exception: {type(e).__name__}: {e}",
-            "suggested_fix": f"inspect {script_path} for robustness; catch the underlying cause",
-        })
+        doc = json.loads(json_body)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: {name} stdout is not valid JSON after summary line: {e}", file=sys.stderr)
+        sys.exit(2)
+    issues = doc.get('issues', []) if isinstance(doc, dict) else []
+    aggregated.extend(issues)
+    for it in issues:
+        sev = it.get('severity', 'info')
+        if order.get(sev, 0) > order[worst]:
+            worst = sev
 
-# Write output
-out_path = os.path.join(round_dir, 'issues', 'round-checker-output.json')
-with open(out_path, 'w', encoding='utf-8') as f:
-    json.dump(all_issues, f, indent=2)
+if script_error:
+    sys.exit(2)
 
-# Expand each issue into an individual <issue-id>.md file so downstream
-# summarizer/judge/reviser (which all read `issues/*.md` frontmatter) can
-# pick them up. Number monotonically within the round starting at 001;
-# cross-reviewer picks up from max+1 when it dispatches later.
-issues_dir = os.path.join(round_dir, 'issues')
-existing_ids = set()
-for fname in os.listdir(issues_dir):
-    m = re.match(r'^R(\d+)-(\d{3})\.md$', fname)
-    if m:
-        existing_ids.add(int(m.group(2)))
-next_seq = max(existing_ids) + 1 if existing_ids else 1
+if not aggregated:
+    print("PASS 0 issues found across all formal-review checkers")
+    sys.exit(0)
 
-def _yaml_escape(s):
-    if s is None:
-        return '""'
-    s = str(s).replace('\\', '\\\\').replace('"', '\\"')
-    # collapse newlines for frontmatter scalars
-    s = s.replace('\n', ' ').replace('\r', ' ')
-    return '"' + s + '"'
-
-for issue in all_issues:
-    issue_id = f"R{round_num}-{next_seq:03d}"
-    next_seq += 1
-    md_path = os.path.join(issues_dir, issue_id + '.md')
-    criterion_id = issue.get('criterion_id', 'UNKNOWN')
-    severity     = issue.get('severity', 'error')
-    file_field   = issue.get('file', '')
-    description  = issue.get('description', '')
-    suggested    = issue.get('suggested_fix', '')
-    extra_fm_lines = []
-    if 'missing_script_path' in issue:
-        extra_fm_lines.append(f'missing_script_path: {_yaml_escape(issue["missing_script_path"])}')
-    extra_fm = ('\n' + '\n'.join(extra_fm_lines)) if extra_fm_lines else ''
-    frontmatter = (
-        '---\n'
-        f'id: {issue_id}\n'
-        f'status: new\n'
-        f'severity: {severity}\n'
-        f'criterion_id: {criterion_id}\n'
-        f'file: {_yaml_escape(file_field)}\n'
-        f'round: {round_num}\n'
-        f'source: script'
-        f'{extra_fm}\n'
-        '---\n\n'
-    )
-    body = f'# {criterion_id}\n\n{description}\n'
-    if suggested:
-        body += f'\n## Suggested Fix\n\n{suggested}\n'
-    with open(md_path, 'w', encoding='utf-8') as f:
-        f.write(frontmatter + body)
-
-print(f"OK checker output written: {out_path} ({len(all_issues)} issues)")
-
-# ────────────────────────────────────────────────────────────────────────────
-# Carry-forward: copy every prior-round open issue (status ∈ {new, persistent,
-# regressed}) into THIS round's issues/ as status=persistent. UNCONDITIONAL —
-# we do NOT filter by cross_reviewer_focus/skip. Rationale:
-#   - skip leaves: cross-reviewer doesn't re-evaluate, so the issue must be
-#     carried so the operator (and judge) still sees it.
-#   - focus leaves: cross-reviewer normally re-evaluates and writes
-#     resolved/persistent records, but Step 1 short-circuit (script-tier
-#     errors) skips cross-reviewer dispatch entirely. Carrying focus-leaf
-#     issues unconditionally guarantees they survive a short-circuited round
-#     and reach the revise phase, which is the only phase guaranteed to run
-#     and which owns final state transitions (resolved | persistent | dismissed).
-# Auto-resolve still applies to script-source carry-forwards: if the original
-# checker no longer reports the (criterion_id, file) pair, the issue is
-# treated as resolved without explicit intervention.
-# ────────────────────────────────────────────────────────────────────────────
-carried_forward = 0
-auto_resolved = 0
-if round_num > 1:
-    prev_round_dir = os.path.join(
-        os.path.dirname(round_dir), f"round-{round_num - 1}")
-    prev_issues_dir = os.path.join(prev_round_dir, "issues")
-    # Build a fingerprint set of (criterion_id, file) pairs found by THIS round's
-    # script-type checks. Used to auto-clear stale script-type carry-forwards: if
-    # a prior CR-S* issue's (criterion_id, file) does not appear in this round's
-    # findings, the underlying script no longer reports it (e.g. the script bug
-    # was fixed, or the file was edited to satisfy the rule via a non-targeted
-    # change). Such issues MUST NOT be carried forward — that would propagate a
-    # phantom finding indefinitely.
-    current_script_pairs = {
-        (i.get("criterion_id", ""), i.get("file", ""))
-        for i in all_issues
-    }
-    if os.path.isdir(prev_issues_dir):
-        for fname in sorted(os.listdir(prev_issues_dir)):
-            m = re.match(r'^R(\d+)-(\d{3})\.md$', fname)
-            if not m:
-                continue
-            prev_path = os.path.join(prev_issues_dir, fname)
-            try:
-                text = open(prev_path, encoding="utf-8").read()
-            except OSError:
-                continue
-            if not text.startswith("---\n"):
-                continue
-            # Split frontmatter
-            end = text.find("\n---\n", 4)
-            if end < 0:
-                continue
-            fm_text = text[4:end]
-            body_text = text[end + 5:]
-            fm: dict = {}
-            for ln in fm_text.split("\n"):
-                if ":" in ln:
-                    k, _, v = ln.partition(":")
-                    fm[k.strip()] = v.strip().strip('"').strip("'")
-            # Open-status filter: only carry forward issues that haven't been
-            # explicitly closed. `resolved` and `dismissed` (revise-phase
-            # status mutations) drop out here.
-            if fm.get("status") not in ("new", "persistent", "regressed"):
-                continue
-            leaf = fm.get("file", "")
-            # Auto-clear stale script-type issues: a prior issue is script-type
-            # iff its `source` is `script` (filed by run-checkers in some round)
-            # or `carry-forward` (propagated from a script-type origin). Script
-            # checks run on the whole tree every round, so absence of the
-            # (criterion_id, file) pair from this round's `all_issues` is
-            # authoritative — the originating script no longer reports it.
-            # Skip the carry-forward; the issue is resolved.
-            #
-            # LLM-type issues (`source: cross-reviewer` / `adversarial-reviewer`)
-            # are NOT auto-resolved here: those reviewers don't run every round
-            # (skip-set, Step 1 short-circuit), so script absence carries no
-            # information about their criteria. LLM issues stay persistent until
-            # the revise phase explicitly transitions them.
-            origin = fm.get("source", "")
-            crit = fm.get("criterion_id", "")
-            if origin in ("script", "carry-forward") \
-                    and (crit, leaf) not in current_script_pairs:
-                auto_resolved += 1
-                continue
-            new_id = f"R{round_num}-{next_seq:03d}"
-            next_seq += 1
-            out_md_path = os.path.join(issues_dir, new_id + ".md")
-            # Rewrite frontmatter with updated id/round/status/source.
-            carries_from = fm.get("id", "")
-            new_fm_lines = [
-                "---",
-                f"id: {new_id}",
-                f"status: persistent",
-                f"severity: {fm.get('severity', 'error')}",
-                f"criterion_id: {fm.get('criterion_id', 'UNKNOWN')}",
-                f"file: {_yaml_escape(fm.get('file', ''))}",
-                f"round: {round_num}",
-                f"source: carry-forward",
-                f"carries_from: {carries_from}",
-            ]
-            for extra_key in ("missing_script_path", "resolved_script_path",
-                              "resolves", "reviewer_variant"):
-                if extra_key in fm and fm[extra_key] not in (None, ""):
-                    new_fm_lines.append(
-                        f"{extra_key}: {_yaml_escape(fm[extra_key])}")
-            new_fm_lines.append("---\n")
-            with open(out_md_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(new_fm_lines) + "\n" + body_text)
-            carried_forward += 1
-if carried_forward:
-    print(f"OK carry-forward: {carried_forward} open issues inherited from round-{round_num-1}")
-if auto_resolved:
-    print(f"OK auto-resolved: {auto_resolved} stale script-type issues dropped (originating script no longer reports them)")
-
-# Clean up temp state
-try:
-    os.remove(state_path)
-except OSError:
-    pass
-
-has_blocking = any(i.get('severity') in ('critical', 'error') for i in all_issues)
-if has_blocking:
-    sys.exit(1)
+print(f"FOUND {len(aggregated)} issue(s) across formal-review checkers (worst severity: {worst}):")
+print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
+sys.exit(1)
 PYEOF
-EXIT_CODE=$?
-set -e
-if [ $EXIT_CODE -eq 1 ]; then
-  echo "INFO: checkers found critical/error issues (exit 1)" >&2
-fi
-
-# Record current reviewer version in state.yml so the NEXT round's
-# version-drift check has a baseline. We do this after the skip-set is
-# written (regardless of has-blocking), so a round that found issues still
-# advances the seen-version pointer — the issues themselves don't invalidate
-# the version comparison for the next round's skip-set computation.
-if [ -n "$CURRENT_REVIEWER_VERSION" ] && [ -f "$STATE_YML" ]; then
-  if grep -q '^reviewer_version_seen:' "$STATE_YML"; then
-    python3 - "$STATE_YML" "$CURRENT_REVIEWER_VERSION" <<'PYEOF'
-import sys, re
-path, ver = sys.argv[1], sys.argv[2]
-with open(path, encoding='utf-8') as f:
-    text = f.read()
-text = re.sub(r'^reviewer_version_seen:.*$',
-              f'reviewer_version_seen: "{ver}"', text, count=1, flags=re.MULTILINE)
-with open(path, 'w', encoding='utf-8') as f:
-    f.write(text)
-PYEOF
-  else
-    echo "reviewer_version_seen: \"$CURRENT_REVIEWER_VERSION\"" >> "$STATE_YML"
-  fi
-fi
-
-exit $EXIT_CODE
