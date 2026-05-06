@@ -63,7 +63,7 @@ Every FAIL row in a self-review archive MUST select exactly one `blocker_scope` 
 MUST return:
 
 ```
-OK trace_id=R3-W-007 role=writer linked_issues=R3-012 self_review_status=PARTIAL fail_count=1
+OK trace_id=R3-W-007 role=writer linked_issues=I-012 self_review_status=PARTIAL fail_count=1
 ```
 
 Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /

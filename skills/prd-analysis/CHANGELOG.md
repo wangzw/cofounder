@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+- **fix: round-8 audit follow-up** —
+  - Round-7 corrected `linked_issues: ["R3-012"]` → `["I-012"]` in
+    `common/snippets.md` but missed three higher-traffic sites that
+    propagate the same conflation between the dispatch `trace_id`
+    namespace (`R<N>-<role>-<NNN>` like `R3-W-007`) and the on-disk
+    issue-ID namespace (`I-NNN`, per `common/issue-schema.md`):
+    - `SKILL.md:272` — `launched` JSONL example
+    - `SKILL.md:296` — `completed` JSONL example
+    - `generate/writer-subagent.md:66` — ACK envelope example
+    These examples sit two lines below schema tables that document
+    `linked_issues` as carrying issue-IDs, so the contradiction was
+    actively misleading writer subagents. Updated all three to
+    `I-012`; trace_id `R3-W-007` values preserved.
+  - `tests/test-cr-id-references.sh`: added a second test that scans
+    every auditable markdown file for `linked_issues` tokens (in
+    JSONL, ACK envelope, and YAML forms) and asserts each matches
+    `I-\d{3,}`. Mechanically rejects any future `R<N>-...` leakage
+    into the issue-ID slot — ending the round-7 → round-8
+    whack-a-mole cycle on this single conceptual error.
+
 - **fix: round-7 audit follow-up** —
   - `common/snippets.md`: harness-event examples used
     `"linked_issues": ["R3-012"]` and `linked_issues=R3-012`, conflating

@@ -124,4 +124,84 @@ else
     _record_fail "fabricated CR-IDs detected — see stderr above"
 fi
 
+# ─── Test 2: linked_issues namespace must be I-NNN (issue-IDs), not R<N>- ─
+#
+# Round-7 surfaced a recurring conflation between the on-disk issue-ID
+# namespace (`I-NNN`, per common/issue-schema.md and emitted by
+# scripts/create-issues.sh as f"I-{n:03d}") and the dispatch trace_id
+# namespace (`R<N>-<role>-<NNN>` like R3-W-007, R3-V-001). Round-8
+# uncovered that round-7 missed 6 sites in higher-traffic SKILL.md and
+# writer-subagent.md examples. Mechanically guard the entire auditable
+# file set so future drift is rejected at test time.
+test_case "every linked_issues token in templates / subagent prompts uses canonical I-NNN issue-IDs"
+
+if python3 - "$SKILL_DIR" <<'PYEOF'
+import os, re, sys
+
+skill_dir = sys.argv[1]
+auditable_dirs = ["common/templates", "generate", "review", "revise",
+                  "evolve", "compact", "clarify", "planner"]
+auditable_files = ["SKILL.md", "mode-routing.md"]
+
+paths_to_scan = []
+for top in auditable_files:
+    p = os.path.join(skill_dir, top)
+    if os.path.isfile(p):
+        paths_to_scan.append(p)
+for sub in auditable_dirs:
+    sub_path = os.path.join(skill_dir, sub)
+    if not os.path.isdir(sub_path):
+        continue
+    for root, _, files in os.walk(sub_path):
+        for fn in files:
+            if fn.endswith(".md"):
+                paths_to_scan.append(os.path.join(root, fn))
+
+# Match three syntactic forms:
+#   "linked_issues": ["I-007", "I-012"]   (JSONL launched/completed events)
+#   linked_issues=I-007,I-012             (ACK envelope text)
+#   linked_issues: [I-007, I-012]         (YAML / tabular)
+# The capture group is the value text up to ] or whitespace / line end.
+forms = [
+    re.compile(r'"linked_issues"\s*:\s*\[([^\]]*)\]'),
+    re.compile(r'linked_issues\s*=\s*([^\s|]+)'),
+    re.compile(r'(?<!")\blinked_issues\s*:\s*\[([^\]]*)\]'),
+]
+token_re = re.compile(r"[A-Za-z][A-Za-z0-9-]*\d")
+issue_id_re = re.compile(r"^I-\d{3,}$")
+
+violations = []
+for p in sorted(paths_to_scan):
+    rel = os.path.relpath(p, skill_dir)
+    with open(p, "r", encoding="utf-8") as f:
+        for lineno, line in enumerate(f, 1):
+            for form in forms:
+                for m in form.finditer(line):
+                    val = m.group(1)
+                    # Permit placeholder / schema-doc shapes that carry
+                    # no real values: empty array, schema metavars in
+                    # angle brackets, or `<comma-separated or empty>`.
+                    if "<" in val or "..." in val:
+                        continue
+                    tokens = [t.strip().strip('"\'') for t in val.split(",") if t.strip()]
+                    for t in tokens:
+                        # strip enclosing quotes if any
+                        if not token_re.search(t):
+                            continue  # not an ID-shaped token, ignore
+                        if not issue_id_re.match(t):
+                            violations.append((rel, lineno, t, line.strip()[:120]))
+
+if violations:
+    print("WRONG-NAMESPACE linked_issues tokens (expected I-NNN):", file=sys.stderr)
+    for rel, lineno, tok, ctx in violations:
+        print(f"  {rel}:{lineno}  {tok}  | {ctx}", file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
+PYEOF
+then
+    _record_pass
+else
+    _record_fail "linked_issues uses non-I-NNN tokens — see stderr above"
+fi
+
 end_tests
