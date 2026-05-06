@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### Added
+- **Incremental review + `--full` flag** — review rounds now write a
+  sha256 leaves manifest (`scripts/snapshot-leaves.sh` →
+  `round-<N>/leaves-manifest.yml`) and a per-round scope file
+  (`scripts/compute-review-scope.sh` → `round-<N>/review-scope.yml`).
+  Cross- and adversarial-reviewers consume `review-scope.yml` to decide
+  whether each LLM criterion is full-scan (apply to every leaf) or
+  per-file (apply only to leaves listed in `changed_leaves[]`). All 10
+  `checker_type: llm` criteria in `common/review-criteria.md` now carry
+  an authoritative `incremental_skip: full_scan | per_file` annotation
+  (previously absent). Decision tree: forced full review on the first
+  round of a delivery (no prior manifest within `current_delivery`), on
+  missing/corrupt prior manifest (safety fallback), or when a new
+  `--full` CLI flag is passed (single invocation only — `--auto` drops
+  it from subsequent rounds in the same loop). Otherwise incremental,
+  diff-based. Reviewer prompts gain a top-level
+  `scope_applied: full | incremental` audit field. Adds
+  `scripts/snapshot-leaves.sh`, `scripts/compute-review-scope.sh`,
+  `enumerate_leaves()` (and `MODULE_FILE_RE` / `API_FILE_RE`) in
+  `scripts/lib/sd_lint.py`, and 39 new tests.
+- **`--compact` mode** — new pure-script mode that aggregates the
+  intermediate review rounds of the current delivery into a single
+  `.review/round-<final>/compacted-history.md` summary and deletes the
+  intermediate `round-N/` + `traces/round-N/` trees. Also sweeps any
+  orphan `.review/traces/round-<N>/` whose source round dir is already
+  gone (left over from prior compacted deliveries). Designed for the
+  hand-off point between `system-design` and the next pipeline stage
+  (e.g. `autoforge`) after many review/revise iterations. Gated on
+  `verdict: converged` for the current delivery's final round; warns
+  when no `delivery-<N>-<slug>` git tag exists (use `--force` or run
+  `commit-delivery.sh` first). Adds `scripts/compact-delivery.sh`,
+  `scripts/check-compacted-history.sh` (CR-CH01, CR-CH02), the
+  `compact` phase in `verify-phase-entry.sh`, and `compact/index.md`
+  orchestration.
+- **`--auto` auto-compaction** — when `--auto` reaches `converged`,
+  the delivery sequence (`review/index.md` Step 9) now runs
+  `compact-delivery.sh` automatically right after `commit-delivery.sh`
+  creates the `delivery-<N>-<slug>` tag. Hand-off to the next pipeline
+  stage no longer needs a manual `--compact` call. Interactive mode is
+  unchanged (still surfaces a next-step hint).
+
 ### Changed
 - Deprecate `.reviews/` (with-S) end-user review directory; consolidate all review and revise
   output to `.review/round-<N>/issues/<issue-id>.md` (no-S) per skill-forge harness convention.

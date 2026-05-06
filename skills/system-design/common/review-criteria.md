@@ -467,10 +467,14 @@ on-disk schema defined in `common/issue-schema.md`. This is review-artifact self
 
 ---
 
-## Audit-Artifact Schema Criteria (CR-CL / CR-PL / CR-SR / CR-RO / CR-RI / CR-VD / CR-VS)
+## Audit-Artifact Schema Criteria (CR-CL / CR-PL / CR-SR / CR-RO / CR-RI / CR-VD / CR-VS / CR-CH)
 
 These criteria audit LLM-produced artifacts of the review pipeline itself
 (guide §10 self-closure). Each pairs with a per-artifact check script.
+`CR-CH*` audits the script-produced `compacted-history.md` summary
+written by `scripts/compact-delivery.sh` when the user runs `--compact`
+to retire intermediate review rounds before transitioning to the next
+pipeline stage.
 
 ```yaml
 - id: CR-CL01
@@ -593,6 +597,22 @@ These criteria audit LLM-produced artifacts of the review pipeline itself
   severity: error
   conflicts_with: []
   priority: 2
+- id: CR-CH01
+  name: "compacted-history-required-frontmatter"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-compacted-history.sh
+  severity: error
+  conflicts_with: []
+  priority: 3
+- id: CR-CH02
+  name: "compacted-history-final-round-monotonic"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-compacted-history.sh
+  severity: error
+  conflicts_with: []
+  priority: 3
 - id: CR-RV01
   name: "revisions-required-sections"
   version: 1.0.0
@@ -629,6 +649,7 @@ a new per-artifact `check-*.sh` rule.
   severity: info
   conflicts_with: []
   priority: 3
+  incremental_skip: full_scan
 ```
 
 ---
@@ -648,6 +669,7 @@ a new substantive criterion.
   severity: warning
   conflicts_with: []
   priority: 3
+  incremental_skip: full_scan
 ```
 
 ---
@@ -666,6 +688,7 @@ design defect: future changes will repeatedly couple unrelated diff scopes.
   severity: error
   conflicts_with: []
   priority: 2
+  incremental_skip: per_file
 ```
 
 ---
@@ -684,6 +707,7 @@ prose. Unjustified inverted dependencies invite future refactors.
   severity: warning
   conflicts_with: []
   priority: 3
+  incremental_skip: per_file
 ```
 
 ---
@@ -703,6 +727,7 @@ substantive defects.
   severity: error
   conflicts_with: []
   priority: 2
+  incremental_skip: per_file
 ```
 
 ---
@@ -721,6 +746,7 @@ views, etc.) MUST be called out explicitly.
   severity: error
   conflicts_with: []
   priority: 2
+  incremental_skip: full_scan
 ```
 
 ---
@@ -739,6 +765,7 @@ strategy implies frozen-forever APIs.
   severity: warning
   conflicts_with: []
   priority: 3
+  incremental_skip: full_scan
 ```
 
 ---
@@ -756,6 +783,7 @@ response). A module without failure-mode documentation is unsafe to operate.
   severity: error
   conflicts_with: []
   priority: 2
+  incremental_skip: per_file
 ```
 
 ---
@@ -773,6 +801,7 @@ with no observability story cannot be operated in production.
   severity: warning
   conflicts_with: []
   priority: 3
+  incremental_skip: per_file
 ```
 
 ---
@@ -791,4 +820,5 @@ privilege, audit logging). Silent omission of security boundaries is a critical 
   severity: critical
   conflicts_with: []
   priority: 1
+  incremental_skip: full_scan
 ```

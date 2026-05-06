@@ -33,6 +33,11 @@
 #   generate-evolve   entering NewVersion generate. Verifies:
 #                     (a) the prior delivery's versions/<N-1>.md exists
 #                         (otherwise --evolve has no baseline to extend)
+#   compact           entering --compact. Verifies:
+#                     (a) the current (highest-delivery_id) delivery's
+#                         final round has verdict.yml with verdict=converged
+#                     (b) at least one intermediate round exists in that
+#                         delivery (otherwise compact would be a no-op)
 #
 # Exit codes:
 #   0  entry preconditions all PASS — phase may proceed
@@ -46,7 +51,7 @@ PRD_ROOT="${2:-}"
 
 if [ -z "$PHASE" ] || [ -z "$PRD_ROOT" ]; then
   echo "ERROR: two arguments required: <phase> <prd-dir>" >&2
-  echo "Usage: verify-phase-entry.sh <read|revise|generate-fresh|generate-evolve> <prd-dir> [round]" >&2
+  echo "Usage: verify-phase-entry.sh <read|revise|generate-fresh|generate-evolve|compact> <prd-dir> [round]" >&2
   exit 2
 fi
 
@@ -156,9 +161,87 @@ case "$PHASE" in
     exit 0
     ;;
 
+  compact)
+    REVIEW_DIR="$PRD_ROOT/.review"
+    if [ ! -d "$REVIEW_DIR" ]; then
+      echo "REFUSE entering compact phase: no .review/ directory under $PRD_ROOT"
+      exit 1
+    fi
+    # Identify current delivery's final round + verify converged verdict.
+    # Reuses the same parsing logic as compact-delivery.sh.
+    python3 - "$PRD_ROOT" <<'PYEOF' || exit $?
+import os, re, sys
+prd_root = sys.argv[1]
+review = os.path.join(prd_root, ".review")
+ROUND_RE = re.compile(r"^round-(\d+)$")
+LINE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.*)$")
+
+def fm(path):
+    if not os.path.isfile(path):
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    body = text
+    if text.startswith("---"):
+        e = text.find("\n---", 3)
+        if e >= 0:
+            body = text[4:e]
+    out = {}
+    for line in body.splitlines():
+        if line.startswith((" ", "\t")) or not line.strip() or line.startswith("#"):
+            continue
+        m = LINE.match(line)
+        if m:
+            v = m.group(2).strip().strip('"')
+            out[m.group(1)] = v
+    return out
+
+rounds = []
+for n in os.listdir(review):
+    m = ROUND_RE.match(n)
+    if m:
+        p = os.path.join(review, n)
+        if os.path.isdir(p):
+            rounds.append((int(m.group(1)), p))
+if not rounds:
+    print("REFUSE entering compact phase: no round-N/ directories")
+    sys.exit(1)
+rounds.sort()
+by_d = {}
+for n, p in rounds:
+    d = None
+    for fn in ("verdict.yml", "index.md"):
+        v = fm(os.path.join(p, fn)).get("delivery_id", "")
+        if v.isdigit():
+            d = int(v); break
+    by_d.setdefault(d, []).append((n, p))
+known = {d: rs for d, rs in by_d.items() if d is not None}
+if not known:
+    print("REFUSE entering compact phase: no round has a usable delivery_id "
+          "in verdict.yml or index.md frontmatter")
+    sys.exit(1)
+cur = max(known.keys())
+delivery = sorted(known[cur])
+last_n, last_p = delivery[-1]
+v = fm(os.path.join(last_p, "verdict.yml")).get("verdict", "")
+if v != "converged":
+    print(f"REFUSE entering compact phase: delivery {cur} final round-{last_n} "
+          f"has verdict={v!r} (need 'converged')")
+    sys.exit(1)
+if len(delivery) <= 1:
+    print(f"REFUSE entering compact phase: delivery {cur} has only one round "
+          f"(round-{last_n}) — nothing to compact")
+    sys.exit(1)
+print(f"OK compact-phase entry verified — delivery {cur}, "
+      f"final round-{last_n} converged, "
+      f"{len(delivery)-1} intermediate round(s) eligible")
+sys.exit(0)
+PYEOF
+    ;;
+
   *)
     echo "ERROR: unknown phase: $PHASE" >&2
-    echo "Valid phases: read, revise, generate-fresh, generate-evolve" >&2
+    echo "Valid phases: read, revise, generate-fresh, generate-evolve, compact" >&2
     exit 2
     ;;
 esac

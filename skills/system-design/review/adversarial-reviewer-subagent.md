@@ -53,6 +53,12 @@ In addition to the cross-reviewer's inputs, you receive:
   `recurrence_of: <id>` from `summary.yml` if available, otherwise skip).
 - `<artifact-root>/.review/issues/summary.yml` for fingerprint matching
   (same protocol as cross-reviewer).
+- `<artifact-root>/.review/round-<N>/review-scope.yml` — the same scope
+  file the cross-reviewer consumed. Honor `mode` and the
+  `changed_leaves` / `unchanged_leaves` partition exactly as the
+  cross-reviewer does (criteria with `incremental_skip: per_file` apply
+  only to changed leaves in `mode: incremental`; `full_scan` criteria
+  always apply). If missing or unparseable, fall back to `mode: full`.
 
 ---
 
@@ -67,13 +73,15 @@ with the same shape as cross-reviewer:
   "round": 3,
   "reviewer_variant": "adversarial",
   "trace_id": "R3-V-002",
+  "scope_applied": "incremental",
   "issues": [...]
 }
 ```
 
-Per-finding fields are identical. Fingerprint-matching rules are
-identical (guide §7.6). Set `criterion_id` to the closest matching CR
-in `common/review-criteria.md`; if no existing CR fits, use
+The top-level `scope_applied` field is REQUIRED and MUST echo the `mode`
+you actually applied. Per-finding fields are identical. Fingerprint-matching
+rules are identical (guide §7.6). Set `criterion_id` to the closest matching
+CR in `common/review-criteria.md`; if no existing CR fits, use
 `criterion_id: CR-META-adversarial` and explain in `description` what
 new criterion the finding suggests — the criteria-evolution loop (guide
 §8) will pick it up if the pattern recurs.

@@ -43,6 +43,8 @@ SEVERITY_ORDER = {"info": 0, "warning": 1, "error": 2, "critical": 3}
 ROUND_RE = re.compile(r"^round-(\d+)$")
 JOURNEY_FILE_RE = re.compile(r"^J-(\d{3,})(?:-[a-z0-9-]+)?\.md$")
 FEATURE_FILE_RE = re.compile(r"^F-(\d{3,})(?:-[a-z0-9-]+)?\.md$")
+MODULE_FILE_RE = re.compile(r"^M-(\d{3,})(?:-[a-z0-9-]+)?\.md$")
+API_FILE_RE = re.compile(r"^API-(\d{3,})(?:-[a-z0-9-]+)?\.md$")
 ISSUE_ID_RE = re.compile(r"^I-\d{3,}$")
 
 # YAML frontmatter line scanner — single-key/value pairs only (no nested
@@ -173,6 +175,53 @@ def walk_md(root: str, exclude_dirs: tuple[str, ...] = (".review",)) -> Iterable
             if not fname.endswith(".md"):
                 continue
             yield fname if rel_dir == "." else f"{rel_dir}/{fname}"
+
+
+def enumerate_leaves(bundle_dir: str) -> list[str]:
+    """Return sorted list of bundle leaf paths (relative to bundle_dir).
+
+    Leaves are the artifact files a downstream consumer reads:
+      - README.md
+      - modules/M-*.md
+      - api/API-*.md
+      - architecture.md (if present), OR architecture/*.md (if present)
+
+    Excluded: .review/, versions/, REVISIONS.md, CHANGELOG.md, any
+    hidden file/dir, and anything under a sub-directory that does not
+    match the known artifact-bearing patterns.
+
+    The returned paths use forward slashes regardless of platform and
+    are relative to bundle_dir (e.g. "modules/M-001-auth.md").
+    """
+    if not os.path.isdir(bundle_dir):
+        return []
+    out: list[str] = []
+    if os.path.isfile(os.path.join(bundle_dir, "README.md")):
+        out.append("README.md")
+    modules_dir = os.path.join(bundle_dir, "modules")
+    if os.path.isdir(modules_dir):
+        for fname in sorted(os.listdir(modules_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            if MODULE_FILE_RE.match(fname):
+                out.append(f"modules/{fname}")
+    api_dir = os.path.join(bundle_dir, "api")
+    if os.path.isdir(api_dir):
+        for fname in sorted(os.listdir(api_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            if API_FILE_RE.match(fname):
+                out.append(f"api/{fname}")
+    arch_index = os.path.join(bundle_dir, "architecture.md")
+    if os.path.isfile(arch_index):
+        out.append("architecture.md")
+    arch_dir = os.path.join(bundle_dir, "architecture")
+    if os.path.isdir(arch_dir):
+        for fname in sorted(os.listdir(arch_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            out.append(f"architecture/{fname}")
+    return out
 
 
 def find_round_dirs(prd_root: str) -> list[tuple[int, str]]:

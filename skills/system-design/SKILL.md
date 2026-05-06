@@ -31,6 +31,7 @@ system-design generates technical design documents as a **multi-file directory**
 /cofounder:system-design --review docs/raw/design/xxx/ --auto  # auto-loop review↔revise until convergence
 /cofounder:system-design --revise docs/raw/design/xxx/      # change management
 /cofounder:system-design --revise docs/raw/design/xxx/ --auto  # same loop, entered from the revise side
+/cofounder:system-design --compact docs/raw/design/xxx/     # retire intermediate review rounds before next stage
 ```
 
 **Note on evolved PRDs:** When a PRD has been evolved (`/cofounder:prd-analysis --evolve`), pass the new incremental PRD path to generate a fresh design, or use `--revise` on the existing design to propagate specific PRD changes. There is no dedicated `--evolve` mode for system-design — `--revise` handles both in-place PRD changes and evolved PRD deltas.
@@ -43,6 +44,7 @@ system-design generates technical design documents as a **multi-file directory**
 | generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
 | review | `/cofounder:system-design --review <design-dir>` | `review/index.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
+| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -128,6 +130,7 @@ the bootstrap precheck for generate modes) is this call:
 | write (revise) | `revise/index.md` Step 1 | `verify-phase-entry.sh revise <design-dir> <round>` |
 | write (generate-fresh) | `generate/from-scratch.md` Step 2 | `verify-phase-entry.sh generate-fresh <design-dir>` |
 | write (generate-evolve) | `generate/new-version.md` Step 2 | `verify-phase-entry.sh generate-evolve <design-dir>` |
+| compact | `compact/index.md` Step 2 | `verify-phase-entry.sh compact <design-dir>` |
 
 `verify-phase-entry.sh` consolidates the underlying gates per phase:
 
@@ -137,6 +140,7 @@ the bootstrap precheck for generate modes) is this call:
 | revise | round-N has at least one `state: new` issue (otherwise no work) |
 | generate-fresh | bundle is empty/absent (avoids overwriting an existing design) |
 | generate-evolve | prior delivery's `versions/<N-1>.md` exists |
+| compact | current delivery's final round has `verdict: converged` AND at least one intermediate round exists |
 
 Exit codes follow the §9 contract uniformly: `0` = phase may proceed,
 `1` = phase MUST NOT proceed (precondition failed; see stdout), `2` =
@@ -390,7 +394,8 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled verdict threshold; default 5). |
-| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set; `state.yml` is the only auto-mode artifact. |
+| `--full` | Review | Force the next review round to apply every LLM criterion to every leaf, regardless of incremental scope. **Single invocation only** — `scripts/compute-review-scope.sh` honors the flag exactly once; in `--auto` mode the orchestrator drops `--full` from subsequent rounds in the same loop so the rest of the loop runs with normal incremental scoping. Use to recover from a suspected stale `leaves-manifest.yml` or to force a fresh look at unchanged leaves after editing `common/review-criteria.md`. Without this flag, scoping is automatic: full on the first round of each delivery (no prior manifest) and incremental thereafter. |
+| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On `converged`, the orchestrator runs the full delivery sequence (`review/index.md` Step 9), which includes auto-compaction of the just-converged delivery's intermediate rounds via `scripts/compact-delivery.sh` so the bundle is hand-off-ready for the next pipeline stage. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set; `state.yml` is the only auto-mode artifact. |
 
 ## Next Steps Hint
 
@@ -433,8 +438,9 @@ Next steps:
   - `scripts/check-module.sh` — Module-class checks (CR-SD03, CR-SD04, CR-SD06, CR-SD07, CR-SD08, CR-SD16, CR-SD17, CR-SD19, CR-SDFM02)
   - `scripts/check-api.sh` — API-class checks (CR-SD03, CR-SD10, CR-SD11, CR-SD12, CR-SD13, CR-SD17, CR-SDFM03)
   - `scripts/check-issue.sh` — issue-file frontmatter + state-machine schema (CR-IS01)
+  - `scripts/check-compacted-history.sh` — `compacted-history.md` schema (CR-CH01, CR-CH02)
 - **Phase-gate scripts**:
-  - `scripts/verify-phase-entry.sh` — single entry point dispatched per `<phase>` argument (`read | revise | generate-fresh | generate-evolve`); composes the underlying gates below
+  - `scripts/verify-phase-entry.sh` — single entry point dispatched per `<phase>` argument (`read | revise | generate-fresh | generate-evolve | compact`); composes the underlying gates below
   - `scripts/check-review-readiness.sh` — read-phase entry: zero `state: new` issues from prior rounds
   - `scripts/check-revise-completeness.sh` — write-phase exit (revise): zero `state: new` issues in current round
   - `scripts/run-checkers.sh` — bundle-level formal-review gate (composes every per-artifact `check-*.sh`)
@@ -446,3 +452,5 @@ Next steps:
   - `scripts/summarize-round.sh` / `scripts/summarize-delivery.sh` — summarizer Phase 1/2 (CR-VS)
 - **Diagnostic scripts**:
   - `scripts/metrics-aggregate.sh` — aggregate harness JSONL + dispatch-log into `.review/metrics/<scope>.metrics.yml`
+- **Compact scripts** (`--compact` mode):
+  - `scripts/compact-delivery.sh` — aggregates intermediate review rounds of the current delivery into `compacted-history.md` and deletes their `round-N/` + `traces/round-N/` trees

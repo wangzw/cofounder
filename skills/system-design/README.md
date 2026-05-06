@@ -45,6 +45,7 @@ marks read-only support.
 | `/cofounder:system-design --review <design-dir>` | Read phase: cross-reviewer + judge |
 | `/cofounder:system-design --revise <design-dir>` | Write phase: per-issue fix loop |
 | `/cofounder:system-design --evolve <design-dir> [<prd-dir>]` | Iterate to a new version |
+| `/cofounder:system-design --compact <design-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
 | `/cofounder:system-design --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
@@ -93,7 +94,7 @@ Key invariants:
 ## Output: artifact ↔ script ↔ test mapping
 
 Every artifact this skill produces has exactly one formal-review script
-and one test runner. **~32 scripts / 20 test runners / 364 tests** (run
+and one test runner. **~34 scripts / 23 test runners / 442 tests** (run
 `bash tests/run-all.sh`).
 
 ### Design bundle (LLM-produced; user-visible)
@@ -172,6 +173,8 @@ and one test runner. **~32 scripts / 20 test runners / 364 tests** (run
 | Script | Role |
 |--------|------|
 | `commit-delivery.sh` | On-converge: stages, commits, creates annotated `delivery-<N>-<slug>` tag. |
+| `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
+| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |
 | `metrics-aggregate.sh` | `--diagnose` mode: JOINs harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`. |
 
@@ -278,12 +281,12 @@ downstream consumers will surface producer bugs.
 
 ## Stats
 
-- **~32 scripts** (`scripts/*.sh` + 4 lib files)
-- **20 test runners** (`tests/test-*.sh`)
-- **364 tests passing** (`bash tests/run-all.sh`)
+- **~34 scripts** (`scripts/*.sh` + 4 lib files)
+- **23 test runners** (`tests/test-*.sh`)
+- **442 tests passing** (`bash tests/run-all.sh`)
 - **~22 CR-IDs** in `common/review-criteria.md` (CR-SD01..19, CR-SDFM01..03,
   CR-SD-DESIGN01..08, CR-META-mechanize, CR-META-adversarial, plus
-  audit-side CR-CL/PL/SR/RO/RI/VD/VS/RV families)
+  audit-side CR-CL/PL/SR/RO/RI/VD/VS/CH/RV families)
 - **8 sub-agent prompts** (planner, writer, domain-consultant,
   cross-reviewer, adversarial-reviewer, per-issue-reviser,
   summarizer, judge)

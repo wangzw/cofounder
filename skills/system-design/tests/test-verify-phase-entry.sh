@@ -246,4 +246,76 @@ assert_exit 0 "$CHECK" generate-evolve "$FIXTURE"
 assert_stdout_contains "OK generate-evolve"
 teardown_fixture
 
+# ──────────────────────────────────────────────────────────────────────
+# Phase: compact
+# ──────────────────────────────────────────────────────────────────────
+
+# Helper: write a round-N with given delivery_id and verdict
+_compact_round() {
+    local rnum="$1" did="$2" v="$3"
+    write_file ".review/round-$rnum/index.md" "---
+round: $rnum
+delivery_id: $did
+---
+"
+    write_file ".review/round-$rnum/verdict.yml" "round: $rnum
+delivery_id: $did
+verdict: $v
+"
+}
+
+test_case "compact: FAIL when no .review/ dir"
+setup_fixture
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "no .review/"
+teardown_fixture
+
+test_case "compact: FAIL when no round dirs"
+setup_fixture
+mkdir -p "$FIXTURE/.review"
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "no round-N"
+teardown_fixture
+
+test_case "compact: FAIL when round has no delivery_id frontmatter"
+setup_fixture
+mkdir -p "$FIXTURE/.review/round-1"
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "delivery_id"
+teardown_fixture
+
+test_case "compact: FAIL when final round not converged"
+setup_fixture
+_compact_round 1 1 progressing
+_compact_round 2 1 progressing
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "need 'converged'"
+teardown_fixture
+
+test_case "compact: FAIL when delivery has only one round"
+setup_fixture
+_compact_round 1 1 converged
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "only one round"
+teardown_fixture
+
+test_case "compact: PASS when current delivery has converged final + intermediates"
+setup_fixture
+_compact_round 1 1 progressing
+_compact_round 2 1 progressing
+_compact_round 3 1 converged
+assert_exit 0 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "OK compact-phase entry verified"
+teardown_fixture
+
+test_case "compact: only highest delivery_id is considered current"
+setup_fixture
+_compact_round 1 1 progressing
+_compact_round 2 1 converged
+_compact_round 3 2 progressing
+_compact_round 4 2 progressing
+assert_exit 1 "$CHECK" compact "$FIXTURE"
+assert_stdout_contains "delivery 2"
+teardown_fixture
+
 end_tests
