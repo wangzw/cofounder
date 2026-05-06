@@ -164,7 +164,7 @@ and one test runner. **~32 scripts / 20 test runners / 364 tests** (run
 | Script | Role |
 |--------|------|
 | `git-precheck.sh` | Verifies git/bash/python versions; auto-init if not in a repo. |
-| `prepare-input.sh` | Round-0 input normalization + PRD-bundle ingestion. |
+| `prepare-input.sh` | Round-0 input normalization. Writes the raw user prompt verbatim to `input.md` (no `@path` / URL expansion — sub-agents fetch any referenced paths or URLs themselves via Read / WebFetch) and emits `input-meta.yml` (word/char counts, structural flags) for downstream sparse-input detection. Idempotently drops `.review/README.md` from the template on first bootstrap. |
 | `glossary-probe.sh` | Round-0 trigger-flags (`glossary_hit`, `sparse_input`). |
 
 ### Delivery / metrics

@@ -58,9 +58,11 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
   rule: lexicographic max by filename (ISO-8601 timestamps sort correctly, so the last entry
   alphabetically is the most recent). Fallback: if no clarification file exists (consultant was
   skipped per `trigger-flags.yml` conditions), read `<target>/.review/round-0/input.md` directly.
-  When `input-meta.yml` references a source PRD bundle, ALSO read that PRD's `README.md`,
-  `features/F-NNN-*.md`, `journeys/J-NNN-*.md`, and `architecture/*.md` — the design's modules
-  are derived from PRD features and architecture topics.
+  When `input.md` names a source PRD bundle path (e.g. `docs/raw/prd/<date>-<slug>/`), ALSO
+  Read that PRD's `README.md`, `features/F-NNN-*.md`, `journeys/J-NNN-*.md`, and
+  `architecture/*.md` directly — the design's modules are derived from PRD features and
+  architecture topics. The orchestrator does NOT pre-expand PRD paths into `input.md`; you
+  resolve them yourself via the Read tool.
 - Constraint: `delete` and `keep` lists MUST be empty (no existing files to preserve or remove)
 - `add` list contains the system-design bundle:
   - exactly one `README.md` index (with the Feature-Module mapping matrix that bridges PRD
@@ -102,7 +104,8 @@ field per entry, never themselves entries.
   - `<target>/README.md`
   - `<target>/CHANGELOG.md`
   - `<target>/.review/versions/<N-1>.md` (last converged version summary)
-  - the (possibly updated) source PRD bundle when one is referenced in `input-meta.yml`
+  - the (possibly updated) source PRD bundle, when `input.md` names a PRD path — Read it
+    directly via the Read tool
 - All four lists are used: `delete`, `modify`, `add`, `keep`
 - `keep` = files in the prior delivery that the planner certifies are unaffected by this
   change. The review pipeline (`review/index.md`) will re-confirm via formal review and

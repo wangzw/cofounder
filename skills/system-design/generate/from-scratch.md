@@ -56,15 +56,19 @@ instead.
 scripts/prepare-input.sh "<user-prompt-or-prd-path>" <design-dir>/.review
 ```
 
-Outputs `<design-dir>/.review/round-0/input.md` (normalized), `input-meta.yml`,
-and (idempotently, on first bootstrap) `.review/README.md` from
-`common/templates/review-readme-template.md`.
+Outputs `<design-dir>/.review/round-0/input.md` (raw user prompt, written
+verbatim — no `@path` or URL expansion) and `input-meta.yml`
+(`word_count`, `char_count`, `has_code_block`, `has_structured_lists` for
+the sparse-input probe). On first bootstrap it also drops
+`.review/README.md` idempotently from `common/templates/review-readme-template.md`.
 
-When the user-prompt is a path to an existing PRD bundle (e.g.
-`docs/raw/prd/<date>-<slug>/`), `prepare-input.sh` records its location
-in `input-meta.yml` so the planner can read the source PRD's
-`README.md`, every `features/F-NNN-*.md`, and every `journeys/J-NNN-*.md`
-as planning input.
+Sub-agents downstream (domain-consultant, planner, writer) have Read /
+WebFetch tools and pull any `@path` / `http(s)://` references on demand
+— the orchestrator no longer inlines them at bootstrap time. When the
+user-prompt itself names a PRD bundle path (e.g.
+`docs/raw/prd/<date>-<slug>/`), the planner reads the source PRD's
+`README.md`, every `features/F-NNN-*.md`, and every
+`journeys/J-NNN-*.md` directly via its Read tool.
 
 Orchestrator: read exit code only; never read the written files.
 
@@ -91,8 +95,8 @@ pure-dispatch — it does not write `clarification/<ts>.yml` directly.
 
 - Dispatches: `generate/domain-consultant-subagent.md`
 - Inputs: `round-0/input.md`, `input-meta.yml`, `trigger-flags.yml`,
-  `common/domain-glossary.md`, plus the source PRD bundle (if
-  `input-meta.yml` references one)
+  `common/domain-glossary.md`, plus the source PRD bundle (when
+  `input.md` names a PRD path — the consultant Reads it directly)
 - Outputs: `<design-dir>/.review/round-0/clarification/<ISO-ts>.yml`
 
 ### Step 6 — Planner (sub-agent dispatch)

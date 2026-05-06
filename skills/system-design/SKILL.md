@@ -27,8 +27,10 @@ system-design generates technical design documents as a **multi-file directory**
 /cofounder:system-design path/to/prd/                       # PRD-based
 /cofounder:system-design path/to/draft.md                   # document-based
 /cofounder:system-design --output docs/raw/design/my-product
-/cofounder:system-design --review docs/raw/design/xxx/      # read-only review
+/cofounder:system-design --review docs/raw/design/xxx/      # read-only review (single round)
+/cofounder:system-design --review docs/raw/design/xxx/ --auto  # auto-loop review↔revise until convergence
 /cofounder:system-design --revise docs/raw/design/xxx/      # change management
+/cofounder:system-design --revise docs/raw/design/xxx/ --auto  # same loop, entered from the revise side
 ```
 
 **Note on evolved PRDs:** When a PRD has been evolved (`/cofounder:prd-analysis --evolve`), pass the new incremental PRD path to generate a fresh design, or use `--revise` on the existing design to propagate specific PRD changes. There is no dedicated `--evolve` mode for system-design — `--revise` handles both in-place PRD changes and evolved PRD deltas.
@@ -384,10 +386,11 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 | Flag | Applies to | Semantics |
 |------|-----------|-----------|
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
-| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-006 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
+| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-006 = `deferred`) from the user prompt in `input.md`. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled verdict threshold; default 5). |
+| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set; `state.yml` is the only auto-mode artifact. |
 
 ## Next Steps Hint
 

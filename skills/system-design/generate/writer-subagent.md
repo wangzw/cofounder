@@ -114,7 +114,7 @@ Read these files before writing:
 | `<design-dir>/.review/round-<N>/plan.md` | Always |
 | Leaf template from `skills/system-design/` | Per `plan.add[].template` or `plan.modify[].template` |
 | `<design-dir>/<file>` (existing content) | NewVersion `modify` files only |
-| Source PRD bundle (READ-ONLY) | When the design references a PRD via `input-meta.yml` |
+| Source PRD bundle (READ-ONLY) | When `input.md` names a PRD path — Read directly via the Read tool |
 
 **Context pre-supplied in the dispatch prompt** (read these inline — do not discover via Grep):
 

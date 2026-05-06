@@ -91,8 +91,8 @@ file-read tools):
 
 | File | Purpose |
 |------|---------|
-| `<target>/.review/round-0/input.md` | Normalized user prompt — the raw design brief or PRD path |
-| `<target>/.review/round-0/input-meta.yml` | Flags: `sparse_input`, `source_list`, `word_count` |
+| `<target>/.review/round-0/input.md` | Raw user prompt, written verbatim — the design brief or PRD path. `@path` / `http(s)://` references are NOT pre-expanded; resolve them yourself with Read / WebFetch on demand. |
+| `<target>/.review/round-0/input-meta.yml` | `word_count` (whitespace + CJK), `char_count`, `has_code_block`, `has_structured_lists` (used by sparse-input probe). |
 | `<target>/.review/round-0/trigger-flags.yml` | Flags: `glossary_hit`, `sparse_input`, `ambiguous_artifact_type`, `has_prd_path`, `has_draft_path` |
 | `common/domain-glossary.md` | Domain terms for system-design; use to disambiguate user vocabulary |
 | `<target>/README.md` | NewVersion / `--revise` only — existing design overview |
