@@ -1,6 +1,6 @@
 ---
 name: prd-analysis
-version: 1.0.0
+version: 1.1.0
 description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'."
 ---
 

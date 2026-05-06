@@ -1,6 +1,12 @@
 # CHANGELOG
 
-## [Unreleased]
+## [1.0.0] — 2026-05-07
+
+First stable release. Convergence after rounds 5–10 of iterative
+audit. Skill reaches zero-findings state with mechanical guardrails
+(`tests/test-cr-id-references.sh`) preventing recurring failure
+patterns from rounds 6–9 (fabricated CR-IDs; trace_id vs on-disk
+issue-ID conflation in `linked_issues`).
 
 ### Fixed
 - **Round-8 audit follow-ups**:

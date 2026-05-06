@@ -1,6 +1,14 @@
 # CHANGELOG
 
-## [Unreleased]
+## [1.1.0] — 2026-05-07
+
+Convergence release after rounds 5–10 of iterative audit. Skill now
+reaches zero-findings state with mechanical guardrails
+(`tests/test-cr-id-references.sh`) preventing the recurring failure
+patterns that drove rounds 6–9 (fabricated CR-IDs; trace_id vs
+on-disk issue-ID conflation in `linked_issues`).
+
+### Changed since 1.0.0
 
 - **fix: round-9 audit follow-up** —
   - `generate/new-version.md:65`: refuse-message guidance referenced a

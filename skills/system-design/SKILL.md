@@ -1,6 +1,6 @@
 ---
 name: system-design
-version: 0.1.0
+version: 1.0.0
 description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, or review existing designs. Triggers: /cofounder:system-design, 'system design', 'module design', 'technical design', 'design review'."
 ---
 
