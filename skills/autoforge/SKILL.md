@@ -1,5 +1,6 @@
 ---
 name: autoforge
+version: 0.1.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules'."
 ---
 
@@ -47,7 +48,7 @@ Every `Agent(...)` dispatch in this skill MUST set the `model` field to a tier *
 | Integration Tester | `sonnet` | Phase-level test authoring + execution |
 | Acceptance Tester | `sonnet` | E2E tests + traceability matrix; escalate to `opus` only for ambiguity classification during the fix cycle |
 
-**Escalation rule:** when Replan Mode / Diagnosis Mode triggers (Module Agent has stalled for ≥3 non-progress rounds), the next Developer spawn uses `model: opus` instead of `sonnet`. After one Opus-backed Replan attempt, revert to `sonnet` for routine retries.
+**Escalation rule:** when Replan Mode / Diagnosis Mode triggers (Module Agent has stalled for ≥3 non-progress rounds), the next Developer spawn uses `model: opus` instead of `sonnet`. After one Opus-backed Replan attempt, revert to `sonnet` for routine retries. For the Acceptance Tester: after classifying a failure as ambiguous (PRD ambiguity type), escalate the next acceptance fix cycle's ambiguity-classification pass to `opus`; revert to `sonnet` once the ambiguity is resolved.
 
 **Why not top-tier everywhere:** top tier is ~5× Sonnet on input and ~15× on cache_read. Autoforge's inner loop (Developer → Tester → Reviewer) runs dozens of times per module across many modules — a mis-tiered default multiplies across the whole run. Sonnet is the right default; Opus is a targeted escalation, not a baseline.
 
@@ -323,7 +324,10 @@ Agent({
     - promotion_action: {Promote | Extend | Rewrite | None — None for backend/shared-library modules}
     - draft_source_path: {extracted draft path, or empty if Promotion action = Rewrite / None}
     - stall_threshold: 3
-    - hard_ceiling: 20"
+    - hard_ceiling: 20
+    - developer_prompt_path: {absolute path to skills/autoforge/module-developer-prompt.md}
+    - tester_prompt_path: {absolute path to skills/autoforge/module-tester-prompt.md}
+    - reviewer_prompt_path: {absolute path to skills/autoforge/module-reviewer-prompt.md}"
 })
 ```
 
@@ -399,7 +403,7 @@ Input:
   - Module design spec (M-xxx.md)
   - Worktree path (isolated workspace)
   - [On retry from Tester]: failure-details (which tests failed, error messages, test file paths)
-  - [On retry from Reviewer]: review-comments (required fixes with severity)
+  - [On retry from Reviewer]: review-M-{id}.md (required fixes with severity)
 
 Output:
   - Implemented code + unit tests in worktree
@@ -453,7 +457,7 @@ Input:
 
 Output:
   - review-result: APPROVE or REJECT
-  - review-comments.md in report directory (if REJECT, overwritten each round): list of issues with severity (required/suggested)
+  - review-M-{id}.md in report directory (overwritten each round): findings table with severity (required/suggested)
 
 Review Dimensions:
   - Spec compliance: does code implement all interfaces and behaviors defined in design?
@@ -490,7 +494,7 @@ Review Dimensions:
 3. **Handle decision requests** — if any module returned DECISION_REQUEST:
    - Orchestrator presents the module's diagnosis and proposed options to the user (the Orchestrator runs in the main conversation and can communicate with the user directly)
    - Human picks an option (or provides their own instruction)
-   - Spawn a Developer agent in the module's worktree with the chosen option as instructions
+   - Spawn a Developer agent (Variant 3 — Retry From Reviewer Rejection, or a custom prompt matching the chosen option) in the module's worktree with the chosen option as instructions. Pass: `module_design_path`, `module_plan_path`, `conventions_path`, and `project_coding_standards` as you would for any Developer spawn.
    - Spawn Tester to verify the fix (Tester will review/update tests as needed)
    - If pass → merge as normal; if fail → present updated diagnosis with new options to human; repeat until resolved or human chooses to skip/abort
 4. **Merge module branches** — in the primary worktree (already on the feature branch), for each approved module sequentially, run the canonical module-merge command sequence documented in the **Git Strategy → Merge Rules** section below (fast-forward merge; on conflict rebase the module branch first then retry).
@@ -522,6 +526,7 @@ Review Dimensions:
    | `previous_phase_modules` | Module IDs from all previous phases |
    | `report_dir` | `docs/raw/plans/{plan-dir}/reports/` |
    | `conventions_path` | `docs/raw/plans/{plan-dir}/plans/conventions.md` |
+   | `project_coding_standards` | Unified project conventions (same as passed to Module Agents) |
    | `is_rerun` | `false` on first run; `true` when re-running after fix cycle |
 
    See `integration-tester-prompt.md` for the complete prompt template.
@@ -542,14 +547,21 @@ Review Dimensions:
    - Run all tests (unit + module-integration + phase-integration) to verify
    - Commit with message: "fix(p{n}): {brief description}"
 
+   ## Inputs
+   - Project conventions: {conventions_path}
+
    ## Rules
    - Fix the minimum necessary — do not refactor unrelated code
    - If the fix requires changes across multiple modules, make them in a single commit
+
+   ## Project Coding Standards
+
+   {project_coding_standards}
    ~~~~
 
    Re-run integration tests after each fix (with `is_rerun: true` — reviews and updates existing tests as needed).
 
-   Continue fix cycles as long as progress is being made (fewer failing tests each round). If stalled, the Orchestrator re-analyzes the failure and tries a different fix approach. Request human decision only after exhausting reasonable alternatives and the remaining options involve quality trade-offs.
+   Continue fix cycles as long as progress is being made (fewer failing tests each round) up to a maximum of **10 fix rounds**. If stalled for 3 consecutive rounds without progress, re-analyze the failure pattern and try a different approach. If still blocked after 10 rounds or after exhausting reasonable approaches, request human decision with the diagnosis and proposed options.
 
 7. **Update status** — update plan README.md status table, commit: `docs(plan): update status after phase-{n}`
 8. **Update design doc** — update Module Index `Impl` column for completed modules (`—` → `Done`), update design-level Status if needed (Finalized → Implementing). Commit: `docs(design): update impl status after phase-{n}`
@@ -583,8 +595,10 @@ Agent({
 | `design_readme_path` | Design README.md path from Step 0 |
 | `report_dir` | `docs/raw/plans/{plan-dir}/reports/` |
 | `conventions_path` | `docs/raw/plans/{plan-dir}/plans/conventions.md` |
+| `project_coding_standards` | Unified project conventions (same as passed to Module Agents) |
 | `acceptance_threshold` | From plan README Design Input table (default: 80) |
 | `is_rerun` | `false` on first run; `true` when re-running after fix cycle |
+| `previous_report_path` | `docs/raw/plans/{plan-dir}/reports/acceptance.md` — only when `is_rerun = true` |
 
 See `acceptance-tester-prompt.md` for the complete prompt template. The Acceptance Tester reads all PRD feature specs and journey specs, writes E2E tests, builds a requirements traceability matrix, and determines the verdict (PASS / PARTIAL / FAIL) based on the acceptance threshold.
 
@@ -618,10 +632,17 @@ If acceptance report shows failures:
    - Run all tests to verify your fix doesn't break anything
    - Commit with message: "fix(M-{id}): {acceptance criterion description}"
 
+   ## Inputs
+   - Project conventions: {conventions_path}
+
    ## Rules
    - Fix only the specific issues listed — do not add features or refactor
    - If multiple criteria fail for the same root cause, fix them together in one commit
    - If you cannot fix the issue because the design doesn't support it, report it rather than implementing an ad-hoc workaround
+
+   ## Project Coding Standards
+
+   {project_coding_standards}
    ~~~~
 
 3. **Handle design gaps** — if any failures are classified as design gaps:
@@ -634,8 +655,8 @@ If acceptance report shows failures:
    - Present to human with the specific acceptance criteria that are problematic
    - Human can: clarify the criterion (Orchestrator updates the acceptance test), waive the criterion (mark as NOT_COVERED with reason), or adjust the acceptance threshold
 
-5. **Re-run acceptance tests** — Acceptance Tester re-runs full suite (with `is_rerun: true`)
-6. **Continue as long as progress** — repeat fix cycles while failing test count decreases. If stalled, the Orchestrator re-analyzes and tries a different approach. Follow the same autonomous-first principle as module-level iteration.
+5. **Re-run acceptance tests** — Acceptance Tester re-runs full suite (with `is_rerun: true`, `previous_report_path: {report_dir}/acceptance.md`)
+6. **Continue up to a ceiling** — repeat fix cycles while failing test count decreases, up to a maximum of **10 fix rounds**. If stalled for 3 consecutive rounds without progress, re-analyze and try a different approach. If still blocked after 10 rounds or after exhausting reasonable approaches, present the residual failures to the user per PARTIAL Verdict Handling below. Follow the same autonomous-first principle as module-level iteration.
 
 ### PARTIAL Verdict Handling
 
@@ -652,7 +673,7 @@ When the acceptance fix cycle stabilizes at PARTIAL (no further progress but som
 
 ## Step 4 — Merge to Main
 
-Only executed when acceptance verdict is PASS.
+Executed when acceptance verdict is PASS, or when the user explicitly chooses to merge with a PARTIAL verdict (see Acceptance Fix Cycle — PARTIAL Verdict Handling, option a).
 
 1. **Rebase feature branch** onto latest main (in the primary worktree, which is on the feature branch):
    ```
@@ -807,6 +828,7 @@ test(M-001): add integration tests for {module}
 fix(M-001): fix {test failure description}
 fix(M-001): address review feedback
 refactor(M-001): {new approach description after Replan}
+state(M-001): update module state
 test(p1): add phase-1 integration tests
 fix(p1): resolve phase-1 integration issues
 docs(plan): re-plan from phase {n} — {reason}
@@ -821,7 +843,7 @@ log: {brief event description}
 
 ### Merge Rules
 
-- **Always rebase before merge** — keep linear history
+- **Prefer fast-forward merge; rebase only when fast-forward is not possible** — keep linear history
 - **Only fast-forward merges** — `git merge --ff-only`; if ff not possible, rebase first
 - **Module → feature branch**: sequential merge after each module completes within a phase
 - **Feature → main**: only after full acceptance passes
@@ -892,6 +914,8 @@ Plan README.md maintains a live status table (updated after each phase):
 | M-001  | 1     | Done | Done | Done | Approved | Yes | — |
 | M-002  | 1     | Done | Retry 2 | — | — | — | Test failure: null check |
 | M-003  | 2     | Done | — | — | — | — | Waiting for Phase 1 |
+
+Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Replan {n}` = in replan mode (n = replan attempt), `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip
 
 ## Phase Status
 

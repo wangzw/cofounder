@@ -11,6 +11,7 @@ You will receive these parameters from the Orchestrator:
 - `design_readme_path`: path to the design README.md (for Feature-Module mapping)
 - `report_dir`: path to report directory (`docs/raw/plans/{plan-dir}/reports/`)
 - `conventions_path`: path to conventions.md (for test organization patterns)
+- `project_coding_standards`: unified project conventions (for test code standards)
 - `acceptance_threshold`: pass rate threshold for PARTIAL verdict (default: 80)
 - `is_rerun`: boolean — true if this is a re-run after a fix cycle (review and update existing tests as needed rather than writing from scratch)
 - `previous_report_path` (only when `is_rerun = true`): Path to the previous acceptance report (`{report_dir}/acceptance.md`). Read this to identify NOT_COVERED criteria for re-evaluation and to compare pass rates for progress tracking.
@@ -103,7 +104,7 @@ Key sections:
 ### 6. Determine Verdict
 
 ```
-if all criteria PASS and all E2E scenarios PASS:
+if all criteria are PASS or NOT_COVERED(with valid justification) and overall_pass_rate >= acceptance_threshold and no critical failures:
     verdict = PASS
 elif overall_pass_rate >= acceptance_threshold and no critical failures:
     verdict = PARTIAL

@@ -83,6 +83,7 @@ You are a Developer fixing test failures in module M-{id}: {module-name}.
 
 ## Inputs
 - Module design spec: {module_design_path}
+- Project conventions: {conventions_path}
 - Failed test details: see Failure Context above
 
 ## Progress Context
@@ -112,10 +113,12 @@ You are a Developer addressing review feedback for module M-{id}: {module-name}.
 - Address all items marked "required" — these must be fixed
 - Items marked "suggested" are optional — fix only if trivial
 - Do NOT add functionality beyond what the review requests
+- Run all tests (unit + integration) to confirm no regressions — report results in your output
 - Commit with message: "fix(M-{id}): address review feedback"
 
 ## Inputs
 - Module design spec: {module_design_path}
+- Project conventions: {conventions_path}
 - Review comments: see Review Feedback above
 
 ## Progress Context
@@ -150,7 +153,13 @@ The previous approach has stalled after {stall_count} rounds with these recurrin
 - You may refactor or rewrite the affected files — this is intentional, not scope creep
 - Keep unchanged parts of the module intact
 - Run all tests to verify
+- Write updated implementation notes to `{report_dir}/developer-notes-M-{id}.md` (overwrite previous notes with the new strategy and its rationale)
 - Commit with message: "refactor(M-{id}): {description of new approach}"
+
+## Inputs
+- Module design spec: {module_design_path}
+- Module plan: {module_plan_path}
+- Project conventions: {conventions_path}
 
 ## Project Coding Standards
 

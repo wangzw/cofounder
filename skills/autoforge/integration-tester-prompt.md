@@ -14,6 +14,7 @@ You will receive these parameters from the Orchestrator:
 - `previous_phase_modules`: module IDs from all previous phases (already integrated)
 - `report_dir`: path to report directory (`docs/raw/plans/{plan-dir}/reports/`)
 - `conventions_path`: path to conventions.md (for test organization patterns)
+- `project_coding_standards`: unified project conventions (for test code standards)
 - `is_rerun`: boolean — true if this is a re-run after a fix cycle (review and update existing tests as needed rather than writing from scratch)
 
 ## Execution
@@ -99,6 +100,10 @@ Create `{report_dir}/integration-phase-{phase_number}.md`:
 ```
 
 Commit test files: `test(p{phase_number}): add phase-{phase_number} integration tests`
+
+## Project Coding Standards
+
+{project_coding_standards}
 
 ## Output
 

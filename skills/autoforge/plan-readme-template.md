@@ -11,7 +11,7 @@
 | Date | {YYYY-MM-DD} |
 | Feature Branch | `autoforge/{design-dir-name}-{hash4}` |
 | Worktree Root | `{project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}/` |
-| Acceptance Threshold | 80% (PARTIAL if >= threshold, FAIL if below) |
+| Acceptance Threshold | {acceptance_threshold}% (default: 80) (PARTIAL if >= threshold, FAIL if below) |
 
 ## Dependency Graph
 
@@ -63,7 +63,7 @@ Integration Points: modules this module interacts with. Format: `-> M-003` (this
 | M-001  | 1     | —    | —   | —    | —      | —      | — |
 | M-008  | 1     | —    | —   | —    | —      | —      | — |
 
-Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip
+Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Replan {n}` = in replan mode (n = replan attempt), `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip
 
 ## Phase Status
 

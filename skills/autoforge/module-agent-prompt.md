@@ -105,6 +105,10 @@ Pick the variant and tier by trigger:
 
 Always use tier aliases (`sonnet` / `opus` / `haiku`); never pin a specific model version. Aliases track the current tier member and avoid rot as models evolve. See the parent skill's Model Tier Policy section for the full rationale.
 
+### Infrastructure Failures
+
+If spawning a sub-agent (Developer, Tester, or Reviewer) fails due to infrastructure (not a logic error in the prompt), retry the spawn once. If the second attempt also fails, record the error in `module-state-M-{id}.json` under `retry_history`, and return `DECISION_REQUEST` to the Orchestrator with `STALLED_AT: infrastructure` and the error details in the DIAGNOSIS block.
+
 ### Spawning Tester
 
 ```
@@ -115,6 +119,8 @@ Agent({
   mode: "auto"
 })
 ```
+
+> **`race_detection_flag`:** If the Development Workflow conventions specify race detection (e.g., `-race` for Go), substitute `{race_detection_flag}` in the Tester prompt template before spawning. Set it to the appropriate flag string (e.g., `-race`), or to an empty string if not applicable.
 
 ### Spawning Reviewer
 
@@ -331,7 +337,7 @@ RETRY_HISTORY:
   - Round 2: {action taken} → {result, metric change}
   ...
 
-REPORTS: {report_dir}/failure-details-M-{id}.md
+REPORTS: {report_dir}/decision-request-M-{id}.md (primary), {report_dir}/failure-details-M-{id}.md (if stall was from Tester)
 ```
 
 **On PLAN_REVISION_NEEDED:**

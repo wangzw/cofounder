@@ -44,6 +44,7 @@ Apply review dimensions from the project's Code Review Policy in conventions.md.
 
 ## Inputs
 - Module design spec: {module_design_path}
+- Project conventions: {conventions_path}
 - Test report: {report_dir}/test-report-M-{id}.md
 - All source and test files in the worktree
 
