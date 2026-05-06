@@ -175,6 +175,59 @@ def walk_md(root: str, exclude_dirs: tuple[str, ...] = (".review",)) -> Iterable
             yield fname if rel_dir == "." else f"{rel_dir}/{fname}"
 
 
+def enumerate_leaves(bundle_dir: str) -> list[str]:
+    """Return sorted list of bundle leaf paths (relative to bundle_dir).
+
+    Leaves are the artifact files a downstream consumer reads:
+      - README.md
+      - journeys/J-*.md
+      - features/F-*.md
+      - architecture.md (if present), OR architecture/*.md (if present)
+
+    Excluded: .review/, versions/, REVISIONS.md, CHANGELOG.md, any
+    hidden file/dir, and anything under a sub-directory that does not
+    match the known artifact-bearing patterns.
+
+    The returned paths use forward slashes regardless of platform and
+    are relative to bundle_dir (e.g. "features/F-001-login.md").
+    """
+    if not os.path.isdir(bundle_dir):
+        return []
+    out: list[str] = []
+    # Top-level README
+    if os.path.isfile(os.path.join(bundle_dir, "README.md")):
+        out.append("README.md")
+    # journeys/
+    journeys_dir = os.path.join(bundle_dir, "journeys")
+    if os.path.isdir(journeys_dir):
+        for fname in sorted(os.listdir(journeys_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            if JOURNEY_FILE_RE.match(fname):
+                out.append(f"journeys/{fname}")
+    # features/
+    features_dir = os.path.join(bundle_dir, "features")
+    if os.path.isdir(features_dir):
+        for fname in sorted(os.listdir(features_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            if FEATURE_FILE_RE.match(fname):
+                out.append(f"features/{fname}")
+    # architecture.md OR architecture/*.md (mutually exclusive in
+    # practice, but both are tolerated here — both will be listed if
+    # both happen to exist).
+    arch_index = os.path.join(bundle_dir, "architecture.md")
+    if os.path.isfile(arch_index):
+        out.append("architecture.md")
+    arch_dir = os.path.join(bundle_dir, "architecture")
+    if os.path.isdir(arch_dir):
+        for fname in sorted(os.listdir(arch_dir)):
+            if fname.startswith(".") or not fname.endswith(".md"):
+                continue
+            out.append(f"architecture/{fname}")
+    return out
+
+
 def find_round_dirs(prd_root: str) -> list[tuple[int, str]]:
     """Return sorted list of (round_number, full_path) for every
     `<prd_root>/.review/round-<N>` directory.

@@ -18,6 +18,7 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 | generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
 | review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
+| compact | `/cofounder:prd-analysis --compact <prd-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -103,6 +104,7 @@ the bootstrap precheck for generate modes) is this call:
 | write (revise) | `revise/index.md` Step 1 | `verify-phase-entry.sh revise <prd-dir> <round>` |
 | write (generate-fresh) | `generate/from-scratch.md` Step 2 | `verify-phase-entry.sh generate-fresh <prd-dir>` |
 | write (generate-evolve) | `generate/new-version.md` Step 2 | `verify-phase-entry.sh generate-evolve <prd-dir>` |
+| compact | `compact/index.md` Step 2 | `verify-phase-entry.sh compact <prd-dir>` |
 
 `verify-phase-entry.sh` consolidates the underlying gates per phase:
 
@@ -112,6 +114,7 @@ the bootstrap precheck for generate modes) is this call:
 | revise | round-N has at least one `state: new` issue (otherwise no work) |
 | generate-fresh | bundle is empty/absent (avoids overwriting an existing PRD) |
 | generate-evolve | prior delivery's `versions/<N-1>.md` exists |
+| compact | current delivery's final round has `verdict: converged` AND at least one intermediate round exists |
 
 Exit codes follow the §9 contract uniformly: `0` = phase may proceed,
 `1` = phase MUST NOT proceed (precondition failed; see stdout), `2` =
@@ -158,6 +161,7 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis --revise docs/raw/prd/xxx/ --auto        # same loop, entered from the revise side
 /prd-analysis --evolve docs/raw/prd/xxx/               # incremental PRD for new iteration
 /prd-analysis --evolve docs/raw/prd/xxx/ notes.md      # evolve with document input
+/prd-analysis --compact docs/raw/prd/xxx/              # retire intermediate review rounds before next stage
 ```
 
 ## Output Structure
@@ -387,7 +391,8 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations`. |
-| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set above; `state.yml` is the only auto-mode artifact. |
+| `--full` | Review | Force the next review round to apply every LLM criterion to every leaf, regardless of incremental scope. **Single invocation only** — `scripts/compute-review-scope.sh` honors the flag exactly once; in `--auto` mode the orchestrator drops `--full` from subsequent rounds in the same loop so the rest of the loop runs with normal incremental scoping. Use to recover from a suspected stale `leaves-manifest.yml` or to force a fresh look at unchanged leaves after editing `common/review-criteria.md`. Without this flag, scoping is automatic: full on the first round of each delivery (no prior manifest) and incremental thereafter. |
+| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On `converged`, the orchestrator runs the full delivery sequence (`review/index.md` Step 9), which includes auto-compaction of the just-converged delivery's intermediate rounds via `scripts/compact-delivery.sh` so the bundle is hand-off-ready for the next pipeline stage. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set above; `state.yml` is the only auto-mode artifact. |
 
 ## Next Steps Hint
 
@@ -428,6 +433,7 @@ Next steps:
     - `scripts/check-round-index.sh`         .review/round-*/index.md (CR-RI01, CR-RI02)
     - `scripts/check-verdict.sh`             .review/round-*/verdict.yml (CR-VD01, CR-VD02)
     - `scripts/check-version.sh`             .review/versions/*.md (CR-VS01, CR-VS02)
+    - `scripts/check-compacted-history.sh`   .review/round-*/compacted-history.md (CR-CH01, CR-CH02)
   - Phase gates (separate argument shape; invoked by orchestrator, not by run-checkers):
     - `scripts/check-review-readiness.sh`    no prior `state: new` issues (guide §7.3)
     - `scripts/check-revise-completeness.sh` no `state: new` in current round (guide §7.3)
@@ -435,6 +441,7 @@ Next steps:
     - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1)
     - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
     - `scripts/synthesize-clarification.sh`  --no-consultant: synthesize deferred-only clarification.yml without violating orchestrator pure-dispatch contract
+    - `scripts/compact-delivery.sh`          `--compact` mode: aggregates intermediate review rounds of the current delivery into `compacted-history.md` and deletes their `round-N/` + `traces/round-N/` trees
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`
   - `generate/planner-subagent.md`

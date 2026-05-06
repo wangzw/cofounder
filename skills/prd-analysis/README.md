@@ -41,6 +41,7 @@ records every dispatch, every issue, and every state transition.
 | `/cofounder:prd-analysis --review <prd-dir>` | Read phase: cross-reviewer + judge |
 | `/cofounder:prd-analysis --revise <prd-dir>` | Write phase: per-issue fix loop |
 | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | Iterate to a new version |
+| `/cofounder:prd-analysis --compact <prd-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
 | `/cofounder:prd-analysis --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
@@ -89,7 +90,7 @@ Key invariants:
 ## Output: artifact ↔ script ↔ test mapping
 
 Every artifact this skill produces has exactly one formal-review script
-and one test runner. **27 scripts / 27 test runners / 403 tests** (run
+and one test runner. **29 scripts / 29 test runners / 470 tests** (run
 `bash tests/run-all.sh`).
 
 ### PRD bundle (LLM-produced; user-visible)
@@ -116,6 +117,7 @@ and one test runner. **27 scripts / 27 test runners / 403 tests** (run
 | `.review/round-N/index.md` | `check-round-index.sh` | `tests/test-check-round-index.sh` |
 | `.review/round-N/verdict.yml` | `check-verdict.sh` | `tests/test-check-verdict.sh` |
 | `.review/versions/<N>.md` | `check-version.sh` | `tests/test-check-version.sh` |
+| `.review/round-N/compacted-history.md` | `check-compacted-history.sh` | `tests/test-check-compacted-history.sh` |
 
 ### Script-produced (no formal review needed; downstream catches bugs)
 
@@ -158,6 +160,9 @@ and one test runner. **27 scripts / 27 test runners / 403 tests** (run
 | Script | Role |
 |--------|------|
 | `commit-delivery.sh` | On-converge: stages, commits, creates annotated `delivery-<N>-<slug>` tag. |
+| `compact-delivery.sh` | `--compact` mode: aggregates current delivery's intermediate rounds into `compacted-history.md`, then deletes those `round-N/` + `traces/round-N/` trees. Gated on `verdict: converged`. |
+| `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
+| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |
 | `metrics-aggregate.sh` | `--diagnose` mode: JOINs harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`. |
 
@@ -260,12 +265,12 @@ downstream consumers will surface producer bugs.
 
 ---
 
-## Stats (as of 2026-04-29)
+## Stats (as of 2026-05-06)
 
-- **27 scripts** (`scripts/*.sh` + 2 lib files)
-- **27 test runners** (`tests/test-*.sh`)
-- **403 tests passing** (`bash tests/run-all.sh`)
-- **70+ CR-IDs** in `common/review-criteria.md`
+- **29 scripts** (`scripts/*.sh` + 2 lib files)
+- **29 test runners** (`tests/test-*.sh`)
+- **470 tests passing** (`bash tests/run-all.sh`)
+- **72+ CR-IDs** in `common/review-criteria.md`
 - **8 sub-agent prompts** (planner, writer, domain-consultant,
   cross-reviewer, adversarial-reviewer, per-issue-reviser,
   summarizer, judge)

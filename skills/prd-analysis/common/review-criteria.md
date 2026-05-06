@@ -197,10 +197,14 @@ state-machine transitions, ratio signals, and cross-round fingerprinting.
 
 ---
 
-## Audit-Artifact Schema Criteria (CR-CL / CR-PL / CR-SR / CR-RO / CR-RI / CR-VD / CR-VS)
+## Audit-Artifact Schema Criteria (CR-CL / CR-PL / CR-SR / CR-RO / CR-RI / CR-VD / CR-VS / CR-CH)
 
 These criteria audit LLM-produced artifacts of the review pipeline itself
 (guide §10 self-closure). Each pairs with a per-artifact check script.
+`CR-CH*` audits the script-produced `compacted-history.md` summary
+written by `scripts/compact-delivery.sh` when the user runs `--compact`
+to retire intermediate review rounds before transitioning to the next
+pipeline stage.
 
 ```yaml
 - id: CR-CL01
@@ -323,6 +327,22 @@ These criteria audit LLM-produced artifacts of the review pipeline itself
   severity: error
   conflicts_with: []
   priority: 2
+- id: CR-CH01
+  name: "compacted-history-required-frontmatter"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-compacted-history.sh
+  severity: error
+  conflicts_with: []
+  priority: 3
+- id: CR-CH02
+  name: "compacted-history-final-round-monotonic"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-compacted-history.sh
+  severity: error
+  conflicts_with: []
+  priority: 3
 ```
 
 ---

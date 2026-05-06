@@ -56,6 +56,43 @@ reordered, control cannot reach LLM dispatch without
 `verify-phase-entry` having exited 0. Per guide §6, a formal problem
 caught here costs zero LLM tokens and saves an entire LLM round.
 
+### Step 1.5 — Snapshot leaves (script-enforced)
+
+```bash
+scripts/snapshot-leaves.sh <prd-dir> <current_round>
+```
+
+Writes `<prd-dir>/.review/round-<N>/leaves-manifest.yml` — a sha256 of every
+PRD leaf (README, journeys/J-*.md, features/F-*.md, architecture). This
+manifest is the input to Step 1.6 on **the next** round (and an audit trail
+for this one). Exit codes: 0 written; 2 script error → HITL.
+
+### Step 1.6 — Compute review scope (script-enforced)
+
+```bash
+scripts/compute-review-scope.sh <prd-dir> <current_round> [--full]
+```
+
+Writes `<prd-dir>/.review/round-<N>/review-scope.yml`. Decides whether the
+LLM dispatch in Step 2 / Step 3 applies every criterion to every leaf
+(`mode: full`) or only `per_file` criteria to changed leaves
+(`mode: incremental`). Decision tree:
+
+| Trigger | mode | reason |
+|---------|------|--------|
+| `--full` flag passed (single invocation; orchestrator MUST drop it on subsequent `--auto` rounds) | full | `--full-flag` |
+| No prior manifest in current delivery | full | `first-round-of-delivery` |
+| Prior manifest unreadable / malformed | full | `missing-prior-manifest` |
+| Otherwise | incremental | `diff` |
+
+The script consults `common/review-criteria.md` `incremental_skip` annotations
+to classify each LLM criterion as `full_scan` (always applied) or `per_file`
+(skipped on unchanged leaves). Exit 0 written; exit 2 → HITL.
+
+Both Step 1.5 and Step 1.6 are **orchestration helpers**, not gates: a non-zero
+exit indicates a script error (HITL) rather than a content failure. Phase
+entry (Step 1) is the only gate.
+
 ### Step 2 — Cross-Reviewer Dispatch (substantive only)
 
 Pre-conditions: Step 1 exit 0 (entry verification PASS) **and** there is meaningful
@@ -74,6 +111,13 @@ Dispatch: review/cross-reviewer-subagent.md
   prior issues (guide §7.6). The reviewer MUST check each new finding
   against this list before emitting it; matched findings get
   `recurrence_of: <prior-id>` in the output.
+- `<prd-dir>/.review/round-<N>/review-scope.yml` (Step 1.6 output) — the
+  reviewer MUST honor `mode` and the `changed_leaves` / `unchanged_leaves`
+  partition: in `mode: incremental`, criteria with `incremental_skip: per_file`
+  apply only to leaves listed in `changed_leaves`; criteria with
+  `incremental_skip: full_scan` apply to all leaves regardless. The reviewer's
+  output JSON MUST include a top-level `scope_applied: full | incremental`
+  field for downstream audit.
 - `common/review-criteria.md` — every entry whose `checker_type: llm`
 
 **Sub-agent output (one disk write)**: writes a JSON document to
@@ -209,9 +253,20 @@ so the skill behaves correctly under `claude -p ... --auto`.
    - (conditional) `<prd-dir>/README.md` — append a Revisions row
 3. Run `scripts/commit-delivery.sh <prd-dir> <delivery-id> <slug>` to create
    the annotated git tag `delivery-<N>-<slug>`.
-4. Orchestrator exits cleanly.
+4. **In `--auto` mode only**: run
+   `scripts/compact-delivery.sh <prd-dir>` to retire the just-converged
+   delivery's intermediate rounds. No `--force` is required because
+   Step 3 just created the `delivery-<N>-<slug>` tag, so the deleted
+   rounds remain recoverable from git history. The script is a no-op
+   (exit 0) if the delivery has only one round; any non-zero exit is
+   treated as a script error and aborts the orchestrator with exit 2 —
+   the converged commit and tag are kept. In interactive mode this
+   step is skipped; the user is instead pointed at
+   `/cofounder:prd-analysis --compact <prd-dir>` in the next-steps
+   hint.
+5. Orchestrator exits cleanly.
 
-Steps 1 and 3 are orchestrator-side (no LLM); Step 2 is the only Phase 2
+Steps 1, 3, and 4 are orchestrator-side (no LLM); Step 2 is the only Phase 2
 sub-agent dispatch in the entire delivery sequence.
 
 ---

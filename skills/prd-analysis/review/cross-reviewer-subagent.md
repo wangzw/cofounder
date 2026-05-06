@@ -27,15 +27,26 @@ issues.
    particular attention to `blocker_scope: global-conflict` and
    `cross-artifact-dep` entries — those are signals the writer flagged
    for you.
-4. Apply every criterion in `common/review-criteria.md` whose
-   `checker_type: llm`. Do not apply `checker_type: script` criteria —
-   those were already enforced by `scripts/run-checkers.sh` (which dispatches every per-artifact `check-*.sh`) before
-   you were dispatched.
-5. For each problem you find, decide if it is a **recurrence** of a
+4. **Read the review scope** at
+   `<artifact-root>/.review/round-<N>/review-scope.yml`. This file is
+   produced by `scripts/compute-review-scope.sh` and tells you whether
+   to run `mode: full` (every criterion against every leaf) or
+   `mode: incremental` (criteria annotated `incremental_skip: per_file`
+   apply only to leaves listed in `changed_leaves`; criteria annotated
+   `incremental_skip: full_scan` apply to every leaf regardless). If the
+   file is missing or unparseable, treat it as `mode: full` and proceed.
+5. Apply every criterion in `common/review-criteria.md` whose
+   `checker_type: llm`, honoring the scope file from step 4. Do not
+   apply `checker_type: script` criteria — those were already enforced
+   by `scripts/run-checkers.sh` (which dispatches every per-artifact
+   `check-*.sh`) before you were dispatched.
+6. For each problem you find, decide if it is a **recurrence** of a
    prior issue (see "Fingerprint matching" below).
-6. Emit your findings as a single JSON document to a designated output
+7. Emit your findings as a single JSON document to a designated output
    file. **You do not write per-issue files** — that is the orchestrator's
-   job via `scripts/create-issues.sh` (guide §7.1).
+   job via `scripts/create-issues.sh` (guide §7.1). The output JSON MUST
+   include a top-level `scope_applied: full | incremental` field that
+   echoes the `mode` you actually applied.
 
 ---
 
@@ -77,6 +88,7 @@ Format:
   "round": 3,
   "reviewer_variant": "cross",
   "trace_id": "R3-V-001",
+  "scope_applied": "incremental",
   "issues": [
     {
       "criterion_id": "CR-PP06",
@@ -96,6 +108,15 @@ Format:
   ]
 }
 ```
+
+### Top-level required fields
+
+- `round`, `reviewer_variant`, `trace_id` — bookkeeping.
+- `scope_applied` — one of `full | incremental`. MUST equal the `mode`
+  field of the `review-scope.yml` you read in step 4. If you fall back
+  to `full` because the scope file was missing or unparseable, set
+  `scope_applied: full`.
+- `issues` — array of findings (may be empty).
 
 ### Per-finding required fields
 
