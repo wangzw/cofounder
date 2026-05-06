@@ -3,6 +3,35 @@
 ## [Unreleased]
 
 ### Fixed
+- **Round-4 audit follow-ups**:
+  - `SKILL.md` Configuration & Subagent Files: `check-revisions.sh` was
+    catalogued under "Pipeline-stage scripts" with the wrong description
+    (`issue state transitions (CR-RI)`); moved to "Per-artifact
+    formal-review scripts" and corrected to `REVISIONS.md version-chain
+    integrity (CR-RV01, CR-SD03)`. The CR-RI ids belong to
+    `check-round-index.sh` (already correct).
+  - `SKILL.md` Configuration & Subagent Files: six per-artifact scripts
+    were labelled with legacy CR-IDs (`CR-X3`, `CR-X4`, `CR-X6`, `CR-X7`,
+    `CR-X8`, `CR-L2`) that no longer appear in
+    `common/review-criteria.md`; replaced with the canonical
+    `CR-SD14..CR-SD19` ids (the runtime CR_MAP in `scripts/lib/sd_emit.sh`
+    continues to remap reviewer-output JSON, so this is purely a doc
+    correction).
+  - `review/cross-reviewer-subagent.md`: removed the false claim that
+    `create-issues.sh` rejects unknown `criterion_id` values. The
+    orchestrator only validates schema (required fields, severity enum,
+    ≥5-char description / fix); criterion-id correctness is the
+    reviewer's responsibility.
+  - `tests/test-check-readme-references.sh`: added two regression tests
+    for the previously-fixed silent-exit-1 bug (a README line containing
+    `(` but no `]( … )` markdown link — e.g. `**Review Required**: Yes
+    (pending formal pre-check)`. Verifies both PASS-without-violations
+    and findings-still-emitted scenarios. Sibling scripts
+    (`check-architecture-coverage.sh`, `check-analytics-coverage.sh`,
+    `check-dependency-layering.sh`, `check-placeholder-json.sh`,
+    `check-single-source-of-truth.sh`) audited and confirmed safe — they
+    either don't use `grep -oE` or wrap it in `< <(...)` process
+    substitution where `set -e` does not propagate.
 - **Round-3 audit follow-ups**:
   - `review/cross-reviewer-subagent.md`: corrected stale LLM CR-ID range
     `CR-SD-DESIGN01..08` → `CR-SD-DESIGN01..11` and appended the bullet

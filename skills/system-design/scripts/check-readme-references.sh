@@ -228,8 +228,10 @@ while IFS= read -r line; do
     # Extract the content inside each (...) that follows a ]
     # Pattern: look for ](  then capture until matching )
     # We use grep -oE to find ](...) tokens, then strip the leading ]( and trailing )
+    # `|| true` keeps a no-match grep (exit 1) from tripping `set -euo pipefail`
+    # in this subshell — lines may contain `(` without any markdown link.
     printf '%s\n' "$line" \
-      | grep -oE '\]\([^)]*\)' \
+      | { grep -oE '\]\([^)]*\)' || true; } \
       | sed 's/^\](//;s/)$//'
   )
 
@@ -240,7 +242,9 @@ link_count=0
 # Re-parse just for counting (lightweight — count extracted targets)
 while IFS= read -r line; do
   [[ "$line" != *"("* ]] && continue
-  cnt=$(printf '%s\n' "$line" | grep -oE '\]\([^)]*\)' | wc -l | tr -d ' ')
+  # `|| true` guards a no-match grep (exit 1) from tripping `set -euo pipefail`
+  # — pre-filter only requires `(`, which can appear in prose without `]( … )`.
+  cnt=$(printf '%s\n' "$line" | { grep -oE '\]\([^)]*\)' || true; } | wc -l | tr -d ' ')
   link_count=$(( link_count + cnt ))
 done < "$README"
 

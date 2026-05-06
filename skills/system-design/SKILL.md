@@ -444,10 +444,10 @@ Next steps:
   - `scripts/check-module.sh` — Module-class checks (CR-SD03, CR-SD04, CR-SD06, CR-SD07, CR-SD08, CR-SD09, CR-SDFM02)
   - `scripts/check-api.sh` — API-class checks (CR-SD03, CR-SD10, CR-SD11, CR-SD12, CR-SD13, CR-SDFM03)
   - `scripts/check-feature-module-mapping.sh` — Feature ↔ Module bidirectional mapping (CR-SD05)
-  - `scripts/check-architecture-coverage.sh` — every PRD `architecture/*.md` topic referenced (CR-X3)
-  - `scripts/check-analytics-coverage.sh` — every PRD analytics event covered by a module (CR-X4)
-  - `scripts/check-readme-references.sh` — every relative path in README resolves (CR-X8)
-  - `scripts/check-dependency-layering.sh` — module dependency DAG forward-only (CR-X6)
+  - `scripts/check-architecture-coverage.sh` — every PRD `architecture/*.md` topic referenced (CR-SD14)
+  - `scripts/check-analytics-coverage.sh` — every PRD analytics event covered by a module (CR-SD15)
+  - `scripts/check-readme-references.sh` — every relative path in README resolves (CR-SD18)
+  - `scripts/check-dependency-layering.sh` — module dependency DAG forward-only (CR-SD16)
   - `scripts/check-issue.sh` — issue-file frontmatter + state-machine schema (CR-IS01)
   - `scripts/check-compacted-history.sh` — `compacted-history.md` schema (CR-CH01, CR-CH02)
   - `scripts/check-self-review.sh` — writer self-review files (CR-SR01, CR-SR02, CR-SR03)
@@ -455,8 +455,9 @@ Next steps:
   - `scripts/check-clarification.sh` — Round-0 clarification yml (CR-CL01, CR-CL02)
   - `scripts/check-version.sh` — `.review/versions/<N>.md` summarizer snapshots (CR-VS01, CR-VS02)
   - `scripts/check-round-index.sh` — `.review/round-<N>/index.md` schema (CR-RI01, CR-RI02)
-  - `scripts/check-placeholder-json.sh` — placeholder-JSON lint (CR-L2)
-  - `scripts/check-single-source-of-truth.sh` — duplicated data-model definitions (CR-X7)
+  - `scripts/check-placeholder-json.sh` — placeholder-JSON lint (CR-SD17)
+  - `scripts/check-single-source-of-truth.sh` — duplicated data-model definitions (CR-SD19)
+  - `scripts/check-revisions.sh` — `REVISIONS.md` version-chain integrity (CR-RV01, CR-SD03)
 - **Phase-gate scripts**:
   - `scripts/verify-phase-entry.sh` — single entry point dispatched per `<phase>` argument (`read | revise | generate-fresh | generate-evolve | compact`); composes the underlying gates below
   - `scripts/check-review-readiness.sh` — read-phase entry: zero `state: new` issues from prior rounds
@@ -466,7 +467,6 @@ Next steps:
   - `scripts/prepare-input.sh` — input-classification (CR-CL) → planner-input (CR-PL)
   - `scripts/create-issues.sh` — reviewer-output (CR-RO) → issue files (CR-IS01); idempotent
   - `scripts/check-reviewer-output.sh` — reviewer-output schema gate (CR-RO)
-  - `scripts/check-revisions.sh` — issue state transitions (CR-RI) → write-side discipline
   - `scripts/check-verdict.sh` — round verdict (CR-VD) using fixed convergence rule
   - `scripts/update-summary.sh` — round / delivery summarizer Phase 1/2 (CR-VS)
   - `scripts/commit-delivery.sh` — finalize a converged delivery (manifest snapshot + summary)

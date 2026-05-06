@@ -125,7 +125,11 @@ Format:
 
 - `criterion_id` — must match a `checker_type: llm` entry in
   `common/review-criteria.md`. The orchestrator's `create-issues.sh`
-  rejects unknown ids.
+  validates schema (required fields, severity enum, ≥5-char
+  description / fix) but does **not** verify the id against the
+  catalog, so reviewers are responsible for using only ids that
+  exist there; hallucinated ids will silently produce malformed
+  issue files.
 - `file` — relative path from artifact root. Use `""` only for issues
   that span the whole bundle and have no single-file location.
 - `severity` — one of `critical | error | warning | info`. Default to
