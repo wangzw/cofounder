@@ -52,7 +52,7 @@ For **every** sub-agent dispatch the orchestrator MUST:
 One JSONL line appended before dispatch:
 
 ```jsonl
-{"event": "launched", "trace_id": "R3-W-007", "role": "writer", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-20T10:15:30Z", "prompt_hash": "sha256:...", "linked_issues": ["R3-012"], "session_file": "/Users/me/.claude/projects/my-project/abc-def.jsonl"}
+{"event": "launched", "trace_id": "R3-W-007", "role": "writer", "reviewer_variant": null, "tier": "balanced", "model": "claude-sonnet-4-5", "delivery_id": 3, "dispatched_at": "2026-04-20T10:15:30Z", "prompt_hash": "sha256:...", "linked_issues": ["I-012"], "session_file": "/Users/me/.claude/projects/my-project/abc-def.jsonl"}
 ```
 
 Required fields:
@@ -76,7 +76,7 @@ Required fields:
 One JSONL line appended after ACK is received:
 
 ```jsonl
-{"event": "completed", "trace_id": "R3-W-007", "role": "writer", "ack_status": "OK", "linked_issues": ["R3-012"], "self_review_status": "PARTIAL", "fail_count": 1, "returned_at": "2026-04-20T10:16:10Z"}
+{"event": "completed", "trace_id": "R3-W-007", "role": "writer", "ack_status": "OK", "linked_issues": ["I-012"], "self_review_status": "PARTIAL", "fail_count": 1, "returned_at": "2026-04-20T10:16:10Z"}
 ```
 
 Required fields:
@@ -163,7 +163,7 @@ These map to §16 `retry_policy` (re-dispatch may be effective: new sub-session,
 MUST return:
 
 ```
-OK trace_id=R3-W-007 role=writer linked_issues=R3-012 self_review_status=PARTIAL fail_count=1
+OK trace_id=R3-W-007 role=writer linked_issues=I-012 self_review_status=PARTIAL fail_count=1
 ```
 
 Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /

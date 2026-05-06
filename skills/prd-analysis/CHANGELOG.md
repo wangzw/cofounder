@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **fix: round-7 audit follow-up** —
+  - `common/snippets.md`: harness-event examples used
+    `"linked_issues": ["R3-012"]` and `linked_issues=R3-012`, conflating
+    the on-disk issue-ID format (`I-NNN`, per `common/issue-schema.md`
+    and emitted by `scripts/create-issues.sh`) with the dispatch
+    `trace_id` namespace (`R<N>-<role>-<NNN>`). Updated all three
+    occurrences (lines ~55, ~79, ~166) to `["I-012"]` / `I-012`. The
+    `trace_id` `R3-W-007` values are preserved — they correctly remain
+    in the trace_id namespace, not the issue-ID namespace.
+
 - **fix: round-6 audit follow-up** —
   - `generate/domain-consultant-subagent.md`: the GOOD-example heading
     cited fabricated `CR-L02 / CR-L06` ids (no `CR-L*` namespace exists
