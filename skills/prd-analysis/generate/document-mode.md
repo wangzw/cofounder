@@ -48,7 +48,7 @@ structure:
 | Technical stack mentions (React, Postgres, etc.) | Tech stack → `architecture/` topic |
 | Compliance terms (GDPR, HIPAA, SOC2) | Privacy & compliance → README |
 | Deployment / environment descriptions | Deployment → `architecture/deployment.md` |
-| Auth roles / permission levels | Authorization model → `architecture/authorization.md` |
+| Auth roles / permission levels | Authorization model → `architecture/auth-model.md` |
 
 If a passage does not fit any mapping, note it as an **unclassified fragment** and present it to
 the user at gap-review time (Step 3).

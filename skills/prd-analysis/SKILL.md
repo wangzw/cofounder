@@ -14,7 +14,7 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; `common/scope-reference.md` and `common/templates/review-checklist.md` are read by writer subagent at self-audit time, not loaded into orchestrator context) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
+| generate (from scratch) | `/cofounder:prd-analysis` or `/cofounder:prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; the writer subagent's self-audit follows `generate/in-generate-review.md`, not loaded into orchestrator context) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
 | generate (new version) | `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand at Evolve Step 4) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
 | review | `/cofounder:prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/cofounder:prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
@@ -157,7 +157,7 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis notes.md --output ./prd                  # both
 /prd-analysis --review docs/raw/prd/xxx/               # review existing PRD (single round)
 /prd-analysis --review docs/raw/prd/xxx/ --auto        # auto-loop review↔revise until convergence
-/prd-analysis --revise docs/raw/prd/xxx/               # change management for existing PRD
+/prd-analysis --revise docs/raw/prd/xxx/               # per-issue revise loop (state-machine: new → fixed/false-positive/deferred/superseded)
 /prd-analysis --revise docs/raw/prd/xxx/ --auto        # same loop, entered from the revise side
 /prd-analysis --evolve docs/raw/prd/xxx/               # incremental PRD for new iteration
 /prd-analysis --evolve docs/raw/prd/xxx/ notes.md      # evolve with document input
@@ -442,6 +442,15 @@ Next steps:
     - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
     - `scripts/synthesize-clarification.sh`  --no-consultant: synthesize deferred-only clarification.yml without violating orchestrator pure-dispatch contract
     - `scripts/compact-delivery.sh`          `--compact` mode: aggregates intermediate review rounds of the current delivery into `compacted-history.md` and deletes their `round-N/` + `traces/round-N/` trees
+  - Pipeline-stage scripts (per audit-design guide §6):
+    - `scripts/prepare-input.sh`             input-classification (CR-CL) → planner-input (CR-PL)
+    - `scripts/commit-delivery.sh`           finalize a converged delivery (manifest snapshot + summary; invokes `prune-traces.sh`)
+    - `scripts/snapshot-leaves.sh`           build / refresh the leaves manifest used for incremental scoping
+    - `scripts/compute-review-scope.sh`      emit the per-round review scope from the leaves manifest
+    - `scripts/prune-traces.sh`              drop trace artifacts retired by `--compact` / commit-delivery
+    - `scripts/glossary-probe.sh`            extract candidate domain terms during questioning to seed the glossary
+    - `scripts/git-precheck.sh`              workspace cleanliness gate; called as first action of every mode
+    - `scripts/metrics-aggregate.sh`         `--diagnose` mode: aggregate harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`
 - **Sub-agent prompts**:
   - `generate/domain-consultant-subagent.md`
   - `generate/planner-subagent.md`

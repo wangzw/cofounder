@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **fix: SKILL.md drift and stale doc strings** —
+  - `generate/document-mode.md`: parser-heuristics route for
+    authorization content corrected from `architecture/authorization.md`
+    to canonical `architecture/auth-model.md` (matches
+    `architecture-template.md`; same class as the earlier `personas.md`
+    fix). Prevents orphan files that bypass `check-architecture-coverage`.
+  - `SKILL.md` Configuration & Subagent Files block: added a new
+    "Pipeline-stage scripts" group listing five scripts that are
+    invoked at runtime but were absent from the catalog
+    (`prepare-input.sh`, `commit-delivery.sh`, `snapshot-leaves.sh`,
+    `compute-review-scope.sh`, `prune-traces.sh`, plus
+    `glossary-probe.sh`, `git-precheck.sh`, `metrics-aggregate.sh`).
+  - `SKILL.md` Mode Routing: removed the stale parenthetical claiming
+    `common/scope-reference.md` and `common/templates/review-checklist.md`
+    are read by the writer subagent at self-audit time. The writer
+    subagent's self-audit follows `generate/in-generate-review.md`;
+    `review-checklist.md` is consumed only by `generate/evolve-mode.md`
+    and `revise/revise-mode.md`.
+  - `SKILL.md` Input Modes Summary: rephrased the `--revise` line so
+    Mode Routing and Input Modes Summary describe the same loop ("per-issue
+    revise loop with state-machine: new → fixed/false-positive/deferred/superseded").
+  - `revise/per-issue-reviser-subagent.md`: corrected `revise/index.md
+    Step 2` reference to `Step 3` (Step 2 builds the manifest;
+    Step 3 fans out per-issue revisers).
+  - `revise/revise-mode.md`: marked **DEPRECATED / NOT ROUTED**.
+    File documents an earlier interactive change-management workflow
+    that is no longer loaded by any SKILL.md mode (the active
+    `--revise` flow lives in `revise/index.md`). Kept as design
+    reference; not deleted.
+
 - **breaking: prototypes → frontend draft** — Phase 5 is renamed from
   "Interactive Prototype" to "Frontend Draft" and now produces runnable
   frontend code (real code, not a low-fidelity throwaway) directly into the

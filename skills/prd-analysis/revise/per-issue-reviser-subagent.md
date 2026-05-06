@@ -8,7 +8,7 @@ issues filed against it. Your job: modify the leaf so every issue is
 addressed, then update each issue's frontmatter with the appropriate
 state transition.
 
-This sub-agent runs in the **revise loop** (`revise/index.md` Step 2).
+This sub-agent runs in the **revise loop** (`revise/index.md` Step 3).
 
 ---
 

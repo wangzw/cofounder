@@ -1,5 +1,12 @@
 # PRD Revise Mode (`--revise`)
 
+> **STATUS: DEPRECATED / NOT ROUTED.** This file documents an earlier
+> interactive change-management workflow ("add a feature to a delivered
+> PRD" without going through `--review` first). It is **not loaded by
+> any current SKILL.md mode**. The actively-routed `--revise` flow lives
+> in [`revise/index.md`](index.md) (per-issue review-driven revise loop).
+> Kept here as design reference; do not consult during normal execution.
+
 This file contains instructions for interactively modifying an existing PRD — whether it's still a draft or already finalized. Auto-detects PRD state, confirms intent with the user, then guides a structured change process with impact analysis and conflict detection.
 
 Review Checklist dimensions are defined in `common/templates/review-checklist.md` — load it on demand (Step 6 specifies when).
