@@ -822,3 +822,52 @@ privilege, audit logging). Silent omission of security boundaries is a critical 
   priority: 1
   incremental_skip: full_scan
 ```
+
+---
+
+## CR-SD-DESIGN09 ui-promotion-action-set
+
+Every frontend module (Type = frontend) MUST declare a `Promotion action` value of
+`Promote`, `Extend`, or `Rewrite` in its UI Architecture section, MUST record the
+corresponding `Draft path` (or `—` for `Rewrite` / net-new views with no PRD draft),
+and MUST be consistent with the README Production Promotion Plan and View / Screen Index
+rows for the views it owns. A frontend module without a Promotion action makes
+autoforge guess whether to harden existing draft code or rewrite from scratch — this
+is the primary handoff signal between design and execution.
+
+```yaml
+- id: CR-SD-DESIGN09
+  name: "ui-promotion-action-set"
+  version: 1.0.0
+  checker_type: llm
+  severity: error
+  conflicts_with: []
+  priority: 2
+  incremental_skip: per_file
+```
+
+---
+
+## CR-SD-DESIGN10 ui-hardening-coverage
+
+Every frontend module with `Promotion action = Promote` or `Extend` MUST include a
+`### Promotion Requirements` subsection covering all five hardening categories:
+**i18n integration**, **Accessibility**, **Performance**, **Tests**, and
+**Coding-standard alignment**. Each row MUST describe both the current draft state
+and the hardening required; rows declared `N/A` MUST include a one-line rationale.
+Missing categories let production-quality concerns silently fall through the
+PRD-draft → autoforge handoff (the PRD draft was experience-validation only and
+explicitly skipped these concerns). Rewrite modules MAY omit this subsection
+because autoforge implements them from scratch under standard production
+conventions.
+
+```yaml
+- id: CR-SD-DESIGN10
+  name: "ui-hardening-coverage"
+  version: 1.0.0
+  checker_type: llm
+  severity: warning
+  conflicts_with: []
+  priority: 3
+  incremental_skip: per_file
+```

@@ -310,24 +310,53 @@ sequenceDiagram
      Omit this entire section if the project has no user-facing interface
      (pure API, CLI-only with no TUI, background service).
      View names MUST match the Screen/View column in PRD journey touchpoints exactly.
-     Source Journeys format: "J-{id} #{n}" where #n is the touchpoint sequence number. -->
+     Source Journeys format: "J-{id} #{n}" where #n is the touchpoint sequence number.
+     Draft Path is the repo-relative directory of the PRD Phase 5 frontend draft for this view
+     (sub-path under PRD architecture/tech-stack.md → "Frontend Implementation Path"; "—" if no draft).
+     Promotion Action describes how autoforge will take this view from draft to production:
+       Promote = keep draft structure; add i18n / a11y / tests / lint / perf hardening in place.
+       Extend  = draft covers part of the view; keep what exists, add missing screens/states.
+       Rewrite = draft is unsuitable; redo from feature spec. Use sparingly. -->
 
-| View | Description | Primary Module | Source Features | Source Journeys |
-|------|-------------|---------------|-----------------|-----------------|
-| {{VIEW_NAME_1}} | {{VIEW_DESCRIPTION_1}} | {{VIEW_MODULE_1}} | {{VIEW_FEATURES_1}} | {{VIEW_JOURNEYS_1}} |
+| View | Description | Primary Module | Source Features | Source Journeys | Draft Path | Promotion Action |
+|------|-------------|---------------|-----------------|-----------------|-----------|------------------|
+| {{VIEW_NAME_1}} | {{VIEW_DESCRIPTION_1}} | {{VIEW_MODULE_1}} | {{VIEW_FEATURES_1}} | {{VIEW_JOURNEYS_1}} | {{VIEW_DRAFT_PATH_1}} | {{VIEW_PROMOTION_ACTION_1}} |
 
-## Prototype-to-Production Mapping
+## Production Promotion Plan
 
-<!-- COMMENTARY: Maps PRD prototype components to production module destinations.
-     Omit this entire section if the PRD has no prototypes.
-     Action values:
-       Reuse   = prototype code is production-ready; copy with minimal changes.
-       Refactor = structure correct but implementation needs improvement.
-       Rewrite  = prototype was validation-only; implement from PRD feature spec. -->
+<!-- COMMENTARY: Replaces the old Prototype-to-Production Mapping. The PRD Phase 5
+     "Frontend Draft" produced runnable code in the project source tree at the path recorded
+     in PRD architecture/tech-stack.md → "Frontend Implementation Path". That draft is
+     experience-validation only — it has not been hardened for production (i18n wiring,
+     accessibility, performance budgets, tests, coding-standard conformance).
+     This section plans how autoforge will promote each user-facing module's draft to
+     production-deliverable quality. Per-module hardening details live in each module's
+     UI Architecture → Promotion Requirements subsection.
 
-| Prototype Component | Source Path (PRD) | Target Module | Action | Gap Description |
-|--------------------|--------------------|---------------|--------|-----------------|
-| {{PROTOTYPE_COMPONENT_1}} | {{PROTOTYPE_PATH_1}} | {{PROTOTYPE_TARGET_MODULE_1}} | {{PROTOTYPE_ACTION_1}} | {{PROTOTYPE_GAP_1}} |
+     Omit this entire section if the project has no user-facing interface or no PRD draft
+     was produced.
+
+     Promotion Action values:
+       Promote = keep draft structure; harden in place (i18n / a11y / tests / lint / perf).
+       Extend  = draft covers part of the module; keep what exists, add missing screens/states,
+                 then harden everything to production.
+       Rewrite = draft is unsuitable; redo from feature spec. Used sparingly — prefer Promote
+                 unless the draft is structurally wrong.
+
+     Hardening categories (every Promote/Extend module must address each in its module file,
+     even if the answer is "N/A — see rationale"):
+       1. i18n integration       — replace draft string tables with the production i18n library;
+                                   namespacing, locale negotiation, fallback rules.
+       2. Accessibility          — full a11y audit on top of draft's basic ARIA; keyboard map,
+                                   focus management, screen-reader passes, axe-core baseline.
+       3. Performance            — Web Vitals or TUI render budgets; bundle limits.
+       4. Tests                  — unit / integration / E2E coverage targets.
+       5. Coding-standard alignment — lint clean, type-clean, framework conventions, dead-code
+                                   removal in draft files. -->
+
+| Module | Action | Draft Path | Hardening Scope (one-line summary) |
+|--------|--------|-----------|------------------------------------|
+| {{PROMOTE_MODULE_1}} | {{PROMOTE_ACTION_1}} | {{PROMOTE_DRAFT_PATH_1}} | {{PROMOTE_SCOPE_1}} |
 
 ## Design System Conventions
 

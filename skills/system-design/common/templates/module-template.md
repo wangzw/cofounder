@@ -444,14 +444,30 @@ stateDiagram-v2
      STACK SOURCE: component framework, state management library, routing, and i18n library MUST
      be taken from clarification.yml `stack.frontend` key (if present) or from README
      Implementation Conventions. Do not make ad-hoc framework choices — inconsistent choices
-     across frontend modules produce conflicting stack signals for coding agents. -->
+     across frontend modules produce conflicting stack signals for coding agents.
+
+     SEMANTIC NOTE: PRD Phase 5 ("Frontend Draft") has already produced runnable code at the
+     repo-relative path below. This section's role is NOT to design the UI from scratch — it
+     is to (a) document the contracts the existing draft realises and (b) specify the
+     hardening that autoforge must add on top of the draft to reach production. The Component
+     Tree, Routing, State Management, Key Interactions sections below describe the contracts
+     that the existing code SHOULD match (treat divergences as draft gaps to fix during
+     promotion). The Promotion Requirements subsection lists the net-new production work that
+     does NOT yet exist in the draft. -->
 
 **Views owned:** {{list of views from README's View / Screen Index that this module implements}}
+
+**Draft path:** `{{repo-relative path to the PRD Phase 5 draft for this module — same as Draft Path in README View/Screen Index; "—" if no draft produced (Action = Rewrite or net-new view)}}`
+
+**Promotion action:** `{{Promote | Extend | Rewrite — must match the value in README's Production Promotion Plan and View/Screen Index for the views this module owns}}`
 
 ### Component Tree
 
 <!-- Show 2–3 levels of nesting. Leaf nodes are the smallest independently testable UI units
-     (e.g. a form, a data table, a navigation bar) — not individual HTML elements. -->
+     (e.g. a form, a data table, a navigation bar) — not individual HTML elements.
+     For Action = Promote/Extend: this tree describes the expected structure of the existing
+     draft code. Note any divergence as a Promotion Requirement under "Coding-standard
+     alignment". For Action = Rewrite: this tree is the design autoforge will implement. -->
 
 ```
 {{ViewName}}/
@@ -520,6 +536,26 @@ stateDiagram-v2
 - **Namespace:** `{{e.g. dashboard, tasks — maps to i18n key prefix from PRD feature specs}}`
 - **Lazy loading:** {{e.g. "load locale files per-route to reduce initial bundle"}}
 - **Fallback:** {{e.g. "en as fallback; show key name if translation missing in dev"}}
+
+### Promotion Requirements
+
+<!-- REQUIRED for every frontend module with Promotion action = Promote or Extend.
+     For Action = Rewrite this subsection MAY be omitted (autoforge implements from the
+     contracts above, and the standard production conventions apply by default).
+
+     Lists the net-new hardening work autoforge must do on top of the existing PRD draft.
+     The PRD draft validated experience only — i18n / a11y / tests / lint / perf budgets
+     were explicitly out of scope at PRD time. Specify each of the five categories below;
+     if a category is genuinely N/A, say so with a one-line rationale rather than dropping
+     the row. CR-SD-ui-hardening-coverage enforces full coverage. -->
+
+| Category | Current Draft State | Hardening Required |
+|----------|---------------------|--------------------|
+| **i18n integration** | {{e.g. "draft uses inline strings under a single `strings.ts` table"}} | {{e.g. "wire react-i18next per architecture stack; extract into `{namespace}` keyspace; add locale negotiation; remove inline strings"}} |
+| **Accessibility** | {{e.g. "draft uses semantic HTML and basic ARIA roles on top-level landmarks"}} | {{e.g. "full keyboard map per view; focus management on modals/dialogs; axe-core CI check; screen-reader pass on form flows"}} |
+| **Performance** | {{e.g. "no budget enforced — bundle currently ~280 KB raw"}} | {{e.g. "code-split per route; meet LCP/INP/CLS targets above; bundlesize CI gate at 150 KB gzipped"}} |
+| **Tests** | {{e.g. "no automated tests — manual walkthrough only at draft phase"}} | {{e.g. "unit tests on component contracts (> 80% lines); integration tests on state-machine transitions; Playwright E2E on each route"}} |
+| **Coding-standard alignment** | {{e.g. "draft has 14 ESLint warnings; TypeScript `any` in 3 places; some inline styles"}} | {{e.g. "zero lint warnings; eliminate `any`; remove all inline styles; align file structure with framework convention"}} |
 
 ---
 

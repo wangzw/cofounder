@@ -2,7 +2,44 @@
 
 ## [Unreleased]
 
+### Changed
+- **PRD-draft → production hardening handoff (paradigm sync with prd-analysis)** —
+  prd-analysis Phase 5 produces a frontend draft (experience-validation only) at
+  the path recorded in PRD `architecture/tech-stack.md` → "Frontend Implementation
+  Path". system-design now plans how that draft becomes production-deliverable
+  rather than designing UI from scratch:
+  - **Replaced** `## Prototype-to-Production Mapping` in
+    `common/templates/design-readme-template.md` with `## Production Promotion
+    Plan` — per-module table of `Module | Action | Draft Path | Hardening Scope`.
+    Action values are **Promote / Extend / Rewrite** (replacing
+    Reuse / Refactor / Rewrite); Promote/Extend keep the draft and harden it
+    in place, Rewrite redoes from feature spec.
+  - **Extended** `## View / Screen Index` table with two new columns:
+    `Draft Path` and `Promotion Action`.
+  - **Inverted** the semantics of `## UI Architecture` in
+    `common/templates/module-template.md`: Component Tree / Routing / State
+    Management / Key Interactions now describe the contracts the **existing
+    draft must match** (divergences are draft gaps to fix during promotion),
+    not a from-scratch design. Added `Draft path:` and `Promotion action:`
+    header fields.
+  - **Added** `### Promotion Requirements` subsection to the module template,
+    required for every frontend module with Action = Promote/Extend. Covers
+    five hardening categories: i18n integration, Accessibility, Performance,
+    Tests, Coding-standard alignment. Each row records the current draft
+    state and the hardening autoforge must add.
+
 ### Added
+- **Two new review criteria**:
+  - **CR-SD-DESIGN09 ui-promotion-action-set** (per_file, error) — every
+    frontend module declares a Promotion action, has a Draft path, and is
+    consistent with the README Production Promotion Plan and View/Screen
+    Index. Replaces (at the design level) part of the responsibility removed
+    when prd-analysis dropped CR-PP35.
+  - **CR-SD-DESIGN10 ui-hardening-coverage** (per_file, warning) — every
+    Promote/Extend module's Promotion Requirements subsection covers all
+    five hardening categories (i18n / a11y / perf / tests / coding-standard);
+    `N/A` rows include a one-line rationale.
+
 - **Incremental review + `--full` flag** — review rounds now write a
   sha256 leaves manifest (`scripts/snapshot-leaves.sh` →
   `round-<N>/leaves-manifest.yml`) and a per-round scope file
