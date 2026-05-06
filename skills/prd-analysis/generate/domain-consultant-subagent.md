@@ -170,7 +170,7 @@ domain_terms_aligned:
 
 ## Quality Bar — DO / DON'T Examples
 
-### GOOD — Well-formed clarification dialogue (satisfies CR-L02 and CR-L06)
+### GOOD — Well-formed clarification dialogue (satisfies CR-CL01 and CR-CL02)
 
 **Context**: User prompt is "I want a PRD for a task management app for remote teams."
 

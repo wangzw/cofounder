@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+- **fix: round-6 audit follow-up** —
+  - `generate/domain-consultant-subagent.md`: the GOOD-example heading
+    cited fabricated `CR-L02 / CR-L06` ids (no `CR-L*` namespace exists
+    in `common/review-criteria.md`); replaced with the canonical
+    `CR-CL01 / CR-CL02` (clarification-required-keys-present /
+    clarification-flat-keys-first).
+  - `tests/test-cr-id-references.sh`: new programmatic guard rail that
+    fails CI whenever any auditable markdown file (templates, subagent
+    prompts, SKILL.md, mode-routing.md) cites a `CR-XXNN` token that is
+    neither defined in `common/review-criteria.md` nor explicitly
+    allowlisted (cross-skill refs, legacy emit-side ids). Catches the
+    full class of bug uncovered across rounds 4–6 mechanically so
+    future drift is rejected at test time rather than at human-audit
+    time.
+
 - **fix: round-5 audit follow-up** —
   - `common/templates/artifact-template.md`: rule #4 cited a non-existent
     `CR-L05 (artifact-template-self-contained)`; replaced with the
