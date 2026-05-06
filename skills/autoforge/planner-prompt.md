@@ -20,7 +20,8 @@ You will receive these parameters from the Orchestrator:
 - `project_coding_standards`: unified coding standards merged from (1) CLAUDE.md/AGENTS.md overrides, (2) design README Implementation Conventions + Key Technical Decisions, (3) PRD architecture.md developer convention sections. Use these as an additional source when creating conventions.md (first module) or validating plan steps align with project standards.
 - `prd_architecture_path`: path to PRD architecture.md (for developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Observability Requirements, Performance Testing, Development Workflow, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration)
 - `implemented_module_paths`: paths to source code of already-implemented modules on the feature branch (empty during initial planning; populated during re-planning)
-- `prototype_source_path`: path to PRD prototype code for this module's features (empty if no prototype exists or Action = Rewrite). When present, the module design spec contains a Prototype Reuse Guide with specific files to copy and adaptations to make
+- `draft_source_path`: path to the PRD-stage frontend draft for this module's user-facing features (empty if Promotion action = Rewrite or the module is backend / shared-library). The draft already lives in the project source tree at the path recorded in PRD `architecture/tech-stack.md` → "Frontend Implementation Path" — autoforge does NOT copy it elsewhere; it hardens it in place
+- `promotion_action`: `Promote | Extend | Rewrite | None` for this module. `None` means the module is backend or shared-library (no UI Architecture). For frontend modules, this matches the design spec's `Promotion action` field
 
 ## Execution
 
@@ -48,16 +49,18 @@ Read in this order:
    - Data model — what data structures it uses
    - Dependencies — what other modules it depends on
    - Acceptance criteria and edge cases
-   - **Prototype Reuse Guide** (in UI Architecture section, if present) — lists prototype files to copy, patterns to preserve, and adaptations needed. Extract the Source path and Action (Reuse/Refactor) for the plan's Context table
+   - For frontend modules: **Promotion action** (Promote / Extend / Rewrite), **Draft path**, and **Promotion Requirements** subsection (in UI Architecture). The Promotion Requirements list the i18n / a11y / perf / tests / coding-standard hardening that autoforge must add on top of the existing draft — extract them for the plan's hardening steps. The PRD draft was experience-validation only and explicitly skipped these concerns
+   - Existing draft contracts — the Component Tree / Routing / State Management / Key Interactions tables in UI Architecture describe the contracts the existing draft SHOULD match. Divergences are draft gaps to fix during promotion
 
 3. **PRD feature specs** (`{prd_feature_paths}`) — user-facing requirements:
    - Acceptance criteria that trace to this module
    - Edge cases and error scenarios
+   - For user-facing features: the **Frontend Draft Reference** subsection records the draft path (already inside the project source tree) and confirmation date
 
-4. **Prototype code** (`{prototype_source_path}`, if provided) — production-seed code from PRD Phase 5:
-   - Read the module design spec's **Prototype Reuse Guide** (in UI Architecture section) for which files to copy and what adaptations are needed
-   - Read the actual prototype source files to understand code patterns, state management, component structure
-   - This code was validated by the user during PRD — preserve its patterns and structure where marked as Reuse
+4. **Frontend draft code** (`{draft_source_path}`, if provided) — runnable PRD-stage code already in the project source tree:
+   - Read the module design spec's UI Architecture section (Component Tree, Routing, State Management, Key Interactions, Promotion Requirements) to understand what the draft already realises and what hardening must be added
+   - Read the actual draft source files at `{draft_source_path}` to see current code structure, state management, and the gap relative to production quality (no full i18n wiring, no tests, lint warnings, etc. — these are normal for the draft)
+   - The draft's interaction structure was validated with the user during PRD Phase 5 — preserve the user-confirmed component structure and visual contracts. Only restructure when the design spec's Promotion action is `Rewrite`
 
 5. **Conventions file** (`{conventions_path}`, if it exists) — follow established patterns
 
@@ -140,8 +143,8 @@ The Orchestrator merges all `conventions-additions/*.md` into `conventions.md` a
 Output: `{plan_dir}/plan-M-{module_id}-{module_slug}.md` following the structure in `module-plan-template.md`.
 
 Populate the Context table fields:
-- **Prototype**: Action from the module design spec's Prototype Reuse Guide (Reuse / Refactor / None). Set to "None" if no Prototype Reuse Guide exists or Action = Rewrite
-- **Prototype Source**: Source path from the Prototype Reuse Guide, or "—" if Prototype = None
+- **Promotion Action**: from the module design spec's UI Architecture `Promotion action` field (`Promote` / `Extend` / `Rewrite`). Set to `None` for backend or shared-library modules with no UI Architecture
+- **Draft Source**: `Draft path` from the design spec, or `—` if Promotion Action is `Rewrite` or `None`
 
 **Rules for writing steps:**
 
@@ -159,22 +162,28 @@ Populate the Context table fields:
    - Consumed interface not yet planned → define the expected interface based on the design spec; the later Planner will conform to your expectation
    - Exposed interface → define with full specificity so later Planners can reference your plan
 
-5. **Step ordering** — depends on whether a prototype exists:
+5. **Step ordering** — depends on Promotion Action (frontend modules) or default (backend / shared-library / `Rewrite`):
 
-   **Without prototype** (no `prototype_source_path`, or Action = Rewrite):
+   **Default — write from scratch** (`promotion_action` = `None` for backend/shared-library, or `Rewrite` for frontend with no usable draft):
    - Interface skeleton (public API this module exposes)
    - Data model (types, schemas, storage)
    - Core logic (business rules, algorithms)
    - Unit tests (cover acceptance criteria and edge cases from design spec)
    - Additional steps as needed (error handling, configuration, CLI/API handlers)
 
-   **With prototype** (Action = Reuse or Refactor, from Prototype Reuse Guide):
-   - Step 1: Copy prototype files from `{prototype_source_path}` to production paths per the Prototype Reuse Guide's "Files to copy/adapt" table. List each file copy with source → target path
-   - Step 2: Adapt copied code per "Adaptation Notes" column (replace mock data, connect real APIs, adjust import paths, add error handling)
-   - Step 3: Discard items listed in "What to discard" from the Reuse Guide
-   - Step 4+: Additional production concerns (error handling, integration with other modules, configuration)
-   - Unit tests (test the adapted code, not the prototype's original behavior)
-   - **Key rule:** Do NOT rewrite code that the Prototype Reuse Guide marks for copy. The prototype was validated by the user — preserve its structure and patterns
+   **Promote** (`promotion_action` = `Promote` — keep the draft, harden it in place):
+   - The draft already lives at `{draft_source_path}` inside the project source tree. Do **NOT** plan any "copy from prototype to production path" step — there is no separate production path
+   - Step 1: Verify the draft at `{draft_source_path}` matches the contracts in the design spec's UI Architecture (Component Tree, Routing, State Management, Key Interactions). For each divergence, plan an in-place adjustment step. Do not rewrite code that already matches the contracts — the user confirmed the draft's structure during PRD Phase 5
+   - Step 2+: Plan one or more steps for **each row** of the Promotion Requirements table (i18n integration, Accessibility, Performance, Tests, Coding-standard alignment). Be concrete: name the i18n library, namespace prefix, accessibility tools (e.g. axe-core), bundle target, test framework, lint rules. Skip a category only if its row is `N/A` with rationale
+   - Add module-integration steps (replacing mock data with real backend calls, wiring auth context, error mapping) as separate steps
+   - Tests: every Promotion Requirements item with a tests target adds at least one test step
+   - **Key rule:** the draft was validated by the user — do **not** restructure components, routes, or state-machine layout under `Promote` action. Hardening only
+
+   **Extend** (`promotion_action` = `Extend` — keep what's in the draft, add missing screens/states, then harden everything):
+   - Step 1: Same draft-vs-contract reconciliation as `Promote`
+   - Step 2: Implement the missing screens/states the draft does not yet cover (the design spec's Component Tree / Routing tables include both existing and net-new entries — plan only the net-new ones as build steps)
+   - Step 3+: Promotion Requirements hardening covering both inherited draft code AND the net-new code, per the same five categories
+   - Tests as for Promote
 
 6. **Complete acceptance mapping** — every acceptance criterion from the design spec must map to at least one implementation step and one test.
 
@@ -189,7 +198,7 @@ Before finishing, verify:
 - [ ] Integration points for implemented modules use exact signatures from the actual code
 - [ ] Integration points for planned-only modules use exact signatures from those plans
 - [ ] Integration points for not-yet-planned modules clearly state the expected interface
-- [ ] If `prototype_source_path` is provided: plan starts with copy/adapt steps (not write-from-scratch); every file in the Prototype Reuse Guide's table has a corresponding plan step
+- [ ] If `promotion_action` = `Promote` or `Extend`: plan does **NOT** include a "copy from prototype to production path" step (the draft is already at the production path); plan starts with a draft-vs-contract reconciliation step; every row in the design spec's Promotion Requirements table (i18n, a11y, perf, tests, coding-standard) is covered by at least one explicit hardening step; for `Extend`, every net-new screen/state in the Component Tree / Routing tables has a build step
 
 ## Output
 

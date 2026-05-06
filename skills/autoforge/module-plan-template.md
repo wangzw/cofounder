@@ -10,8 +10,8 @@
 | Source Features | {F-001, F-003, ...} |
 | Phase | {n} |
 | Dependencies | {M-xxx, M-yyy or "None"} |
-| Prototype | {Action: Reuse / Refactor / None — from design spec Prototype Reuse Guide} |
-| Prototype Source | {`{prd-dir}/prototypes/src/{feature-slug}/` or "—"} |
+| Promotion Action | {Promote / Extend / Rewrite / None — from design spec UI Architecture; None for backend or shared-library modules} |
+| Draft Source | {`{repo-root}/{frontend-implementation-path}/{feature-area}/` from design spec Draft path, or "—" for Rewrite/None} |
 
 ## Prerequisites
 

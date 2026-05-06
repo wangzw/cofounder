@@ -15,7 +15,8 @@ You will receive these parameters from the main Orchestrator:
 - `worktree_path`: absolute path to this module's worktree directory
 - `project_coding_standards`: unified project conventions from three sources in priority order: (1) CLAUDE.md/AGENTS.md project-specific overrides — highest priority, (2) design README's Implementation Conventions and Key Technical Decisions, (3) PRD architecture.md developer convention sections (Coding Conventions, Test Isolation, Security Coding Policy, Observability Requirements, Performance Testing, Development Workflow, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration) — all sub-agents must follow these
 - `conventions_path`: path to conventions.md (`{plan_dir}/conventions.md`) — project-wide implementation conventions derived during planning
-- `prototype_source_path`: path to PRD prototype code for this module's features (empty if no prototype or Action = Rewrite). When present, pass this to the Developer prompt's Prototype Instructions section
+- `draft_source_path`: path to the PRD-stage frontend draft for this module's user-facing code (empty if Promotion action = Rewrite, or the module is backend/shared-library). The draft already lives in the project source tree at the path recorded in PRD `architecture/tech-stack.md` → "Frontend Implementation Path" — autoforge hardens it in place and does NOT copy it elsewhere. Pass this and `promotion_action` to the Developer prompt's UI Promotion Instructions section
+- `promotion_action`: `Promote | Extend | Rewrite | None` for this module (`None` for backend/shared-library; matches the design spec UI Architecture `Promotion action` field for frontend modules)
 - `stall_threshold`: consecutive non-progress rounds before changing strategy (default: 3)
 - `hard_ceiling`: absolute maximum retries as safety net (default: 20)
 

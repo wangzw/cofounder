@@ -22,16 +22,19 @@ Follow the implementation plan step by step. Each step has: Goal, Files, Code, V
 - Implementation plan: {module_plan_path}
 - Module design spec: {module_design_path}
 - Project conventions: {conventions_path}
-{if prototype_source_path: "- Prototype source code: {prototype_source_path} (Action: {Reuse/Refactor} — see plan Context table)"}
+{if draft_source_path: "- Frontend draft (already at this path in the project source tree): {draft_source_path} (Promotion Action: {Promote/Extend} — see plan Context table; harden in place, do not copy elsewhere)"}
 
 Reference {conventions_path} for project conventions (naming, error handling, security patterns, test isolation). Plan steps take precedence for implementation details, but conventions.md governs code style, security practices, and test patterns.
 
-## Prototype Instructions
-{Include this section ONLY if the plan's Context table has Prototype = Reuse or Refactor. Omit entirely if Prototype = None.}
+## UI Promotion Instructions
+{Include this section ONLY if the plan's Context table has Promotion Action = Promote or Extend. Omit entirely if Promotion Action = Rewrite or None.}
 
-This module has validated prototype code. The plan's first steps will tell you to copy prototype files — follow them exactly:
-- **Action = Reuse:** Copy prototype files to production paths, then adapt per the plan's adaptation notes. Do NOT rewrite code that the plan says to copy — the prototype was validated by the user.
-- **Action = Refactor:** Start from prototype code, apply the refactoring steps documented in the plan. Preserve the prototype's structure and patterns unless the plan explicitly says to change them.
+This module's user-facing code already exists at {draft_source_path} as a PRD-stage frontend draft validated by the user for interaction and visual experience. The draft was experience-validation only — it intentionally skipped i18n library wiring, accessibility hardening, performance budgets, tests, and full coding-standard conformance. Your job is to harden it in place, not rewrite it:
+
+- **Action = Promote:** Keep the draft's component structure, routing, state management, and visual layout intact (the user confirmed them at PRD time). Apply the plan's hardening steps in place: wire the production i18n library and replace inline strings, add accessibility (keyboard, focus, ARIA, axe-core); meet performance budgets; add unit / integration / E2E tests per the plan; clean up lint warnings and align with coding standards. Do NOT relocate the code — production path == draft path.
+- **Action = Extend:** Same as Promote for inherited code, plus implement the net-new screens / states the plan calls out (these are the ones the draft did not yet cover). Harden both inherited and net-new code together.
+
+If the draft diverges from the design spec's Component Tree / Routing / State Management contracts, the plan will list reconciliation steps before the hardening steps — follow them. Otherwise, do not restructure.
 
 ## Rules
 - Follow plan steps sequentially — do not skip or reorder

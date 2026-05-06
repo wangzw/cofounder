@@ -91,7 +91,7 @@ flowchart TD
    - **(c) PRD architecture.md developer convention sections** — follow the design README's `Design Input > Source` to the PRD directory, then read `architecture.md` for: Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration, Deployment Architecture (environments, local dev setup, config management, CD pipeline, environment isolation)
    
    Merge these into a unified `project_coding_standards` context: (a) overrides (b) overrides (c). Pass relevant sections to all sub-agents throughout the pipeline.
-3. **Locate PRD** — follow `Design Input > Source` to find the PRD directory. Read: `README.md` (feature index only). Do NOT read journeys/, architecture topic files, or prototypes/ upfront — they are not needed for planning. Individual module Planners and Developers will read specific feature files on demand when they need acceptance criteria or interaction design details.
+3. **Locate PRD** — follow `Design Input > Source` to find the PRD directory. Read: `README.md` (feature index only). Do NOT read journeys/ or architecture topic files upfront — they are not needed for planning. Individual module Planners and Developers will read specific feature files (and the frontend draft files referenced via `Frontend Draft Reference`) on demand when they need acceptance criteria, interaction design details, or existing-code context.
 4. **Build dependency graph** — from Module Index `Deps` column, construct a DAG. Topologically sort into phases: Phase 1 = modules with no dependencies, Phase 2 = modules whose deps are all in Phase 1, etc.
 5. **Detect project state** — check if project has existing source code (package manifests, src directories). If so, note this — Planners must account for existing code structure
 6. **Determine output paths**:
@@ -200,11 +200,11 @@ See `planner-prompt.md` for the complete Planner prompt template.
 | Input | Source | Notes |
 |-------|--------|-------|
 | Module design spec | `modules/M-{id}-{slug}.md` | Primary input for this module |
-| Design README | Design `README.md` | Cross-module context: interaction protocols, test strategy, tech stack, Implementation Conventions, Key Technical Decisions |
-| PRD architecture.md | `{prd-dir}/architecture.md` | Developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Development Workflow, Observability Requirements, Performance Testing, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration |
-| PRD feature specs | `features/F-*.md` | Features referenced in module's Source Features section |
-| Prototype Reuse Guide | Module spec's UI Architecture section | If module has Action = Reuse/Refactor: files to copy, patterns to preserve, adaptations needed. Planner uses this to generate "copy/adapt prototype" steps instead of "write from scratch" steps |
-| PRD prototype source | `{prd-dir}/prototypes/src/{feature-slug}/` | Actual prototype code files (if module has Prototype Reuse Guide). Planner reads these to write concrete adaptation steps |
+| Design README | Design `README.md` | Cross-module context: interaction protocols, test strategy, tech stack, Implementation Conventions, Key Technical Decisions, **Production Promotion Plan** (per-module Promote/Extend/Rewrite actions for frontend modules) |
+| PRD architecture.md | `{prd-dir}/architecture.md` | Developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Development Workflow, Observability Requirements, Performance Testing, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration, **Frontend Implementation Path** (root of any PRD-stage frontend draft for user-facing modules) |
+| PRD feature specs | `features/F-*.md` | Features referenced in module's Source Features section. For user-facing features, the **Frontend Draft Reference** subsection records the draft path and confirmation date — used by Planner to decide draft-promotion vs build-from-scratch step ordering |
+| UI Promotion Guide | Module spec's UI Architecture section | If module has Promotion action = Promote/Extend: existing draft path, the contracts the draft must match, and the Promotion Requirements (i18n / a11y / perf / tests / coding-standard hardening). Planner uses this to generate "harden draft in place" steps instead of "write from scratch" steps |
+| PRD frontend draft source | `{repo-root}/{frontend-implementation-path}/{feature-area}/` | Actual draft code files in the project source tree (NOT under `{prd-dir}/`). Planner reads these for Promote/Extend modules to write concrete hardening steps. For Rewrite or backend-only modules: skip |
 | Dependency closure plans | `plans/plan-M-*.md` for every module in `closure(M)` | Concrete interface signatures, types, and file paths for the upstream modules this one consumes. Empty for Phase 1 modules. Replaces the prior "all previous plans" input. |
 | Implemented code | Source files on feature branch | For already-merged modules: actual code is source of truth over plans (populated during re-planning) |
 | Conventions | `plans/conventions.md` | First Planner creates; subsequent Planners read. Extensions are written to per-module `conventions-additions/M-{id}.md` files and merged by the Orchestrator between phases. |
@@ -295,9 +295,9 @@ module_worktree = {worktree_root}/p{n}-M-{id}-{slug}
 git worktree add -b {module_branch} {module_worktree} autoforge/{design-dir-name}-{hash4}
 ```
 
-**Before spawning, detect prototype source** (if the module has one):
+**Before spawning, detect frontend draft source** (if the module has one):
 
-Read the module design spec's UI Architecture section. If a **Prototype Reuse Guide** exists with Action = Reuse or Refactor, extract the `Source` path (e.g. `{prd-dir}/prototypes/src/F-006-tui/`). This becomes `prototype_source_path`. If no Prototype Reuse Guide exists or Action = Rewrite, set `prototype_source_path` to empty.
+Read the module design spec's UI Architecture section. If `Promotion action` is `Promote` or `Extend`, extract the `Draft path` (a repo-relative directory under PRD `architecture/tech-stack.md` → "Frontend Implementation Path"; the draft already lives in the project source tree, not under `{prd-dir}/`). This becomes `draft_source_path`. If `Promotion action` is `Rewrite`, or the module is backend / shared-library (no UI Architecture section), set `draft_source_path` to empty.
 
 **Then spawn the Module Agent in the worktree directory:**
 
@@ -320,7 +320,8 @@ Agent({
     - worktree_path: {module_worktree}
     - conventions_path: docs/raw/plans/{plan-dir}/plans/conventions.md
     - project_coding_standards: {unified conventions from: (1) CLAUDE.md/AGENTS.md overrides, (2) design README Implementation Conventions + Key Technical Decisions, (3) PRD architecture.md developer convention sections — merged in priority order, or 'none'}
-    - prototype_source_path: {extracted path, or empty if no prototype}
+    - promotion_action: {Promote | Extend | Rewrite | None — None for backend/shared-library modules}
+    - draft_source_path: {extracted draft path, or empty if Promotion action = Rewrite / None}
     - stall_threshold: 3
     - hard_ceiling: 20"
 })
