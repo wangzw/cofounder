@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **fix: round-5 audit follow-up** —
+  - `common/templates/artifact-template.md`: rule #4 cited a non-existent
+    `CR-L05 (artifact-template-self-contained)`; replaced with the
+    canonical `CR-PP14 (self-containment)` (line 552 of
+    `common/review-criteria.md`). Same failure mode that the round-4
+    cross-reviewer fix addressed: a writer subagent looking up a
+    fabricated CR-ID would either skip the rule or hallucinate it.
+
 - **fix: round-4 audit follow-ups** —
   - `CHANGELOG.md`: switched the unreleased heading from `## Unreleased`
     to `## [Unreleased]` so it matches the keep-a-changelog convention

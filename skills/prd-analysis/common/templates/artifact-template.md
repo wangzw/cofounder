@@ -40,7 +40,7 @@ Every output file produced from the templates above MUST satisfy all of the foll
    `architecture/design-tokens.md`.
 
 4. **No placeholder sections**: A file with empty sections or `<!-- TBD -->` content fails
-   CR-L05 (artifact-template-self-contained) and CR-PP04 (no-tbd-placeholders). Every section
+   CR-PP14 (self-containment) and CR-PP04 (no-tbd-placeholders). Every section
    either has substantive content or is omitted entirely.
 
 5. **IPC envelope prohibition**: Artifact files MUST NOT contain any HTML-comment IPC envelopes
