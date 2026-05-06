@@ -3,6 +3,37 @@
 ## [Unreleased]
 
 ### Fixed
+- **Round-6 audit follow-ups**:
+  - `generate/domain-consultant-subagent.md`: three sites
+    (lines ~149, ~202, ~206) cited the retired `CR-D01..CR-D10`
+    namespace as the default "semantic review criteria" set; the
+    canonical namespace today is `CR-SD01..CR-SD19` plus
+    `CR-SDFM01..CR-SDFM03`. Updated the R-005 placeholder, the
+    Q5-asked-rarely guidance, and the deferred-default narrative.
+    The GOOD-example heading also cited fabricated `CR-L02 / CR-L06`;
+    replaced with `CR-CL01 / CR-CL02` (the canonical clarification
+    criteria).
+  - `common/templates/revision-entry-template.md`: three sites used
+    the retired `REVIEW-001.md, LINT-001.md` filename convention from
+    the pre-`.review/` consolidation. Reworked the placeholder
+    description, example header, and verification narrative to use
+    the canonical issue IDs `R<N>-<seq>` (lint) and `R<N>-V-<seq>`
+    (cross-reviewer) at `.review/round-<N>/issues/`.
+  - `common/templates/design-readme-template.md`: cross-journey
+    patterns commentary cited `PRD CR-PP07`; the actual
+    traceability-chain criterion is `CR-PP06` (`CR-PP07` is
+    `evidence-present`). Updated to `CR-PP06 (traceability-chain)`.
+- **Test infrastructure**: added `tests/test-cr-id-references.sh`,
+  a programmatic guard rail that fails CI whenever any auditable
+  markdown file (templates, subagent prompts, SKILL.md,
+  mode-routing.md) cites a `CR-XXNN` token that is neither defined
+  in `common/review-criteria.md` nor explicitly allowlisted (PRD
+  cross-skill refs `CR-PP06`, the in-skill `CR-SDFM01..03`, and
+  legacy emit-side ids `CR-X3/X4/X6/X7/CR-L2` that
+  `scripts/lib/sd_emit.sh` remaps at runtime). Catches the full
+  class of bug uncovered across rounds 4–6 mechanically.
+
+### Fixed
 - **Round-5 audit follow-ups**:
   - `common/templates/design-readme-template.md`: removed the stale
     `CR-D07` reference in the cross-module interactions matrix

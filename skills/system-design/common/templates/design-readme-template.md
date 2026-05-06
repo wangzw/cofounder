@@ -254,9 +254,10 @@ graph LR
 
 <!-- COMMENTARY: PRD README's "Cross-Journey Patterns" section enumerates recurring
      themes across user journeys (shared pain points, repeated touchpoints, common
-     infrastructure needs, handoff points between personas). PRD CR-PP07 requires
-     each pattern to be addressed by at least one Feature; the design must in turn
-     show how each pattern is realized at the module level. Copy the pattern list
+     infrastructure needs, handoff points between personas). PRD CR-PP06
+     (traceability-chain) requires each pattern to be addressed by at least one
+     Feature; the design must in turn show how each pattern is realized at the
+     module level. Copy the pattern list
      from PRD `README.md` inline (do NOT cross-link only) so this design file is
      independently readable. -->
 

@@ -146,7 +146,8 @@ Ask in this order (skip any that are already answered by the input or flags):
 
 **Q5 — Review and semantic criteria overrides (R-004 / R-005, rarely asked)**
 > Only ask if the user explicitly mentions wanting to restrict or change the default review
-> criteria set. Default: full L1..L5 + X1..X8 structural lint + CR-D01..CR-D10 semantic review.
+> criteria set. Default: full L1..L5 + X1..X8 structural lint + CR-SD01..CR-SD19 (plus
+> CR-SDFM01..CR-SDFM03) semantic review.
 
 ### Output Schema — `clarification.yml`
 
@@ -199,12 +200,13 @@ normalized_requirements:
       If yes: value = "standard system-design criteria set" (all L1..L5 + X1..X8 active).
       If no: value = "api-checks-disabled" — L1/L2/L4/X2 run but find nothing; api/ dir omitted.
       Default (deferred): "standard system-design criteria set".
-  R-005:  # Semantic review criteria — CR-D01..CR-D10 design review dimensions
+  R-005:  # Semantic review criteria — CR-SD01..CR-SD19 + CR-SDFM01..03 design review dimensions
     value: "standard system-design criteria set | <custom override list>"
     status: confirmed | deferred
     guidance: |
-      Default (deferred): "standard system-design criteria set" — applies CR-D01..CR-D10 from
-      common/review-criteria.md. Only ask if user explicitly requests a restricted scope.
+      Default (deferred): "standard system-design criteria set" — applies CR-SD01..CR-SD19 plus
+      CR-SDFM01..CR-SDFM03 from common/review-criteria.md. Only ask if user explicitly requests
+      a restricted scope.
   R-006:  # New-version semantics — first run vs. revising existing design
     value: "first-run | revise-existing:<design-dir-path> | fresh-from-evolved-prd:<prd-path>"
     status: confirmed | deferred | not-applicable
@@ -227,7 +229,7 @@ marker in the skeleton will be left un-substituted, silently polluting the scaff
 
 ## Quality Bar — DO / DON'T Examples
 
-### GOOD — Well-formed clarification dialogue (satisfies CR-L02 and CR-L06)
+### GOOD — Well-formed clarification dialogue (satisfies CR-CL01 and CR-CL02)
 
 **Context**: User invokes `/cofounder:system-design docs/raw/prd/2026-04-28-teamflow/`
 
