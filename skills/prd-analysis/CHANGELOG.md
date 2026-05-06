@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## Unreleased
+## [Unreleased]
+
+- **fix: round-4 audit follow-ups** —
+  - `CHANGELOG.md`: switched the unreleased heading from `## Unreleased`
+    to `## [Unreleased]` so it matches the keep-a-changelog convention
+    used by the system-design skill (and is recognized by automated
+    changelog parsers).
+  - `review/cross-reviewer-subagent.md`: removed the false claim that
+    `create-issues.sh` rejects unknown `criterion_id` values. The
+    orchestrator only validates schema (required fields, severity enum,
+    ≥5-char description / fix); criterion-id correctness is the
+    reviewer's responsibility. Updated wording explicitly warns that
+    hallucinated ids will silently produce malformed issue files.
 
 - **fix: round-3 audit follow-ups** — added regression tests for the
   incremental-review snapshot script (`scripts/snapshot-leaves.sh`):
