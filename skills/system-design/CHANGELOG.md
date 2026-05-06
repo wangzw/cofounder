@@ -45,6 +45,24 @@
     (with source features, addressing modules, and realization mechanism).
 
 ### Fixed
+- **`scripts/check-analytics-coverage.sh` (CR-X4 / CR-SD15) silent
+  no-op** — section detector matched `^##[[:space:]]+Analytics`
+  (level-2), but the PRD `feature-template.md` emits
+  `### Analytics & Tracking` (level-3), so the parser entered the
+  Analytics section on **zero** real PRD features and never reported a
+  coverage gap. Updated entry/exit regex to level-3 (`^###` →
+  `^####` for nested event headings) and added
+  `tests/test-check-analytics-coverage.sh` (8 cases) covering the
+  level-3 happy path, the missing-event blocker path, and a regression
+  guard that verifies the legacy level-2 heading is **not** mistakenly
+  parsed.
+- **Test coverage for previously-untested lint scripts** — added
+  `tests/test-check-architecture-coverage.sh` (7),
+  `tests/test-check-readme-references.sh` (7), and
+  `tests/test-check-dependency-layering.sh` (6). Each covers arg
+  validation, the blocker path, the PASS path, and (where applicable)
+  the skip-on-missing-source path.
+
 - **Module template heading drift** — `common/templates/module-template.md`
   now uses the canonical CR-SD06 section names (`## Responsibilities`,
   `## Public Interfaces`, `## Dependencies`) that `scripts/check-module.sh`

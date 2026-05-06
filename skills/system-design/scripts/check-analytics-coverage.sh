@@ -2,7 +2,7 @@
 # check-analytics-coverage.sh — CR-X4 (analytics-coverage)
 #
 # Lint check: every PRD analytics event enumerated in any PRD feature file's
-# "## Analytics" section MUST appear in <design-dir>/README.md's
+# "### Analytics & Tracking" section MUST appear in <design-dir>/README.md's
 # "## Analytics Coverage" section as an explicit row, or be covered by a named
 # sweep rule that lists the feature IDs and the emitting channel. Unnamed
 # blanket rules ("all backend features emit audit events" without feature IDs
@@ -17,8 +17,8 @@
 #
 # Detection:
 #   1. For each PRD feature file (${PRD_PATH}/features/F-*.md): locate
-#      "## Analytics" section; extract event names from:
-#        a) "### event_name" headings within the section, OR
+#      "### Analytics & Tracking" section; extract event names from:
+#        a) "#### event_name" headings within the section, OR
 #        b) table rows where the first column is an event name (not a header
 #           or separator row). The table must have an "Event" column header.
 #   2. Build set A = {(feature_id, event_name)}.
@@ -244,9 +244,9 @@ fi
 # Step 2 — Extract analytics events from each PRD feature file
 # ---------------------------------------------------------------------------
 # For each features/F-*.md:
-#   Locate the "## Analytics" section (ends at next ## heading or EOF).
+#   Locate the "### Analytics & Tracking" section (ends at next ### heading or EOF).
 #   Within that section, extract event names via:
-#     a) "### event_name" headings  (heading-style event declarations)
+#     a) "#### event_name" headings  (heading-style event declarations)
 #     b) Table rows whose first column is a non-header, non-separator value,
 #        when the table header row contains an "Event" column.
 #
@@ -266,16 +266,16 @@ extract_analytics_events() {
   local line
 
   while IFS= read -r line; do
-    # Detect entry: "## Analytics" (any casing after ##, but typically "Analytics")
-    if printf '%s\n' "$line" | grep -qE '^##[[:space:]]+Analytics'; then
+    # Detect entry: "### Analytics & Tracking" (matches "### Analytics" prefix in any casing)
+    if printf '%s\n' "$line" | grep -qE '^###[[:space:]]+Analytics'; then
       in_analytics=1
       event_col_idx=0
       header_found=0
       continue
     fi
 
-    # Detect exit: any other ## heading
-    if [ "$in_analytics" -eq 1 ] && printf '%s\n' "$line" | grep -qE '^##[[:space:]]'; then
+    # Detect exit: any other ### heading
+    if [ "$in_analytics" -eq 1 ] && printf '%s\n' "$line" | grep -qE '^###[[:space:]]'; then
       in_analytics=0
       event_col_idx=0
       header_found=0
@@ -284,10 +284,10 @@ extract_analytics_events() {
 
     [ "$in_analytics" -eq 0 ] && continue
 
-    # Pattern a: "### event_name" headings
-    if printf '%s\n' "$line" | grep -qE '^###[[:space:]]+'; then
+    # Pattern a: "#### event_name" headings
+    if printf '%s\n' "$line" | grep -qE '^####[[:space:]]+'; then
       local event_name
-      event_name="$(printf '%s\n' "$line" | sed -E 's/^###[[:space:]]*//')"
+      event_name="$(printf '%s\n' "$line" | sed -E 's/^####[[:space:]]*//')"
       event_name="$(printf '%s\n' "$event_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
       if [ -n "$event_name" ]; then
         FEAT_IDS+=( "$fid" )
@@ -296,7 +296,7 @@ extract_analytics_events() {
       continue
     fi
 
-    # Pattern b: table rows in "## Analytics" section
+    # Pattern b: table rows in "### Analytics & Tracking" section
     # The table must have an "Event" column header.
     if printf '%s\n' "$line" | grep -qE '^\|'; then
       # Separator row — skip
