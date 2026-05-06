@@ -265,13 +265,13 @@ A well-formed module spec MUST have all of the following sections:
    (F-NNN list copied from the README's Feature-Module mapping), Complexity (S/M/L/XL).
 2. **Change Scope** — only for `--revise` mode and incremental designs; omit for initial
    `add` files.
-3. **Responsibility** — exactly one cohesive responsibility per module (CR-SD-DESIGN01).
+3. **Responsibilities** — exactly one cohesive responsibility per module (CR-SD-DESIGN01).
    Multiple unrelated responsibilities → split into multiple modules.
-4. **Public Interface** — types, function signatures, or REST endpoints exposed to other
+4. **Public Interfaces** — types, function signatures, or REST endpoints exposed to other
    modules. Every type referenced MUST be defined inline (CR-SD07) — either in this section
    or in Internal Structure.
 5. **Internal Structure** — sub-components, persistence schema, key algorithms.
-6. **Module Deps** — table: dependent module, protocol, direction. Every edge MUST appear
+6. **Dependencies** — table: dependent module, protocol, direction. Every edge MUST appear
    in the README's Interaction Protocols section (CR-SD08, CR-SD16).
 7. **Failure Modes** — for every dependency, document behavior on timeout, 5xx, malformed
    response (CR-SD-DESIGN06).

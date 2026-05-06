@@ -27,7 +27,7 @@
 
 ---
 
-## Responsibility
+## Responsibilities
 
 <!-- 2–3 sentences. State what this module DOES and what it explicitly DOES NOT do.
      If you cannot describe the scope in 2–3 sentences the module is too large — split it.
@@ -121,7 +121,7 @@ export type TaskStatus = "pending" | "in_progress" | "done" | "cancelled";
 
 ---
 
-## Interfaces
+## Public Interfaces
 
 <!-- TypeScript-style signatures for ALL public interfaces exposed by this module.
      Covers: outbound (what other modules call on this module) and inbound (what this module calls
@@ -273,7 +273,7 @@ export function createTaskService(deps: {
 
 ---
 
-## Module Deps
+## Dependencies
 
 <!-- Direct outbound dependency module slugs (M-NNN format).
      X1 lint (check-module-deps-vs-protocols.sh) verifies every (caller, callee) pair listed here

@@ -97,8 +97,8 @@ Format:
       "criterion_id": "CR-SD-DESIGN01",
       "file": "modules/M-004-billing.md",
       "severity": "error",
-      "description": "M-004 'Responsibility' section lists three unrelated responsibilities: invoice generation, payment processing, and dunning emails. The Module Deps table also shows M-004 importing both the email-template store and the payment-gateway client, which suggests two separable cohesion centers.",
-      "suggested_fix": "Split M-004 into M-004 (billing/invoicing — owns invoice + dunning) and a new M-NNN (payments — owns gateway client). Update README Module Index, Feature-Module mapping matrix, and any Module Deps edges that pointed at M-004."
+      "description": "M-004 'Responsibilities' section lists three unrelated responsibilities: invoice generation, payment processing, and dunning emails. The Dependencies section also shows M-004 importing both the email-template store and the payment-gateway client, which suggests two separable cohesion centers.",
+      "suggested_fix": "Split M-004 into M-004 (billing/invoicing — owns invoice + dunning) and a new M-NNN (payments — owns gateway client). Update README Module Index, Feature-Module mapping matrix, and any Module Interaction Protocols rows that pointed at M-004."
     },
     {
       "criterion_id": "CR-SD-DESIGN06",

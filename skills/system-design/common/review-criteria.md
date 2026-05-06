@@ -871,3 +871,28 @@ conventions.
   priority: 3
   incremental_skip: per_file
 ```
+
+---
+
+## CR-SD-DESIGN11 cross-journey-coverage
+
+The README's `## Cross-Journey Patterns Coverage` table MUST contain one row for every
+Cross-Journey Pattern listed in the source PRD's `README.md` "Cross-Journey Patterns"
+section. Each row MUST identify (a) the source PRD features, (b) the design module(s)
+that realize the pattern, and (c) the realization mechanism (shared module, common
+middleware, infrastructure module, or an explicit "no shared module — accepted
+duplication because <reason>" rationale). Patterns missing from the design lose the
+PRD's primary cross-cutting traceability signal — recurring pain points, repeated
+touchpoints, and persona handoff requirements that the PRD identified as cross-cutting
+become invisible to autoforge planning.
+
+```yaml
+- id: CR-SD-DESIGN11
+  name: "cross-journey-coverage"
+  version: 1.0.0
+  checker_type: llm
+  severity: warning
+  conflicts_with: []
+  priority: 3
+  incremental_skip: per_file
+```

@@ -41,7 +41,7 @@ graph TD
 
 <!-- COMMENTARY: Replace the placeholder nodes with the actual modules derived from the PRD.
      One node per module. Show only the primary data-flow edges; cross-cutting concerns
-     (auth, logging, config) may be omitted from the diagram but MUST appear in Module Deps. -->
+     (auth, logging, config) may be omitted from the diagram but MUST appear in each affected module's Dependencies section. -->
 
 ## Dependency Layering
 
@@ -249,6 +249,31 @@ graph LR
      Add a column per module and a row per PRD feature. Blank cells are intentional —
      not every module touches every feature.
      Do NOT use any other symbols beyond ✦ and △. -->
+
+## Cross-Journey Patterns Coverage
+
+<!-- COMMENTARY: PRD README's "Cross-Journey Patterns" section enumerates recurring
+     themes across user journeys (shared pain points, repeated touchpoints, common
+     infrastructure needs, handoff points between personas). PRD CR-PP07 requires
+     each pattern to be addressed by at least one Feature; the design must in turn
+     show how each pattern is realized at the module level. Copy the pattern list
+     from PRD `README.md` inline (do NOT cross-link only) so this design file is
+     independently readable. -->
+
+| PRD Pattern | Source Features | Addressing Module(s) | Realization Notes |
+|-------------|----------------|----------------------|-------------------|
+| {{PATTERN_NAME_1}} | {{F-NNN, F-NNN}} | {{M-NNN, M-NNN}} | {{1–2 sentences: which module owns the shared mechanism (e.g. shared widget, common middleware, infrastructure module) and how the listed features consume it}} |
+| {{PATTERN_NAME_2}} | {{F-NNN}} | {{M-NNN}} | {{...}} |
+
+<!-- COMMENTARY:
+     One row per Cross-Journey Pattern in the PRD README. Every pattern listed in
+     PRD `README.md` MUST appear here. CR-SD-DESIGN11 (cross-journey-coverage)
+     enforces this. If a pattern degenerates to a single feature with no cross-
+     cutting infrastructure (e.g. duplication accepted by design), state that
+     explicitly in Realization Notes (`No shared module — accepted duplication
+     because <reason>`) so reviewers can confirm the decision was deliberate. -->
+
+
 
 ## Module Interaction Protocols
 

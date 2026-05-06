@@ -79,8 +79,8 @@ added, or kept. The plan is the orchestrator's dispatch manifest for the writer 
                                                    Interaction Protocols, Implementation
                                                    Conventions, Analytics Coverage, Boundary
                                                    Enforcement, References
-  - `modules/M-001-{slug}.md`                   — one per module (Responsibility, Public
-                                                   Interface, Internal Structure, Module Deps,
+  - `modules/M-001-{slug}.md`                   — one per module (Responsibilities, Public
+                                                   Interfaces, Internal Structure, Dependencies,
                                                    Failure Modes, Observability, Security
                                                    Considerations, API Surface)
   - `modules/M-002-{slug}.md`                   — ...
@@ -158,7 +158,7 @@ Each entry in `add` and `modify` MUST include:
   the source PRD bundle. One module per cohesive responsibility; module count is typically
   5–12 for a first delivery. Group features by data-model + interaction-mode locality;
   modules with high coupling (frequent inter-module calls) should be merged or have their
-  dependency direction documented in `README.md` Module Deps.
+  dependency direction documented in `README.md` Module Interaction Protocols.
 - For each module that exposes a network/CLI/IPC surface to clients outside this design,
   emit one `api/API-NNN-{slug}.md` entry. Internal-only modules (called only by other
   modules in this design) do NOT need an API file.

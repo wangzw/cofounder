@@ -288,4 +288,36 @@ assert_exit 0 "$CHECK" "$FIXTURE"
 assert_stdout_contains "PASS"
 teardown_fixture
 
+# ════════════════════════════════════════════════
+# Template-vs-script consistency
+# Catches drift between common/templates/module-template.md
+# and the canonical section names enforced by check-module.sh / CR-SD06.
+# ════════════════════════════════════════════════
+
+TEMPLATE="$SKILL_ROOT/common/templates/module-template.md"
+
+test_case "module template contains canonical heading: ## Responsibilities"
+assert_exit 0 grep -qxF "## Responsibilities" "$TEMPLATE"
+
+test_case "module template contains canonical heading: ## Public Interfaces"
+assert_exit 0 grep -qxF "## Public Interfaces" "$TEMPLATE"
+
+test_case "module template contains canonical heading: ## Data Models"
+assert_exit 0 grep -qxF "## Data Models" "$TEMPLATE"
+
+test_case "module template contains canonical heading: ## Dependencies"
+assert_exit 0 grep -qxF "## Dependencies" "$TEMPLATE"
+
+test_case "module template contains canonical heading: ## Boundary Enforcement"
+assert_exit 0 grep -qxF "## Boundary Enforcement" "$TEMPLATE"
+
+test_case "module template does NOT contain stale heading ## Responsibility (singular)"
+assert_exit 1 grep -qxF "## Responsibility" "$TEMPLATE"
+
+test_case "module template does NOT contain stale heading ## Interfaces (sans Public)"
+assert_exit 1 grep -qxF "## Interfaces" "$TEMPLATE"
+
+test_case "module template does NOT contain stale heading ## Module Deps"
+assert_exit 1 grep -qxF "## Module Deps" "$TEMPLATE"
+
 end_tests

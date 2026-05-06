@@ -31,10 +31,16 @@ system-design generates technical design documents as a **multi-file directory**
 /cofounder:system-design --review docs/raw/design/xxx/ --auto  # auto-loop review↔revise until convergence
 /cofounder:system-design --revise docs/raw/design/xxx/      # change management
 /cofounder:system-design --revise docs/raw/design/xxx/ --auto  # same loop, entered from the revise side
+/cofounder:system-design --evolve docs/raw/design/xxx/      # generate new version from an evolved PRD
+/cofounder:system-design --evolve docs/raw/design/xxx/ notes.md  # supply explicit change notes
 /cofounder:system-design --compact docs/raw/design/xxx/     # retire intermediate review rounds before next stage
 ```
 
-**Note on evolved PRDs:** When a PRD has been evolved (`/cofounder:prd-analysis --evolve`), pass the new incremental PRD path to generate a fresh design, or use `--revise` on the existing design to propagate specific PRD changes. There is no dedicated `--evolve` mode for system-design — `--revise` handles both in-place PRD changes and evolved PRD deltas.
+**Note on evolved PRDs:** When a PRD has been evolved (`/cofounder:prd-analysis --evolve`),
+either pass the new PRD path to a fresh design (`/cofounder:system-design <new-prd-path>`),
+use `--evolve <design-dir>` to generate a delta-aware new version of an existing design,
+or use `--revise <design-dir>` to thread specific PRD changes through the change-management
+state machine.
 
 ## Mode Routing
 
@@ -44,7 +50,7 @@ system-design generates technical design documents as a **multi-file directory**
 | generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
 | review | `/cofounder:system-design --review <design-dir>` | `review/index.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
-| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
+| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -390,7 +396,7 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 | Flag | Applies to | Semantics |
 |------|-----------|-----------|
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
-| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-006 = `deferred`) from the user prompt in `input.md`. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
+| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-007 = `deferred`) from the user prompt in `input.md`. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). Abstract tiers `heavy/balanced/light` map via `config.yml.model_tier_defaults`. |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations` (stalled verdict threshold; default 5). |
@@ -411,7 +417,7 @@ Next steps:
 ## Configuration & Subagent Files
 
 - **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions)
-- **Review criteria**: `common/review-criteria.md` (CR catalog: formal script-type CR-SD01..CR-SD19 + frontmatter CR-SDFM01..03 + LLM-type CR-SD-DESIGN01..08 + audit-artifact schema CRs + meta CRs)
+- **Review criteria**: `common/review-criteria.md` (CR catalog: formal script-type CR-SD01..CR-SD19 + frontmatter CR-SDFM01..03 + LLM-type CR-SD-DESIGN01..11 + audit-artifact schema CRs + meta CRs)
 - **Issue schema**: `common/issue-schema.md` (issue-file frontmatter contract, state-machine transitions, history append-only invariants — read at runtime by `create-issues.sh`, `check-issue.sh`, and the reviser subagent)
 - **Domain glossary**: `common/domain-glossary.md` (system-design domain terms: module, API surface, Boundary Enforcement, Feature-Module mapping, etc.)
 - **Templates**:
@@ -433,10 +439,15 @@ Next steps:
   - `generate/new-version.md`
   - `review/index.md`
   - `revise/index.md`
-- **Per-artifact formal-review scripts** (per-artifact harness; auto-discovered by `scripts/run-checkers.sh`):
-  - `scripts/check-readme.sh` — README-class checks (CR-SD01, CR-SD02, CR-SD05, CR-SD09, CR-SD14, CR-SD15, CR-SD18, CR-SDFM01)
-  - `scripts/check-module.sh` — Module-class checks (CR-SD03, CR-SD04, CR-SD06, CR-SD07, CR-SD08, CR-SD16, CR-SD17, CR-SD19, CR-SDFM02)
-  - `scripts/check-api.sh` — API-class checks (CR-SD03, CR-SD10, CR-SD11, CR-SD12, CR-SD13, CR-SD17, CR-SDFM03)
+- **Per-artifact formal-review scripts** (per-artifact harness; auto-discovered by `scripts/run-checkers.sh`; the authoritative CR-ID list for each script is the `# CR-ID …` block at the top of the script itself):
+  - `scripts/check-readme.sh` — README-class checks (CR-SD01, CR-SD02, CR-SD03, CR-SDFM01)
+  - `scripts/check-module.sh` — Module-class checks (CR-SD03, CR-SD04, CR-SD06, CR-SD07, CR-SD08, CR-SD09, CR-SDFM02)
+  - `scripts/check-api.sh` — API-class checks (CR-SD03, CR-SD10, CR-SD11, CR-SD12, CR-SD13, CR-SDFM03)
+  - `scripts/check-feature-module-mapping.sh` — Feature ↔ Module bidirectional mapping (CR-SD05)
+  - `scripts/check-architecture-coverage.sh` — every PRD `architecture/*.md` topic referenced (CR-X3)
+  - `scripts/check-analytics-coverage.sh` — every PRD analytics event covered by a module (CR-X4)
+  - `scripts/check-readme-references.sh` — every relative path in README resolves (CR-X8)
+  - `scripts/check-dependency-layering.sh` — module dependency DAG forward-only (CR-X6)
   - `scripts/check-issue.sh` — issue-file frontmatter + state-machine schema (CR-IS01)
   - `scripts/check-compacted-history.sh` — `compacted-history.md` schema (CR-CH01, CR-CH02)
 - **Phase-gate scripts**:
@@ -447,9 +458,14 @@ Next steps:
 - **Pipeline-stage scripts** (per audit-design guide §6):
   - `scripts/prepare-input.sh` — input-classification (CR-CL) → planner-input (CR-PL)
   - `scripts/create-issues.sh` — reviewer-output (CR-RO) → issue files (CR-IS01); idempotent
-  - `scripts/finalize-revisions.sh` — issue state transitions (CR-RI) → write-side discipline
-  - `scripts/judge-round.sh` — round verdict (CR-VD) using fixed convergence rule
-  - `scripts/summarize-round.sh` / `scripts/summarize-delivery.sh` — summarizer Phase 1/2 (CR-VS)
+  - `scripts/check-reviewer-output.sh` — reviewer-output schema gate (CR-RO)
+  - `scripts/check-revisions.sh` — issue state transitions (CR-RI) → write-side discipline
+  - `scripts/check-verdict.sh` — round verdict (CR-VD) using fixed convergence rule
+  - `scripts/update-summary.sh` — round / delivery summarizer Phase 1/2 (CR-VS)
+  - `scripts/commit-delivery.sh` — finalize a converged delivery (manifest snapshot + summary)
+  - `scripts/snapshot-leaves.sh` — build / refresh the leaves manifest used for incremental scoping
+  - `scripts/compute-review-scope.sh` — emit the per-round review scope from the leaves manifest
+  - `scripts/prune-traces.sh` — drop trace artifacts retired by `--compact`
 - **Diagnostic scripts**:
   - `scripts/metrics-aggregate.sh` — aggregate harness JSONL + dispatch-log into `.review/metrics/<scope>.metrics.yml`
 - **Compact scripts** (`--compact` mode):

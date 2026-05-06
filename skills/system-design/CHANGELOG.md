@@ -39,6 +39,31 @@
     Promote/Extend module's Promotion Requirements subsection covers all
     five hardening categories (i18n / a11y / perf / tests / coding-standard);
     `N/A` rows include a one-line rationale.
+  - **CR-SD-DESIGN11 cross-journey-coverage** (per_file, warning) — the
+    new README `## Cross-Journey Patterns Coverage` table contains one row
+    for every Cross-Journey Pattern listed in the source PRD's README
+    (with source features, addressing modules, and realization mechanism).
+
+### Fixed
+- **Module template heading drift** — `common/templates/module-template.md`
+  now uses the canonical CR-SD06 section names (`## Responsibilities`,
+  `## Public Interfaces`, `## Dependencies`) that `scripts/check-module.sh`
+  enforces. Previously the template shipped with `## Responsibility` /
+  `## Interfaces` / `## Module Deps`, so any writer following the template
+  produced bundles that failed formal review. Propagated rename to
+  `generate/writer-subagent.md`, `generate/planner-subagent.md`,
+  `review/cross-reviewer-subagent.md`, `common/domain-glossary.md`, and
+  `common/templates/design-readme-template.md` README diagram commentary.
+  Added template-vs-script consistency tests in
+  `tests/test-check-module.sh` so future drift fails CI.
+- **`SKILL.md` documentation drift** — corrected the per-artifact
+  formal-review CR-ID map to match each `scripts/check-*.sh` header, listed
+  `--evolve` in Input Modes (was contradicted by mode table), removed a
+  stale reference to a non-existent `common/output-discipline.md` from the
+  compact mode-routing row, replaced four named scripts that don't exist
+  (`finalize-revisions.sh`, `judge-round.sh`, `summarize-round.sh`,
+  `summarize-delivery.sh`) with the actual pipeline scripts, and updated
+  the `R-001..R-006` and `CR-SD-DESIGN01..08` ranges to current values.
 
 - **Incremental review + `--full` flag** — review rounds now write a
   sha256 leaves manifest (`scripts/snapshot-leaves.sh` →
