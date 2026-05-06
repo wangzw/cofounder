@@ -128,7 +128,11 @@ in place. This loop continues until either:
 - formal pass (exit 0) — proceed to Step 5
 - 3 consecutive formal failures on the same leaf — escalate to HITL with
   the leaf path and the failing CR-IDs (per guide §4.1 last paragraph,
-  this is the only time a self-audit failure becomes a real issue)
+  this is the only time a self-audit failure becomes a real issue).
+  Under `--auto`, the orchestrator instead appends an `auto_decision`
+  block to `state.yml` with `verdict: formal_self_loop_exhausted`,
+  `leaf`, and `failing_cr_ids` (schema in `review/index.md` Step 8),
+  and exits non-zero (`1`).
 
 ### Step 5 — Phase Gate: revise completeness
 
@@ -139,7 +143,11 @@ scripts/check-revise-completeness.sh <prd-dir> <round-number>
 Exit 0 → all issues this round have left `state: new`; proceed.
 Exit 1 → at least one issue still in `state: new`; loop back to Step 3 for
 the affected groups (guide §7.4 allows revise to repeat until the gate
-passes). After 3 such iterations, escalate to HITL.
+passes). After 3 such iterations, escalate to HITL. Under `--auto`,
+the orchestrator instead appends an `auto_decision` block to
+`state.yml` with `verdict: revise_completeness_exhausted` and
+`stuck_issue_ids` (schema in `review/index.md` Step 8), and exits
+non-zero (`1`).
 Exit 2 → script error; HITL.
 
 ### Step 6 — Update Summary
@@ -179,7 +187,10 @@ Dispatch `shared/judge-subagent.md`. Verdict considers:
 - Ratio signals from Step 7
 - Recurrence counts for any `recurrence_of` matches
 
-Verdict routing is identical to review/index.md Step 8.
+Verdict routing is identical to review/index.md Step 8 (including
+`--auto` semantics: HITL prompts are replaced by an `auto_decision`
+block appended to `state.yml`, and the orchestrator exits non-zero on
+non-converged terminal verdicts).
 
 ---
 

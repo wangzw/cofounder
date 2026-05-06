@@ -163,13 +163,41 @@ considers:
 
 ### Step 8 — Verdict Routing
 
-| Verdict        | Next Action |
-|----------------|-------------|
-| `converged`    | Delivery sequence (Step 9 below) |
-| `progressing`  | Load `revise/index.md`, increment round number for the next review pass |
-| `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` |
-| `diverging`    | HITL gate: surface regression report; same options |
-| `stalled`      | HITL gate: report stall; same options |
+| Verdict        | Default (interactive) | `--auto` mode |
+|----------------|------------------------|---------------|
+| `converged`    | Delivery sequence (Step 9 below) | Same — delivery sequence runs, skill exits 0 |
+| `progressing`  | Load `revise/index.md`, increment round number for the next review pass | Same — auto-loop continues. Stop when (a) verdict is `converged` (exit 0) or (b) round count reaches `config.yml.convergence.max_iterations` (exit 1, treat as `stalled` — see below) |
+| `oscillating`  | HITL gate: surface oscillating-issue list with their `recurrence_count`; wait for `/continue`, `/override`, or `/abort` | No prompt. Append `auto_decision` block to `state.yml` (schema below), print the same diagnostic to stdout, and exit `1`. |
+| `diverging`    | HITL gate: surface regression report; same options | No prompt. Append `auto_decision` block to `state.yml`; exit `1`. |
+| `stalled`      | HITL gate: report stall; same options | No prompt. Append `auto_decision` block to `state.yml`; exit `1`. |
+
+**`auto_decision` schema** (single block in `state.yml`; the only
+machine-readable artifact `--auto` produces — no sidecar file, since
+`state.yml` is the orchestrator's only permitted write target outside
+`dispatch-log.jsonl`):
+
+```yaml
+auto_decision:
+  verdict: oscillating         # one of: oscillating | diverging | stalled
+                               # | formal_self_loop_exhausted
+                               # | revise_completeness_exhausted
+  round: 7                     # round number at which auto-mode aborted
+  reason: "recurrence_count >= 2 on R6-V003-004"  # human-readable
+  recurrence_ids: ["I-007", "I-012"]   # present for `oscillating`
+  regression_ids:  ["I-031"]            # present for `diverging`
+  stuck_issue_ids: ["I-014"]            # present for `revise_completeness_exhausted`
+  leaf: features/F-001-checkout.md      # present for `formal_self_loop_exhausted`
+  failing_cr_ids: ["CR-PP02", "CR-FM01"] # present for `formal_self_loop_exhausted`
+```
+
+Downstream tooling (CI, `--diagnose`) reads `state.yml`'s
+`auto_decision` block; only the keys whose listed verdict matches are
+populated for any given run.
+
+`--auto` semantics summary: the orchestrator replaces every HITL prompt
+in this table with a deterministic `state.yml` record + non-zero exit
+so the skill behaves correctly under `claude -p ... --auto`.
+`converged` still exits through the normal delivery sequence (Step 9).
 
 ### Step 9 — Delivery Sequence (only on `converged`)
 

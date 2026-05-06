@@ -152,8 +152,10 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis path/to/notes.md                         # document-based mode
 /prd-analysis --output docs/raw/prd/my-project         # custom output dir
 /prd-analysis notes.md --output ./prd                  # both
-/prd-analysis --review docs/raw/prd/xxx/               # review existing PRD
+/prd-analysis --review docs/raw/prd/xxx/               # review existing PRD (single round)
+/prd-analysis --review docs/raw/prd/xxx/ --auto        # auto-loop review↔revise until convergence
 /prd-analysis --revise docs/raw/prd/xxx/               # change management for existing PRD
+/prd-analysis --revise docs/raw/prd/xxx/ --auto        # same loop, entered from the revise side
 /prd-analysis --evolve docs/raw/prd/xxx/               # incremental PRD for new iteration
 /prd-analysis --evolve docs/raw/prd/xxx/ notes.md      # evolve with document input
 ```
@@ -381,10 +383,11 @@ tool) and the `model` actually observed in the harness JSONL for each dispatch, 
 | Flag | Applies to | Semantics |
 |------|-----------|-----------|
 | `--interactive` | Generate | Force-dispatch `domain-consultant` even on dense input. |
-| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-007 = `deferred`) from the user prompt + `input.md` expanded refs. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
+| `--no-consultant` | Generate | Skip `domain-consultant` even if triggers fire; orchestrator synthesizes a minimal `clarification.yml` (R-001..R-007 = `deferred`) from the user prompt in `input.md`. Saves the consultant's heavy-tier dispatch (~$4 at opus rates). |
 | `--force-continue` | Generate | Override `oscillating`/`diverging` judge verdict and run one more round; requires HITL approval gate. |
 | `--tier <role>=<tier>` | Generate / Review / Revise | Override model tier for one dispatch role (e.g. `--tier writer=heavy`). |
 | `--max-iterations N` | Generate / Review / Revise | Override `config.yml.convergence.max_iterations`. |
+| `--auto` | Review / Revise | Non-interactive review-revise loop. Iterate until terminal verdict (`converged`, `oscillating`, `diverging`, `stalled`) or `max_iterations` is reached, **without HITL prompts**. On non-converged terminal verdicts the orchestrator prints the verdict + summary path and exits non-zero (1 = non-converged, 2 = script error). Suitable for `claude -p ... --auto` batch use. Implies `hitl.auto_approve = [plan_approval, force_continue, regression_justification, stalled_release]` for the duration of the run; user-facing prompts are replaced by an `auto_decision` block in `state.yml` (containing `verdict`, `round`, `reason`, and verdict-specific IDs — see `review/index.md` Step 8 for the schema) so the run can be inspected post-hoc. The orchestrator does NOT write any sidecar file under `.review/round-<N>/` — that would violate the pure-dispatch write-set above; `state.yml` is the only auto-mode artifact. |
 
 ## Next Steps Hint
 

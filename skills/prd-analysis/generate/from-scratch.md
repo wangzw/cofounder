@@ -56,9 +56,13 @@ instead.
 scripts/prepare-input.sh "<user-prompt>" <prd-dir>/.review
 ```
 
-Outputs `<prd-dir>/.review/round-0/input.md` (normalized), `input-meta.yml`,
-and (idempotently, on first bootstrap) `.review/README.md` from
-`common/templates/review-readme-template.md`.
+Writes `<prd-dir>/.review/round-0/input.md` (raw user prompt, no
+expansion) and `input-meta.yml` (word_count, char_count,
+has_code_block, has_structured_lists). Also idempotently drops
+`.review/README.md` from `common/templates/review-readme-template.md`
+on the first bootstrap. Sub-agents (consultant, planner, writer)
+follow up by reading any `@path` references or URLs from the prompt
+themselves via their own Read / WebFetch tools.
 
 Orchestrator: read exit code only; never read the written files.
 

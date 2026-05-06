@@ -4,11 +4,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/test_helpers.sh"
 CHECK="$REPO_SCRIPTS/prepare-input.sh"
 
-test_case "rejects unknown --dir-mode value"
+test_case "rejects unknown flags"
 setup_fixture
 mkdir -p "$FIXTURE/.review"
-run_command "$CHECK" --dir-mode bogus "some prompt" "$FIXTURE/.review"
+run_command "$CHECK" --bogus-flag value "some prompt" "$FIXTURE/.review"
 [ "$LAST_EXIT" = "1" ] && _record_pass || _record_fail "expected 1 got $LAST_EXIT"
+teardown_fixture
+
+test_case "drops .review/README.md from template on first bootstrap"
+setup_fixture
+mkdir -p "$FIXTURE/.review"
+run_command "$CHECK" "Build a todo list app" "$FIXTURE/.review"
+[ -f "$FIXTURE/.review/README.md" ] && _record_pass || _record_fail ".review/README.md not bootstrapped"
 teardown_fixture
 
 test_case "writes input.md and input-meta.yml in default round-0 subdir"

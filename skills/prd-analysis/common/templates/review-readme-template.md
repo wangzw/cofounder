@@ -60,8 +60,8 @@ probe, optional clarification dialogue). Contents:
 
 | File | Produced by role | Purpose |
 |---|---|---|
-| `input.md` | `prepare-input` (script) | Normalized user prompt + any `@path` / `http://` references expanded inline. Directory refs are walked and inlined under a per-directory size budget. |
-| `input-meta.yml` | `prepare-input` (script) | `word_count`, `has_code_block`, `has_structured_lists`, `expanded_references`, `fetch_errors`. |
+| `input.md` | `prepare-input` (script) | Raw user prompt, written verbatim. Sub-agents (consultant, planner, writer) Read referenced `@path` files and Fetch URLs on demand using their own tools. |
+| `input-meta.yml` | `prepare-input` (script) | `word_count`, `char_count`, `has_code_block`, `has_structured_lists`. Used by `glossary-probe.sh` to compute `sparse_input`. |
 | `trigger-flags.yml` | `glossary-probe` (script) | `glossary_hit`, `sparse_input`, `hit_terms[]`. Orchestrator routes the clarification step off this file. |
 | `clarification/<ISO-ts>.yml` | `domain-consultant` (sub-agent) | Flat `SKILL_NAME`/`SKILL_VERSION`/`SKILL_DESCRIPTION`/`ARTIFACT_ROOT` keys + `normalized_requirements` R-001..R-007. Planner + writers read this. |
 

@@ -6,7 +6,7 @@
 #   --bootstrap-subdir <name>:  subdir under <review-dir> holding input.md (default: "round-0").
 #                               Must match the flag passed to prepare-input.sh for the same
 #                               bootstrap. For new-version delivery-N, pass the starting round
-#                               (e.g. "round-5"). (F8 fix)
+#                               (e.g. "round-5").
 # Produces:
 #   <review-dir>/<bootstrap-subdir>/trigger-flags.yml
 # No external packages — stdlib only.

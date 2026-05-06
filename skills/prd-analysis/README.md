@@ -150,7 +150,7 @@ and one test runner. **27 scripts / 27 test runners / 403 tests** (run
 | Script | Role |
 |--------|------|
 | `git-precheck.sh` | Verifies git/bash/python versions; auto-init if not in a repo. |
-| `prepare-input.sh` | Round-0 input normalization + `@path`/`http://` expansion. |
+| `prepare-input.sh` | Round-0 input bootstrap: writes `input.md` (raw prompt) + `input-meta.yml` (word/char counts) + drops `.review/README.md` from template. |
 | `glossary-probe.sh` | Round-0 trigger-flags (`glossary_hit`, `sparse_input`). |
 
 ### Delivery / metrics

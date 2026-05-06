@@ -57,8 +57,8 @@ file-read tools):
 
 | File | Purpose |
 |------|---------|
-| `<target>/.review/round-0/input.md` | Normalized user prompt — the raw product idea or brief |
-| `<target>/.review/round-0/input-meta.yml` | Flags: `sparse_input`, `source_list`, `word_count` |
+| `<target>/.review/round-0/input.md` | Raw user prompt — the product idea or brief, including any `@path` / URL references the user wrote. Read referenced paths or fetch URLs yourself if you need them. |
+| `<target>/.review/round-0/input-meta.yml` | Stats: `word_count`, `char_count`, `has_code_block`, `has_structured_lists`. |
 | `<target>/.review/round-0/trigger-flags.yml` | Flags: `glossary_hit`, `sparse_input`, `ambiguous_artifact_type` |
 | `common/domain-glossary.md` | Domain terms for prd-analysis; use to disambiguate user vocabulary |
 
