@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **fix: round-3 audit follow-ups** — added regression tests for the
+  incremental-review snapshot script (`scripts/snapshot-leaves.sh`):
+  empty-bundle handling, hash stability across calls, sensitivity to
+  leaf content changes, and feature/journey leaf enumeration.
+
 - **fix: SKILL.md drift and stale doc strings** —
   - `generate/document-mode.md`: parser-heuristics route for
     authorization content corrected from `architecture/authorization.md`
