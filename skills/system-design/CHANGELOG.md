@@ -3,6 +3,24 @@
 ## [Unreleased]
 
 ### Fixed
+- **Round-8 audit follow-ups**:
+  - `SKILL.md:273, 297` — round-7 corrected `linked_issues:
+    ["R3-012"]` → `["I-012"]` in `common/snippets.md` but missed the
+    same `launched` / `completed` JSONL examples in SKILL.md, which
+    sit two lines below schema tables documenting `linked_issues` as
+    carrying on-disk issue-IDs (`I-NNN`, per `common/issue-schema.md`,
+    not the dispatch `trace_id` `R<N>-<role>-<NNN>`).
+  - `generate/writer-subagent.md:66` — same conflation in the ACK
+    envelope example; updated to `linked_issues=I-012`. Trace_id
+    `R3-W-007` preserved.
+  - `tests/test-cr-id-references.sh`: added a second test that scans
+    every auditable markdown file for `linked_issues` tokens (JSONL,
+    ACK envelope, YAML forms) and asserts each matches `I-\d{3,}`.
+    Mechanically rejects future `R<N>-...` leakage into the issue-ID
+    slot — ending the round-7 → round-8 whack-a-mole cycle on this
+    single conceptual error.
+
+### Fixed
 - **Round-7 audit follow-ups**:
   - `common/templates/revision-entry-template.md`: round-6 replaced the
     retired `REVIEW-001.md / LINT-001.md` naming with `R<N>-<seq>` /
