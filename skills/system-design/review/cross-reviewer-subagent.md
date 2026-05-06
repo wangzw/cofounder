@@ -38,7 +38,7 @@ waste tokens on structural / format / id-uniqueness / frontmatter issues.
    `incremental_skip: full_scan` apply to every leaf regardless). If the
    file is missing or unparseable, treat it as `mode: full` and proceed.
 5. Apply every criterion in `common/review-criteria.md` whose
-   `checker_type: llm` (CR-SD-DESIGN01..08, CR-META-mechanize,
+   `checker_type: llm` (CR-SD-DESIGN01..11, CR-META-mechanize,
    CR-META-adversarial), honoring the scope file from step 4. Do not
    apply `checker_type: script` criteria — those were already enforced by
    `scripts/run-checkers.sh` (which dispatches every per-artifact
@@ -198,6 +198,17 @@ The criteria you apply (every entry in `common/review-criteria.md` with
 - **CR-SD-DESIGN08** — security considerations (every module touching
   authn/authz/PII/external networks documents validation, sanitization,
   least-privilege, audit logging)
+- **CR-SD-DESIGN09** — UI promotion-action set (every frontend module
+  declares a Promotion action, has a Draft path, and is consistent with
+  the README Production Promotion Plan and View/Screen Index)
+- **CR-SD-DESIGN10** — UI hardening coverage (every Promote/Extend
+  module's Promotion Requirements subsection covers all five hardening
+  categories: i18n / a11y / perf / tests / coding-standard;
+  `N/A` rows include a one-line rationale)
+- **CR-SD-DESIGN11** — cross-journey-pattern coverage (the README
+  `## Cross-Journey Patterns Coverage` table contains one row for every
+  Cross-Journey Pattern listed in the source PRD's README, with source
+  features, addressing modules, and realization mechanism)
 
 Read the YAML blocks for the canonical wording, severity, and any
 `incremental_skip` annotations. If you find a recurring pattern that

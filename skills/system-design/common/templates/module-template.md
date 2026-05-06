@@ -547,7 +547,7 @@ stateDiagram-v2
      The PRD draft validated experience only — i18n / a11y / tests / lint / perf budgets
      were explicitly out of scope at PRD time. Specify each of the five categories below;
      if a category is genuinely N/A, say so with a one-line rationale rather than dropping
-     the row. CR-SD-ui-hardening-coverage enforces full coverage. -->
+     the row. CR-SD-DESIGN10 enforces full coverage. -->
 
 | Category | Current Draft State | Hardening Required |
 |----------|---------------------|--------------------|

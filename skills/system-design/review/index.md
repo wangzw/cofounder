@@ -232,7 +232,7 @@ auto_decision:
   regression_ids:  ["I-031"]            # present for `diverging`
   stuck_issue_ids: ["I-014"]            # present for `revise_completeness_exhausted`
   leaf: modules/M-001-auth.md           # present for `formal_self_loop_exhausted`
-  failing_cr_ids: ["CR-PP02", "CR-FM01"] # present for `formal_self_loop_exhausted`
+  failing_cr_ids: ["CR-SD04", "CR-SDFM02"] # present for `formal_self_loop_exhausted`
 ```
 
 Downstream tooling (CI, `--diagnose`) reads `state.yml`'s

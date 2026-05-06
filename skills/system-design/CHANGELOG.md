@@ -2,6 +2,45 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Round-3 audit follow-ups**:
+  - `review/cross-reviewer-subagent.md`: corrected stale LLM CR-ID range
+    `CR-SD-DESIGN01..08` → `CR-SD-DESIGN01..11` and appended the bullet
+    summaries for DESIGN09/10/11 so the cross-reviewer LLM actually
+    enforces the three new criteria (previously silently unenforced).
+  - `review/index.md`: the `auto_decision.failing_cr_ids` example used
+    PRD-domain CR-IDs (`CR-PP02`, `CR-FM01`) carried over from a
+    skill-fork; replaced with valid SD IDs (`CR-SD04`, `CR-SDFM02`).
+  - `common/templates/module-template.md`: stale CR ref
+    `CR-SD-ui-hardening-coverage` → canonical `CR-SD-DESIGN10`.
+  - `SKILL.md`: Output Structure tree referenced `REVIEW-*.md`,
+    `LINT-*.md`; corrected to the canonical `I-NNN.md per
+    common/issue-schema.md`. Configuration & Subagent Files catalog
+    extended with the previously-missing per-artifact formal-review
+    scripts (`check-self-review`, `check-plan`, `check-clarification`,
+    `check-version`, `check-round-index`, `check-placeholder-json`,
+    `check-single-source-of-truth`) and a new "Helpers / bootstrap
+    scripts" group (`glossary-probe`, `synthesize-clarification`,
+    `git-precheck`).
+- **`scripts/prune-traces.sh`**: was grepping for `retention_rounds:`
+  but `common/config.yml` writes `retention.traces_retention_rounds:`,
+  so the script always fell back to default 20 and never honored
+  user-configured retention. Now matches the canonical key.
+- **`scripts/metrics-aggregate.sh`**: added the `_set_scope` helper
+  (already in prd-analysis) so passing two scope flags (e.g.
+  `--round 1 --delivery 1`) exits 1 with a clear "scope flags are
+  mutually exclusive" error instead of silently overwriting the first.
+
+### Added
+- **Test coverage parity with prd-analysis**: ported the
+  `commit-delivery`, `git-precheck`, `glossary-probe`,
+  `metrics-aggregate`, and `prune-traces` test runners from
+  prd-analysis. New tests for `check-placeholder-json` and
+  `check-single-source-of-truth` (the two SD-specific lint scripts).
+  New `test-snapshot-leaves.sh` covering empty-bundle, hash stability
+  across calls, content-change sensitivity, and module enumeration.
+  Test count: 523 → 591 (+68).
+
 ### Changed
 - **PRD-draft → production hardening handoff (paradigm sync with prd-analysis)** —
   prd-analysis Phase 5 produces a frontend draft (experience-validation only) at
@@ -29,7 +68,7 @@
     state and the hardening autoforge must add.
 
 ### Added
-- **Two new review criteria**:
+- **Three new review criteria**:
   - **CR-SD-DESIGN09 ui-promotion-action-set** (per_file, error) — every
     frontend module declares a Promotion action, has a Draft path, and is
     consistent with the README Production Promotion Plan and View/Screen
@@ -89,7 +128,7 @@
   (`scripts/compute-review-scope.sh` → `round-<N>/review-scope.yml`).
   Cross- and adversarial-reviewers consume `review-scope.yml` to decide
   whether each LLM criterion is full-scan (apply to every leaf) or
-  per-file (apply only to leaves listed in `changed_leaves[]`). All 10
+  per-file (apply only to leaves listed in `changed_leaves[]`). All 13
   `checker_type: llm` criteria in `common/review-criteria.md` now carry
   an authoritative `incremental_skip: full_scan | per_file` annotation
   (previously absent). Decision tree: forced full review on the first

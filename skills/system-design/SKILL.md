@@ -177,7 +177,7 @@ docs/raw/design/YYYY-MM-DD-{product-name}/
     ├── traces/round-<N>/
     │   └── dispatch-log.jsonl           # Per-dispatch launched/completed events
     ├── round-<N>/
-    │   ├── issues/                      # Reviewer-written issue files (REVIEW-*.md, LINT-*.md)
+    │   ├── issues/                      # Reviewer-written issue files (I-NNN.md per common/issue-schema.md)
     │   ├── self-reviews/                # Writer self-review archives
     │   ├── plan.md                      # Planner output
     │   └── verdict.yml                  # Judge convergence verdict
@@ -450,6 +450,13 @@ Next steps:
   - `scripts/check-dependency-layering.sh` — module dependency DAG forward-only (CR-X6)
   - `scripts/check-issue.sh` — issue-file frontmatter + state-machine schema (CR-IS01)
   - `scripts/check-compacted-history.sh` — `compacted-history.md` schema (CR-CH01, CR-CH02)
+  - `scripts/check-self-review.sh` — writer self-review files (CR-SR01, CR-SR02, CR-SR03)
+  - `scripts/check-plan.sh` — planner plan.md (CR-PL01, CR-PL02)
+  - `scripts/check-clarification.sh` — Round-0 clarification yml (CR-CL01, CR-CL02)
+  - `scripts/check-version.sh` — `.review/versions/<N>.md` summarizer snapshots (CR-VS01, CR-VS02)
+  - `scripts/check-round-index.sh` — `.review/round-<N>/index.md` schema (CR-RI01, CR-RI02)
+  - `scripts/check-placeholder-json.sh` — placeholder-JSON lint (CR-L2)
+  - `scripts/check-single-source-of-truth.sh` — duplicated data-model definitions (CR-X7)
 - **Phase-gate scripts**:
   - `scripts/verify-phase-entry.sh` — single entry point dispatched per `<phase>` argument (`read | revise | generate-fresh | generate-evolve | compact`); composes the underlying gates below
   - `scripts/check-review-readiness.sh` — read-phase entry: zero `state: new` issues from prior rounds
@@ -466,6 +473,10 @@ Next steps:
   - `scripts/snapshot-leaves.sh` — build / refresh the leaves manifest used for incremental scoping
   - `scripts/compute-review-scope.sh` — emit the per-round review scope from the leaves manifest
   - `scripts/prune-traces.sh` — drop trace artifacts retired by `--compact`
+- **Helpers / bootstrap scripts**:
+  - `scripts/glossary-probe.sh` — Round-0 glossary probe (guide §6.2)
+  - `scripts/synthesize-clarification.sh` — emit a minimal deferred-only clarification.yml
+  - `scripts/git-precheck.sh` — bootstrap git-state precheck (guide §21.0 + §8.3)
 - **Diagnostic scripts**:
   - `scripts/metrics-aggregate.sh` — aggregate harness JSONL + dispatch-log into `.review/metrics/<scope>.metrics.yml`
 - **Compact scripts** (`--compact` mode):
