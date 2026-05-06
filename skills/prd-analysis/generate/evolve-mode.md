@@ -1,14 +1,23 @@
-# PRD Evolve Mode (`--evolve`)
+# PRD Evolve Mode (`--evolve`) — Domain Conventions
 
-This file contains instructions for generating an incremental PRD for a new software iteration,
-using an existing PRD as baseline. The new PRD contains only delta (new/modified/deprecated items)
-and references the predecessor for unchanged content.
+**Scope.** This file documents the **domain-content conventions** that apply when generating
+an incremental PRD for a new software iteration on top of a delivered baseline: how to flatten
+the version chain, how to ask delta-aware questions per phase, what evolve-specific metadata
+and inline change markers look like, the two-layer review checklist, and the commit /
+post-commit cascade format.
+
+**Orchestration lives elsewhere.** The dispatch sequence (git precheck → phase-entry verify →
+prepare-input → glossary probe → planner sub-agent → HITL plan-approval → writer fan-out →
+review loop) is defined in `generate/new-version.md`. This file does **not** define an
+alternate orchestration path; the section headers below describe domain-content concerns
+that the planner, writer, and reviewer sub-agents (dispatched by `new-version.md`) consult
+when their work touches evolve semantics.
 
 For evolve mode, also read `generate/questioning-phases.md` — the per-phase questioning guide is reused
 with a "review existing → ask delta → deep-dive" pattern.
 
-Review checklist dimensions are defined in `common/templates/review-checklist.md` — load it on demand (Evolve
-Step 4 specifies when).
+Review checklist dimensions are defined in `common/templates/review-checklist.md` — load it on demand
+(see "Evolve Review Checklist (Two-Layer)" below for which dimensions apply when).
 
 ---
 
@@ -19,7 +28,7 @@ Step 4 specifies when).
 
 ---
 
-## Evolve Step 1 — Load & Flatten Baseline
+## Baseline Loading & Flattening
 
 1. **Read the specified baseline PRD directory**, validate structural integrity (`README.md`,
    `journeys/`, `features/`, `architecture/` exist).
@@ -85,7 +94,7 @@ informally"), adjust the baseline accordingly before proceeding.
 
 ---
 
-## Evolve Step 2 — Per-Phase Incremental Analysis
+## Per-Phase Incremental Analysis Patterns
 
 Reuse the Phase 1–8 definitions from `generate/questioning-phases.md`. Each phase runs in the pattern:
 **review existing → ask if changes → deep-dive changes**. Requirements sources are identical to
@@ -171,7 +180,7 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 
 ---
 
-## Evolve Step 3 — Generate Incremental PRD Files
+## Incremental File Generation Rules
 
 Generate files using the standard templates, with the following evolve-specific rules:
 
@@ -210,7 +219,7 @@ final sweep.
 
 ---
 
-## Evolve Step 4 — Review Checklist
+## Evolve Review Checklist (Two-Layer)
 
 Run a two-layer review. Load `common/templates/review-checklist.md` only when you need to reference a dimension's
 exact definition.
@@ -264,13 +273,10 @@ Fix issues directly in files, same as initial creation.
 
 ---
 
-## Evolve Step 5 — User Review & Commit
+## Commit Message & Post-Commit Cascade
 
-Same as initial creation flow:
-
-1. User reviews files.
-2. Fix any requested changes.
-3. Commit all files.
+After the `new-version.md` review loop converges and the user approves the bundle, the
+orchestrator commits using the format below.
 
 **Commit message format:**
 `"PRD evolve: {product-name} — add F-012, modify F-003, deprecate F-005"` (list key changes)

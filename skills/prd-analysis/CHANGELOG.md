@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+- **fix: round-9 audit follow-up** —
+  - `generate/new-version.md:65`: refuse-message guidance referenced a
+    fabricated `--no-evolve` flag ("user should use `--no-evolve` or
+    generate from scratch") that exists nowhere else in either skill;
+    `system-design`'s sister file phrases the same exit as "user should
+    generate from scratch". Dropped the `--no-evolve` clause to match.
+  - `generate/evolve-mode.md`: the file's `## Evolve Step 1 — …` …
+    `## Evolve Step 5 — …` headers framed it as an alternate
+    orchestration sequence, contradicting `generate/new-version.md`
+    (the canonical planner→writer dispatch flow declared in the
+    Phase Contract at `SKILL.md:106`, in `generate/planner-subagent.md`,
+    and in `scripts/check-plan.sh`'s `mode: new-version` enum).
+    The "Step" sections are actually domain-content references that
+    the planner / writer / reviewer sub-agents consult — not an
+    alternate orchestration path. Renamed to non-orchestration
+    headings ("Baseline Loading & Flattening", "Per-Phase Incremental
+    Analysis Patterns", "Incremental File Generation Rules", "Evolve
+    Review Checklist (Two-Layer)", "Commit Message & Post-Commit
+    Cascade") and rewrote the preamble to point explicitly at
+    `generate/new-version.md` for orchestration. Updated two stale
+    cross-references that named "Evolve Step 4" / "Evolve Step 5"
+    (`SKILL.md:18` mode-routing parenthetical, `SKILL.md:410` evolve
+    cascade pointer).
+
 - **fix: round-8 audit follow-up** —
   - Round-7 corrected `linked_issues: ["R3-012"]` → `["I-012"]` in
     `common/snippets.md` but missed three higher-traffic sites that

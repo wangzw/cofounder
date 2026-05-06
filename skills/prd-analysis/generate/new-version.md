@@ -62,7 +62,7 @@ delivered baseline.
 | Exit | Meaning | Next action |
 |------|---------|-------------|
 | 0    | Prior delivery found | continue to Step 3 |
-| 1    | No `versions/*.md` files | refuse to start; surface "no baseline to evolve" — user should use `--no-evolve` or generate from scratch |
+| 1    | No `versions/*.md` files | refuse to start; surface "no baseline to evolve" — user should generate from scratch |
 | 2    | Script-level error | HITL |
 
 ### Steps 3–4 — Same as FromScratch
