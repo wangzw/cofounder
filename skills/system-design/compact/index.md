@@ -148,8 +148,8 @@ Next steps:
 
 ## Forbidden actions
 
-- Reading or rewriting any design content leaf (README.md, features/,
-  journeys/, architecture/) — compact only touches `.review/`.
+- Reading or rewriting any design content leaf (README.md, modules/,
+  api/, architecture/) — compact only touches `.review/`.
 - Reading issue bodies (frontmatter aggregation only — done by the
   script, not by the orchestrator).
 - Auto-running compact across multiple deliveries in a single

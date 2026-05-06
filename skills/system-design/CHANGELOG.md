@@ -3,6 +3,36 @@
 ## [Unreleased]
 
 ### Fixed
+- **Round-7 audit follow-ups**:
+  - `common/templates/revision-entry-template.md`: round-6 replaced the
+    retired `REVIEW-001.md / LINT-001.md` naming with `R<N>-<seq>` /
+    `R<N>-V-<seq>` — but that namespace is the dispatch `trace_id`
+    (`R3-W-007`, `R3-V-001`), NOT the on-disk issue filename. The
+    canonical issue-ID format is `I-\d{3,}` (e.g., `I-007`), enforced
+    by `scripts/create-issues.sh` (`f"I-{n:03d}"`) and documented in
+    `common/issue-schema.md:23,59`. Updated all four sites
+    (placeholder description, example header, in-line Summary refs,
+    Verification narrative) to `I-NNN`.
+  - `common/domain-glossary.md`: three glossary entries propagated the
+    same wrong claim — `structural-lint` ("issue IDs follow
+    `R<N>-<seq>`"), `design-review` ("issue IDs follow `R<N>-V-<seq>`
+    for cross-reviewer, `R<N>-V-<seq>-ADV` for adversarial"), and
+    `REVISIONS.md` ("source issue IDs (e.g. `R<N>-<seq>`,
+    `R<N>-V-<seq>`)"). Corrected to `I-\d{3,}` per
+    `common/issue-schema.md`. The `design-review` entry now also
+    clarifies that the dispatch `trace_id` is recorded inside the
+    issue body, not used as the filename.
+  - `common/snippets.md`: harness-event examples used
+    `"linked_issues": ["R3-012"]` and `linked_issues=R3-012` (lines
+    ~53, ~77, ~164), confusing trace_id with issue-ID. Updated to
+    `["I-012"]` / `I-012`. Trace_id `R3-W-007` values preserved.
+  - `compact/index.md:151`: forbidden-actions block enumerated PRD
+    bundle dirs (`features/`, `journeys/`, `architecture/`) instead
+    of design bundle dirs. Updated to `modules/, api/, architecture/`
+    so the orchestrator's prompt names the actual content leaves a
+    compact pass must not touch.
+
+### Fixed
 - **Round-6 audit follow-ups**:
   - `generate/domain-consultant-subagent.md`: three sites
     (lines ~149, ~202, ~206) cited the retired `CR-D01..CR-D10`

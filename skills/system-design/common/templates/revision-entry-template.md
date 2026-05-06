@@ -52,7 +52,7 @@ Append the following block verbatim (replacing `{{PLACEHOLDER}}` values) as the 
 |-------------|--------|-------------|
 | `{{REV_ID}}` | `NNN` (zero-padded, e.g. `001`) | Sequential revision counter within this design directory. Start at `001`; increment by 1 for each new entry. |
 | `{{DATE}}` | `YYYY-MM-DD` | Calendar date the `--revise` invocation completed (UTC). |
-| `{{TRIGGERED_BY}}` | Comma-separated issue IDs, e.g. `R1-001, R1-V-002` | The `R<N>-<seq>` (lint) and/or `R<N>-V-<seq>` (cross-reviewer) issue IDs from `.review/round-<N>/issues/` consumed by this revise pass. Use bare IDs (no path or extension). If no review issues were consumed (interactive-only pass), write `interactive`. |
+| `{{TRIGGERED_BY}}` | Comma-separated issue IDs, e.g. `I-007, I-014` | The `I-NNN` issue IDs (per `common/issue-schema.md`, format `I-\d{3,}`) from `.review/round-<N>/issues/` consumed by this revise pass. Use bare IDs (no path or extension). If no review issues were consumed (interactive-only pass), write `interactive`. |
 | `{{CHANGE_TYPE}}` | `In-place edit` \| `New version` | `In-place edit` when changes were applied directly to the existing design directory. `New version` when a new dated directory was created. |
 | `{{STATUS}}` | `Applied` \| `Reverted` | `Applied` once all edits are committed and lint is clean. `Reverted` if the revision was rolled back (rare; document the reason in Summary). |
 | `{{MODULES_TOUCHED}}` | Bulleted list of `M-NNN-{slug}` IDs, one per line. Write `_None_` if no module files were changed. | All module files (`modules/M-*.md`) modified during this revision cycle. |
@@ -80,7 +80,7 @@ When `Status` is `Applied`, lint gate MUST show `PASS`. A revision that ends wit
 |-------|-------|
 | **Revision ID** | REV-002 |
 | **Date** | 2026-05-14 |
-| **Triggered by** | R1-001, R1-V-002 |
+| **Triggered by** | I-007, I-014 |
 | **Change type** | In-place edit |
 | **Status** | Applied |
 
@@ -96,10 +96,10 @@ When `Status` is `Applied`, lint gate MUST show `PASS`. A revision that ends wit
 
 ### Summary
 
-Extracted cache invalidation logic from M-004 into a new M-007 module to eliminate the circular dependency flagged in `R1-V-002`. Updated API-002's response schema to include a `cache_hit` boolean field per `R1-001` L2 finding (placeholder JSON removed from example block).
+Extracted cache invalidation logic from M-004 into a new M-007 module to eliminate the circular dependency flagged in `I-014`. Updated API-002's response schema to include a `cache_hit` boolean field per `I-007` L2 finding (placeholder JSON removed from example block).
 
 ### Verification
 
 Lint gate: PASS (0 failures)
-Cross-reviewer status: Addressed 4/4 open findings from R1-V-001..R1-V-004
+Cross-reviewer status: Addressed 4/4 open findings from I-007, I-014, I-019, I-023
 ```
