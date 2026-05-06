@@ -37,7 +37,7 @@ structure:
 
 | Source signal | Maps to |
 |---------------|---------|
-| "as a <role>" / "the user wants" / persona descriptions | Persona → `architecture/personas.md` |
+| "as a <role>" / "the user wants" / persona descriptions | Persona → README.md `### Target Users` table |
 | Step-by-step flows / user stories / "when X, then Y" | Journey touchpoints → `journeys/J-NNN.md` |
 | Feature requests / bullet lists of capabilities | Feature items → `features/F-NNN-slug.md` |
 | KPIs / success metrics / OKRs | Goals + Metrics → README |
