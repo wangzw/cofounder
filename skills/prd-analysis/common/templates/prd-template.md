@@ -18,17 +18,19 @@ nothing useful to say.
 ├── architecture/          # Architecture topic files (data model, conventions, design tokens, etc.)
 │   ├── design-tokens.md
 │   └── ...
-├── features/
-│   ├── F-001-{slug}.md    # Self-contained feature spec
-│   └── ...
-└── prototypes/            # Interactive prototypes (optional — omit when not generated)
-    ├── src/               # Runnable prototype source, organized per feature
-    │   ├── F-001-{slug}/
-    │   └── ...
-    └── screenshots/       # Key-state screenshots per feature
-        ├── F-001-{slug}/
-        └── ...
+└── features/
+    ├── F-001-{slug}.md    # Self-contained feature spec
+    └── ...
 ```
+
+> **Frontend draft lives outside the PRD.** Phase 5 ("Frontend Draft")
+> produces a runnable frontend draft into the project source tree at the path
+> recorded in `architecture/tech-stack.md` → "Frontend Implementation Path"
+> (e.g. `frontend/`, `web/`, `apps/web/`, `cmd/<app>/`). The draft validates
+> interaction and visual experience only — it is not production-ready; system-
+> design and autoforge harden it later in place. The PRD records only the
+> draft path and confirmation date per feature — no prototypes/, no
+> screenshots, no goldens are archived under the PRD directory.
 
 ---
 
@@ -128,9 +130,9 @@ at least one feature.
 
 ### Feature Index
 
-| ID | Feature | Type | Impact | Effort | Priority | Deps | Prototype | Spec |
-|----|---------|------|--------|--------|----------|------|-----------|------|
-| F-001 | {feature name} | {type} | H | M | P0 | — | [screenshots](prototypes/screenshots/F-001-{slug}/) | [spec](features/F-001-{slug}.md) |
+| ID | Feature | Type | Impact | Effort | Priority | Deps | UI | Spec |
+|----|---------|------|--------|--------|----------|------|----|------|
+| F-001 | {feature name} | {type} | H | M | P0 | — | `{frontend-path}/F-001-{slug}/` | [spec](features/F-001-{slug}.md) |
 | F-002 | {feature name} | {type} | H | S | P0 | F-001 | — | [spec](features/F-002-{slug}.md) |
 
 **Type values** (non-exclusive — use comma-separated when applicable):
@@ -142,8 +144,9 @@ at least one feature.
 
 **Priority:** `P0` = MVP (Phase 1), `P1` = Phase 2, `P2` = Phase 3
 
-**Prototype column:** link to `prototypes/screenshots/F-{NNN}-{slug}/`; use `—` when no prototype
-exists.
+**UI column:** repo-relative path to the feature's frontend draft directory
+(under the path declared in `architecture/tech-stack.md` → "Frontend
+Implementation Path"); use `—` for backend-only features.
 
 > **Mandatory auto-derived features (always include, regardless of product):**
 > Two features MUST appear in every Feature Index as P0/Phase 1 with no journey dependency (`Deps = —`):
@@ -219,7 +222,6 @@ with explicit rationale (e.g. a technical dependency forces a P1 feature into Ph
 
 - [User Journeys](journeys/)
 - [Architecture, Design Tokens & Data Model](architecture/)
-- [Interactive Prototypes](prototypes/) *(omit if no prototypes generated)*
 - [Revision History](REVISIONS.md) *(omit on initial creation — added by `--revise` mode)*
 
 ---

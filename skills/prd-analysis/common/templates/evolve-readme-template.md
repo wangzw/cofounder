@@ -25,10 +25,13 @@ to that file for the complete format specification, tag syntax, and examples.
 ├── features/
 │   ├── F-{NNN}-{slug}.md  # New features, modified features (full rewrite), or tombstones
 │   └── ...
-├── prototypes/            # Only new/modified feature prototypes
-│   ├── src/
-│   └── screenshots/
 ```
+
+> **Frontend draft lives in the project source tree** at the path
+> recorded in the baseline's `architecture/tech-stack.md` → "Frontend
+> Implementation Path". Evolve mode modifies that draft in place for new and
+> modified user-facing features — it does not create a `prototypes/` directory
+> under the evolved PRD.
 
 ---
 
@@ -195,7 +198,7 @@ listed for context with "(baseline)" note, new/modified features annotated.
 - Baseline PRD: [{YYYY-MM-DD-product-name}](../YYYY-MM-DD-product-name/README.md)
 - Journeys: [journeys/](journeys/) + [baseline journeys](../YYYY-MM-DD-product-name/journeys/)
 - Architecture: [architecture/](architecture/) + [baseline architecture](../YYYY-MM-DD-product-name/architecture/)
-- Prototypes: [prototypes/](prototypes/) + [baseline prototypes](../YYYY-MM-DD-product-name/prototypes/) {omit if no prototypes}
+- Frontend draft: `{repo-root}/{frontend-implementation-path}/` *(see baseline `architecture/tech-stack.md`; evolve modifies in place — no PRD-local copy)*
 
 ---
 

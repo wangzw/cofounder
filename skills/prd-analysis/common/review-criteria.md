@@ -660,7 +660,7 @@ Every user-facing Feature MUST have an Interaction Design section with: Screen &
 Component Contracts, Interaction State Machine, Accessibility, Internationalization, and Responsive
 Behavior. Screen/View names MUST be consistent between journey touchpoints and feature files. No
 user-facing feature MAY have Interaction Design omitted. Missing interaction design produces
-inconsistent UI and blocks frontend implementation.
+inconsistent UI and blocks the frontend draft.
 
 ```yaml
 - id: CR-PP18
@@ -996,68 +996,6 @@ produce janky UX and inconsistent loading state handling across features.
 ```yaml
 - id: CR-PP34
   name: "page-transitions-complete"
-  version: 1.0.0
-  checker_type: llm
-  severity: warning
-  conflicts_with: []
-  priority: 3
-  incremental_skip: per_file
-```
-
----
-
-## CR-PP35 prototype-spec-alignment
-
-(Applies only when `prototypes/` directory exists.) Every state in a Feature's Interaction State
-Machine MUST have a corresponding prototype screenshot or snapshot. No states visible in prototypes
-MUST be absent from the state machine. Divergence between prototype states and state machine
-indicates unimplemented or undocumented design decisions.
-
-```yaml
-- id: CR-PP35
-  name: "prototype-spec-alignment"
-  version: 1.0.0
-  checker_type: llm
-  severity: error
-  conflicts_with: []
-  priority: 2
-  incremental_skip: per_file
-```
-
----
-
-## CR-PP36 prototype-feedback-incorporated
-
-(Applies only when `prototypes/` directory exists.) Every prototype MUST have evidence of user
-validation (confirmation date in Prototype Reference). Feedback MUST be categorized (spec change /
-token change / prototype-only) and incorporated — spec changes reflected in Feature files, token
-changes reflected in architecture. Prototypes without confirmed user validation are design
-hypotheses, not validated requirements.
-
-```yaml
-- id: CR-PP36
-  name: "prototype-feedback-incorporated"
-  version: 1.0.0
-  checker_type: llm
-  severity: warning
-  conflicts_with: []
-  priority: 3
-  incremental_skip: per_file
-```
-
----
-
-## CR-PP37 prototype-archival-complete
-
-(Applies only when `prototypes/` directory exists.) Prototype source code MUST exist in
-`{prd-dir}/prototypes/src/`. Key state screenshots or snapshots MUST exist in
-`{prd-dir}/prototypes/screenshots/`. Every user-facing Feature's Prototype Reference section MUST
-have path and confirmation date filled. Missing archival means prototypes cannot be referenced
-in future PRD iterations.
-
-```yaml
-- id: CR-PP37
-  name: "prototype-archival-complete"
   version: 1.0.0
   checker_type: llm
   severity: warning

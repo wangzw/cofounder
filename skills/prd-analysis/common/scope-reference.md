@@ -22,7 +22,7 @@ Use this reference during questioning-phases and document-mode to detect out-of-
 | Form specifications (fields, validation rules, i18n keys) | Form library config, validation execution, server integration | — |
 | Accessibility requirements (WCAG level, ARIA, keyboard, focus management) | a11y testing tools (axe-core), implementation patterns | — |
 | Responsive layout changes per breakpoint | CSS grid implementation, breakpoint utilities | — |
-| Interactive prototypes (seed-quality code for validation) | Prototype-to-production mapping, refactoring plan | — |
+| Frontend draft produced into the project source tree per spec (Phase 5 deliverable — experience-validation only) | Production promotion of the draft (i18n integration, a11y hardening, tests, lint conformance, perf budgets) — owned by system-design + autoforge | — |
 | Coding conventions — error propagation policy, logging level rules, global state prohibition, naming rules | Concrete patterns (specific error types, logger library config, DI container setup) | — |
 | Test isolation policy — tests must use temporary resources, no shared mutable state, parallel-safe | Test helper implementations, fixture libraries, CI runner configuration | — |
 | Development workflow requirements — prerequisite versions, CI gate policies, release versioning scheme | CI pipeline YAML, Makefile/Taskfile, release automation scripts | — |

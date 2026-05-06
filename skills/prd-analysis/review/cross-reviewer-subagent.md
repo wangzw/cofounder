@@ -189,7 +189,6 @@ The criteria you apply (every entry in `common/review-criteria.md` with
 - Interaction completeness: form spec, micro-interactions, navigation,
   page transitions
 - Privacy & compliance hooks
-- Prototype-spec alignment (when prototypes exist)
 - Risk identification + mitigation paths
 
 Read the YAML blocks for the canonical wording, severity, and any

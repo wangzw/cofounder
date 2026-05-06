@@ -274,13 +274,21 @@ stateDiagram-v2
 | < {breakpoint.sidebar.collapse} | {e.g. sidebar hidden, content full-width} | {e.g. Ctrl+B toggles sidebar} |
 | >= {breakpoint.sidebar.collapse} | {e.g. sidebar visible at fixed width} | {e.g. sidebar always shown} |
 
-#### Prototype Reference
+#### Frontend Draft Reference
 
-{Populated after prototype validation completes. Omit during initial feature writing. Must be filled for every user-facing feature after prototype validation.}
+{Populated after Phase 5 (Frontend Draft) completes. Omit during initial feature writing. Must be filled for every user-facing feature after the draft is confirmed.}
 
-- **Prototype path:** `../prototypes/src/{feature-slug}/`
-- **Screenshots:** `../prototypes/screenshots/{feature-slug}/` {browser screenshots for web; teatest `.golden` files or terminal screenshots for TUI}
-- **Confirmed:** {YYYY-MM-DD}
+In the AI-coding era, frontend changes are cheap, so Phase 5 produces a
+runnable draft (real code, not a throwaway low-fidelity prototype) used to
+validate interaction and visual experience with the user. The draft lives in
+the project source tree at the path declared in `architecture/tech-stack.md`
+→ "Frontend Implementation Path". system-design plans the production
+promotion (i18n, a11y, performance, tests, coding-standard alignment) and
+autoforge executes it in place — neither phase re-implements the UI from this
+feature spec.
+
+- **Draft path:** `{repo-root}/{frontend-implementation-path}/{feature-area}/` *(repo-relative; the base path is set in `architecture/tech-stack.md`)*
+- **Confirmed (experience):** {YYYY-MM-DD}
 
 ### State Flow
 

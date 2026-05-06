@@ -102,6 +102,25 @@ Each file below is a standalone document. Agents read only the files relevant to
 | Form Management | {e.g. React Hook Form} | {e.g. 7.x} | {why} |
 | i18n | {e.g. react-i18next} | {e.g. 15.x} | {why} |
 | E2E Testing | {e.g. Playwright} | {e.g. 1.x} | {why} |
+
+### Frontend Implementation Path
+
+{Omit if the product has no user-facing interface.}
+
+The repo-relative path under which Phase 5 produces the **frontend draft** —
+runnable code (not a throwaway low-fidelity prototype) used to validate
+interaction and visual experience with the user. The draft sits in the project
+source tree at this path; system-design plans how to harden it for production
+(i18n integration, a11y, performance, tests, coding-standard alignment), and
+autoforge executes the promotion in place. There is no separate "production
+implementation" path — the draft and the production code live at the same
+location.
+
+| Field | Value |
+|-------|-------|
+| Path | {e.g. `frontend/`, `web/`, `apps/web/`, `cmd/<app>/`, `internal/tui/`} |
+| Rationale | {why this layout — monorepo convention, framework default, etc.} |
+| Run command | {e.g. `pnpm --filter web dev`, `go run ./cmd/<app>`} |
 ```
 
 ---

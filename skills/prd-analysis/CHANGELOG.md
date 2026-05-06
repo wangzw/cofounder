@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+- **breaking: prototypes → frontend draft** — Phase 5 is renamed from
+  "Interactive Prototype" to "Frontend Draft" and now produces runnable
+  frontend code (real code, not a low-fidelity throwaway) directly into the
+  project source tree at the path recorded in `architecture/tech-stack.md` →
+  "Frontend Implementation Path". The draft is **experience-validation only**:
+  it confirms layout, navigation, state-machine reachability, and visual look
+  with the user. Production hardening — full i18n library wiring, accessibility
+  audit, test coverage, lint/coding-standard conformance, performance budgets —
+  is **explicitly deferred** to the next two phases: system-design plans the
+  promotion (Production Promotion Plan + per-module Promotion Requirements);
+  autoforge executes it in place via Promote / Extend / Rewrite actions.
+  Rationale: in the AI-coding era, the traditional "low-fidelity prototype →
+  re-implement in production" loop is pure rework; design **is**
+  implementation. Changes:
+  - New "Frontend Implementation Path" subsection in
+    `architecture/tech-stack.md` records the repo-relative path (e.g.
+    `frontend/`, `web/`, `apps/web/`, `cmd/<app>/`) chosen by the user at
+    Phase 5 entry. system-design and autoforge continue to evolve the code
+    at the same path; there is no separate "production implementation" path.
+  - Feature template's "Prototype Reference" section is renamed to
+    "Frontend Draft Reference" and now records only draft path +
+    `Confirmed (experience)` date (no prototype source path, no
+    screenshots path).
+  - PRD README's Feature Index "Prototype" column renamed to "UI" and links
+    to the repo-relative draft directory (or `—` for backend-only
+    features). The `prototypes/` directory disappears from both the standard
+    and evolve directory trees; the "Interactive Prototypes" reference link
+    is removed.
+  - `revise-mode` "Prototype impact" dimension renamed to
+    "Frontend draft impact" — invalidating the recorded confirmation,
+    not regenerating prototype source/screenshots, and explicitly leaving
+    production promotion of the affected code to system-design.
+  - `evolve-mode` Phase 5 modifies the existing draft at the baseline's
+    Frontend Implementation Path in place; no per-evolve `prototypes/`
+    directory is produced.
+  - Three review criteria removed entirely: **CR-PP35** (prototype-spec
+    alignment), **CR-PP36** (prototype-feedback-incorporated), **CR-PP37**
+    (prototype-archival-complete). Draft review responsibility shifts to
+    system-design (promotion-plan completeness) and autoforge (promotion
+    execution). The corresponding three rows are dropped from
+    `review-checklist.md` (one Per-file row split is removed too) and the
+    bullet from `cross-reviewer-subagent.md`.
+  - `scope-reference.md` lists the Phase 5 deliverable as "Frontend draft
+    produced into the project source tree per spec (experience-validation
+    only)"; production promotion is explicitly out of scope at PRD level.
 - **feat: incremental review + `--full` flag** — review rounds now write
   a sha256 leaves manifest (`scripts/snapshot-leaves.sh` →
   `round-<N>/leaves-manifest.yml`) and a per-round scope file

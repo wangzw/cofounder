@@ -96,7 +96,7 @@ After parsing, run the gap checklist below. For each item, mark it one of:
 - [ ] Frontend internationalization requirements stated per user-facing feature?
 - [ ] Backend internationalization requirements stated per feature returning user-visible text?
 - [ ] Responsive behavior described per breakpoint for user-facing features?
-- [ ] Prototype feedback documented and incorporated?
+- [ ] Frontend draft produced and confirmed (interaction & visual experience) for every user-facing feature (path recorded in each feature's Frontend Draft Reference)?
 - [ ] Authorization / permission model described (if multi-role)?
 - [ ] Privacy / compliance requirements stated (if handling personal data)?
 - [ ] Notification requirements captured (if the product notifies users)?
@@ -170,7 +170,7 @@ corresponding phase and deep-dive in `generate/questioning-phases.md`:
 | Evidence base | Phase 1 | Evidence Base deep-dive |
 | Frontend foundation (tokens, navigation, a11y, i18n) | Phase 3 | Frontend Foundation deep-dive |
 | Features, interaction design, forms | Phase 4 | Interaction Design, Form Specification deep-dives |
-| Prototypes | Phase 5 | Prototypes deep-dive |
+| Frontend Draft | Phase 5 | Frontend Draft deep-dive |
 | Architecture conventions | Phase 6 | Development Infrastructure, Deployment Infrastructure, AI Agent Configuration deep-dives |
 | Authorization, privacy | Phase 6 | Authorization, Privacy deep-dives |
 | Prioritization, roadmap | Phase 7 | — |

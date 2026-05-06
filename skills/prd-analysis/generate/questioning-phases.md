@@ -10,13 +10,13 @@ This file contains the phase-by-phase questioning guide for PRD analysis. It is 
 | 2 | Users & Journeys | [Phase 2 Deep-Dive](#phase-2-deep-dive-user-journeys) |
 | 3 | Frontend Foundation | [Phase 3](#phase-3-frontend-foundation) |
 | 4 | Features & Interaction Design | [Phase 4 Step 1](#phase-4-step-1-user-story-extraction--feature-derivation) |
-| 5 | Interactive Prototypes | [Phase 5](#phase-5-interactive-prototype) |
+| 5 | Frontend Draft | [Phase 5](#phase-5-frontend-draft) |
 | 6 | Architecture & Conventions | [Phase 6 Deep-Dives](#phase-6-deep-dive-authorization--permissions) |
 | 7 | Prioritization & Roadmap | [Phase 7 Deep-Dive](#phase-7-deep-dive-priority-framework) |
 | 8 | Risk Identification | [Phase 8 Deep-Dive](#phase-8-deep-dive-risk-identification) |
 | — | Phase Completion Conditions | [Conditions](#phase-completion-conditions) |
 
-**Deep-Dives:** Competitive Landscape, Evidence Base, User Journeys, Frontend Foundation, Interaction Design, Form Specification, Prototypes, Authorization, Privacy, Development Infrastructure, Deployment Infrastructure, AI Agent Configuration
+**Deep-Dives:** Competitive Landscape, Evidence Base, User Journeys, Frontend Foundation, Interaction Design, Form Specification, Frontend Draft, Authorization, Privacy, Development Infrastructure, Deployment Infrastructure, AI Agent Configuration
 
 ---
 
@@ -26,7 +26,7 @@ This file contains the phase-by-phase questioning guide for PRD analysis. It is 
 **Phase 2 — Users & Journeys:** personas, then deep-dive each persona's journeys (see below), then identify cross-journey patterns (see below)
 **Phase 3 — Frontend Foundation:** (skip if no user-facing interface) frontend tech stack confirmation, design token system, navigation architecture (see below)
 **Phase 4 — Features & Interaction Design:** extract user stories from journey touchpoints (see below), derive features from stories, MVP boundary, inputs/outputs, edge cases (see granularity guide below), interaction design for user-facing features (see Interaction Design guide below)
-**Phase 5 — Interactive Prototype:** (skip if no user-facing features) generate runnable prototypes per feature (web: browser-based via `frontend-design` skill; TUI: terminal-based via TUI framework), user validates, feedback loops, archive (see below)
+**Phase 5 — Frontend Draft:** (skip if no user-facing features) confirm the project-internal frontend implementation path (e.g. `frontend/`, `web/`, `apps/web/`, `cmd/<app>/`), generate a **runnable frontend draft** per feature directly into that path (real code, not a throwaway low-fidelity prototype, but **not** production-ready — i18n / a11y / tests / lint / perf budgets are deferred to system-design + autoforge); user validates the experience; feedback loops back into spec/tokens or into the draft code itself (see below)
 **Phase 6 — Technical:** platform, backend tech stack, integrations, data/auth requirements, shared conventions (see below), coding conventions (see below), test isolation (see below), development workflow (see below), security coding policy (see below), backward compatibility (see below), git/branch strategy (see below), code review policy (see below), observability requirements (see below), performance testing (see below), AI agent configuration (see below), deployment & environment strategy (see below)
 **Phase 7 — NFRs & Priority:** performance (including frontend Core Web Vitals), security, scalability, then prioritize using framework below
 **Phase 8 — Risks:** technical risks, dependency risks, data/security risks, mitigation strategies
@@ -230,7 +230,7 @@ Move to the next phase when:
 - **Phase 2 → 3:** Every persona has at least one journey with happy path + one error path fully walked through; every touchpoint has Interaction Mode specified; multi-step journeys have Page Transitions defined; cross-journey patterns documented in README (or explicitly N/A for single-journey products); multi-touchpoint journeys have E2E Test Scenarios covering happy, alternative, and error paths; Journey Metrics have Verification entries
 - **Phase 3 → 4:** (Skip if no user-facing interface) Frontend tech stack confirmed; design tokens defined (all applicable categories — web: colors, typography, spacing, breakpoints, motion, z-index; TUI: colors, typography, spacing per TUI Handling); navigation architecture established (web: site map, routes, breadcrumbs; TUI: command structure, screen flow); accessibility baseline set; i18n baseline set; all recorded in architecture.md
 - **Phase 4 → 5:** Feature list covers all journey touchpoints, MVP boundary agreed, no feature exceeds XL effort without a split plan; all user-facing features have full Interaction Design section filled (component contracts, state machines, form specifications, micro-interactions & motion, a11y, i18n, responsive); edge cases use Given/When/Then format; features with dependencies have at least one cross-feature integration AC; features with non-trivial test setup have Test Data Requirements
-- **Phase 5 → 6:** (Skip if no user-facing features) All user-facing features have confirmed prototypes; prototype source code archived in `prototypes/src/{feature-slug}/`; visual records archived in `prototypes/screenshots/{feature-slug}/` (web: browser screenshots via playwright-cli; TUI: teatest `.golden` files preferred, terminal screenshots via `script`/`asciinema` as fallback); feedback incorporated into feature specs and design tokens; every user-facing feature's Prototype Reference section populated with path and confirmation date
+- **Phase 5 → 6:** (Skip if no user-facing features) Frontend Implementation Path is recorded in `architecture/tech-stack.md`; every user-facing feature has a frontend draft at that path that the user has confirmed for **interaction and visual experience** (production hardening — i18n wiring, a11y audit, tests, lint conformance, perf budgets — is **not** a Phase 5 gate; those are owned by system-design + autoforge); spec-affecting feedback has been folded back into Feature files or design tokens; every user-facing feature's Frontend Draft Reference section is populated with draft path and confirmation date. **No `prototypes/` directory, no screenshots, no goldens are produced under the PRD directory** — the source tree itself is the visual record.
 - **Phase 6 → 7:** Backend tech stack decided, all external integrations identified, data model entities drafted, shared conventions (API, error handling, testing) defined, coding conventions defined (code organization, naming, error handling, logging, concurrency, dependency wiring — technology-agnostic policies), test isolation policies defined (resource isolation, parallel safety, race detection, timeouts), development workflow defined (prerequisites, CI gates, release process), security coding policy defined (input validation, secret handling, dependency scanning, injection prevention, auth enforcement), backward compatibility policy defined (or N/A for v1), git/branch strategy defined (naming, merge strategy, protection, PR conventions, commit format), code review policy defined (review dimensions, approvals, SLA, automated vs human), observability requirements defined (mandatory events, health checks, metrics, alerting, audit trail), performance testing policy defined (regression detection, budgets, load testing), AI agent configuration defined (instruction file strategy, structure policy, convention references, maintenance policy), authorization model captured (or N/A), privacy requirements captured (or N/A), backend i18n requirements captured (or N/A for single-language backend)
 - **Phase 7 → 8:** Every feature has Impact/Effort rating and P0/P1/P2 assigned, Roadmap phases mapped, frontend performance metrics included (Core Web Vitals targets for user-facing products)
 - **Phase 8 → Generate:** All high-impact risks have mitigation strategies, no open questions remain
@@ -268,79 +268,95 @@ For features that notify users (email, push, in-app, SMS), capture at the produc
 
 Record these in the feature's Notifications section. Omit if the product has no notifications.
 
-### Phase 5: Interactive Prototype
+### Phase 5: Frontend Draft
 
-Skip if the product has no user-facing features. After feature interaction design (Phase 4) is complete, generate interactive prototypes for user validation. **This phase generates actual running code — not more markdown.**
+Skip if the product has no user-facing features. After feature interaction design (Phase 4) is complete, generate a runnable **frontend draft** so the user can validate interaction and visual experience on real code rather than markdown.
+
+**Scope — experience validation only.** The frontend draft exists for one purpose: get user confirmation on layout, navigation, state-machine reachability, and visual look-and-feel. It is **not** production code. The following are **explicitly out of scope** for Phase 5:
+
+- Strict i18n wiring (a stub key-value table for visible strings is enough — production i18n library integration, locale negotiation, fallback rules belong to system-design + autoforge)
+- Comprehensive coding-standard conformance (lint clean, no warnings, full type coverage)
+- Test suites (unit / integration / E2E)
+- Performance budgets and Core-Web-Vitals tuning
+- Full accessibility hardening beyond semantic HTML / basic ARIA
+
+**Why design-as-implementation:** in the AI-coding era, building a separate low-fidelity throwaway prototype and then re-implementing it in the production codebase is pure rework. Phase 5 writes the real frontend code in the project source tree once. **system-design** then identifies what that draft is missing for production (i18n integration, a11y hardening, performance contracts, test plan, coding-standard alignment) and writes a Production Promotion Plan. **autoforge** executes the promotion in place — Promote / Extend / Rewrite — without re-creating the UI from scratch.
+
+**Step 5.0 — Confirm the Frontend Implementation Path**
+
+Before writing any code, confirm with the user the repo-relative path under which all frontend code will live. Typical choices:
+
+- Web/Desktop: `frontend/`, `web/`, `apps/web/`, `packages/web/`, `client/`
+- TUI: `cmd/<app>/`, `internal/tui/`, `apps/cli/`
+
+Record this once in `architecture/tech-stack.md` under the **Frontend Implementation Path** subsection (path, rationale, run command). All per-feature draft directories sit beneath it. system-design and autoforge will continue to evolve the code at this same path — there is no later "copy from prototype to production" step.
 
 **IMPORTANT — Execution guidance:**
-- For web/desktop UI: use the `frontend-design` skill to generate prototype code, use the `playwright-cli` skill to open it in a browser and take screenshots
-- For TUI: write prototype code directly using the TUI framework (e.g. bubbletea + lipgloss for Go, Ink for JS). No specialized skill needed — TUI frameworks produce straightforward application code. Use the framework's snapshot tools (e.g. bubbletea teatest) for visual verification
-- Write all prototype code into `{prd-dir}/prototypes/src/`. Organize by feature: `prototypes/src/{feature-slug}/`. This is a real coding step — create files, install dependencies, ensure the prototype runs
+- For web/desktop UI: use the `frontend-design` skill to generate code into the chosen path; use the `playwright-cli` skill to open it in a browser for live validation
+- For TUI: write code directly using the chosen TUI framework (e.g. bubbletea + lipgloss for Go, Ink for JS) into the chosen path. No specialized skill needed — TUI frameworks produce straightforward application code. Use the framework's snapshot tools (e.g. bubbletea teatest) for live validation
+- Organize per feature: `{frontend-implementation-path}/{feature-slug}/` (or whatever sub-layout the chosen framework expects). This is a real coding step — create files, install dependencies, ensure the draft runs (`dev` mode is fine; production builds are not required at this phase)
 
-**Step 5.1 — Prototype Generation**
+**Step 5.1 — Frontend Draft Generation**
 
 For each user-facing feature (or group of related features sharing a screen/view):
 
 **Web/Desktop UI:**
 
-1. Use the `frontend-design` skill to generate a runnable prototype using the confirmed tech stack (Phase 3)
-2. Prototype requirements:
+1. Use the `frontend-design` skill to generate runnable draft code using the confirmed tech stack (Phase 3) directly into the Frontend Implementation Path
+2. Draft requirements (the experience contract — these are what the user is validating):
    - Implement the component contracts from the feature's Interaction Design section
-   - Apply design tokens (real CSS custom properties / theme values)
-   - Implement state machines (all states must be reachable)
-   - Include semantic HTML and ARIA attributes (from a11y requirements)
-   - Externalize text strings (from i18n requirements) — at minimum, use a key-value structure even if only one language
+   - Apply design tokens (real CSS custom properties / theme values) — visual fidelity matters here
+   - Implement state machines (all states must be reachable through user input)
+   - Include semantic HTML and basic ARIA roles (deeper a11y audit happens in system-design)
+   - Place visible text behind a key-value table (full i18n library integration is **not** required at this phase)
    - Follow the navigation architecture (routes, breadcrumbs)
-   - Be self-contained and runnable (single `npm install && npm run dev` or equivalent)
-3. Prototype code quality requirements (prototype is seed code for production):
-   - Components match the component tree defined in the feature spec
-   - State management follows the chosen approach from Phase 3
-   - File structure follows framework conventions
-   - No inline styles — use design tokens through the CSS approach chosen
-   - No hardcoded strings — use i18n keys
+   - Runs in dev mode as part of the project (`pnpm --filter web dev`, `npm run dev`, or equivalent)
+3. Out of scope for the draft (deferred to system-design + autoforge):
+   - Lint-clean / type-clean / no-warnings build
+   - Unit / integration / E2E tests
+   - Performance budgets and bundle-size contracts
+   - Full i18n library wiring (locale negotiation, ICU plurals, fallback chains)
+   - Coding-standard conformance pass
 
 **TUI:**
 
-1. Generate a runnable TUI prototype using the confirmed TUI framework (e.g. bubbletea, Ink, blessed)
-2. Prototype requirements:
+1. Generate runnable draft TUI code using the confirmed TUI framework (e.g. bubbletea, Ink, blessed) directly into the Frontend Implementation Path
+2. Draft requirements:
    - Implement the component contracts from the feature's Interaction Design section (bubbletea Models, Messages, Views)
    - Apply design tokens (terminal colors via lipgloss/equivalent, spacing in character units)
-   - Implement state machines (all states must be reachable via keyboard input)
+   - Implement state machines (all states reachable via keyboard input)
    - Implement key interactions from the feature spec (Tab navigation, input handling, Command Center if applicable)
-   - Be self-contained and runnable (single `go run ./cmd/prototype/` or equivalent)
-3. Prototype code quality requirements (prototype is seed code for production):
-   - TUI models match the component tree defined in the feature spec
-   - State management follows the framework's architecture (e.g. bubbletea Elm architecture)
-   - File structure follows framework conventions
-   - No hardcoded colors — use design token constants
+   - Runs as part of the project (`go run ./cmd/<app>/` or equivalent)
+3. Out of scope for the draft (deferred to system-design + autoforge):
+   - Snapshot / unit / integration test coverage
+   - Coding-standard conformance pass
+   - Hardened key-binding conflict checks across screens
 
 **Step 5.2 — User Validation**
 
-Present the prototype to the user for feedback.
+Present the running draft to the user for feedback.
 
 **Web/Desktop UI:**
-1. Use the `playwright-cli` skill to open the prototype in a browser, navigate through states, and take screenshots
+1. Use the `playwright-cli` skill to open the app in a browser, navigate through states
 2. Walk through each feature's state machine — user verifies each state looks and behaves as expected
 3. Collect feedback per category:
-   - **Spec change** — the feature's Interaction Design section needs updating (update the feature file)
-   - **Token change** — design tokens need adjustment (update architecture.md design tokens)
-   - **Prototype-only fix** — implementation detail, doesn't affect spec (fix in prototype code only)
+   - **Spec change** — the feature's Interaction Design section needs updating (update the feature file, then update the draft accordingly)
+   - **Token change** — design tokens need adjustment (update `architecture/design-tokens.md`, then update the draft)
+   - **Draft-only fix** — the spec is right but the draft code isn't (fix the code only — no PRD edit)
+
+Do **not** treat lint output, missing tests, or perf metrics as Phase 5 feedback — those are deferred.
 
 **TUI:**
-1. Run the TUI prototype in the terminal. If the TUI framework supports snapshot testing (e.g. bubbletea teatest), generate golden snapshots for each state
+1. Run the TUI in the terminal. If the framework supports snapshot testing (e.g. bubbletea teatest), use snapshots as a development aid — but do **not** archive them under the PRD; they are project test fixtures, owned by the project
 2. Walk through each feature's state machine via keyboard — user verifies layout, colors, and interactions
-3. Collect feedback per same categories as web (spec change / token change / prototype-only fix)
-4. Save terminal snapshots (teatest `.golden` files or terminal screenshots via `script`/`asciinema`) as the visual record
+3. Collect feedback per same categories as web (spec change / token change / draft-only fix)
 
-**Step 5.3 — Archive**
+**Step 5.3 — Confirm**
 
-After user confirms the prototype:
+After user confirms the draft:
 
-1. Take screenshots/snapshots of key states:
-   - Web: save browser screenshots to `{prd-dir}/prototypes/screenshots/` (via `playwright-cli` skill)
-   - TUI: save teatest `.golden` files or terminal screenshots to `{prd-dir}/prototypes/screenshots/`
-2. Store prototype source code in `{prd-dir}/prototypes/src/`
-3. Record prototype metadata in each feature file's Prototype Reference section
+1. Record the draft path and confirmation date in each feature file's **Frontend Draft Reference** section (`{repo-root}/{frontend-implementation-path}/{feature-area}/`, `Confirmed: YYYY-MM-DD`)
+2. The draft remains in the project source tree as the visual record and as the seed for system-design's Production Promotion Plan. **Do not** copy source code or screenshots into `{prd-dir}/` — there is no `prototypes/` directory under the PRD
 
 ### Phase 6 Deep-Dive: Authorization & Permissions
 
