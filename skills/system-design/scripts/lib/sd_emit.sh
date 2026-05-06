@@ -2,13 +2,18 @@
 # sd_emit.sh — shared §9 emitter for cross-bundle linters.
 #
 # Cross-bundle scripts (architecture-coverage, analytics-coverage, dependency-
-# layering, placeholder-json, readme-references, single-source-of-truth)
-# accumulate findings into a comma-separated `$JSON_FINDINGS` shell variable
-# whose objects use a pre-§9 vocabulary (criterion ids `CR-X3/X4/X6/L2/X7/X8`,
-# severities `blocker/mechanical`).  This helper normalises that vocabulary
-# to the canonical `CR-SD14..19` ids and `sd_lint.py` severity values, then
+# layering, placeholder-json, single-source-of-truth) accumulate findings into
+# a comma-separated `$JSON_FINDINGS` shell variable whose objects use a
+# pre-§9 vocabulary (criterion ids `CR-X3/X4/X6/L2/X7`, severities
+# `blocker/mechanical`).  This helper normalises that vocabulary to the
+# canonical `CR-SD14..17, CR-SD19` ids and `sd_lint.py` severity values, then
 # emits the conformant `PASS … / FOUND … {"issues":[…]}` format and exits
 # the process with the §9 status code.
+#
+# Note: `check-readme-references.sh` (CR-SD18) was previously routed through
+# this helper but as of 912fb4e emits CR-SD18 directly via `sd_lint.emit()`,
+# so `CR-X8` no longer appears among the live callers and is intentionally
+# omitted from the `CR_MAP` below.
 #
 # Usage at the END of a cross-bundle script:
 #
@@ -40,7 +45,6 @@ CR_MAP = {
     "CR-X4": "CR-SD15",
     "CR-X6": "CR-SD16",
     "CR-L2": "CR-SD17",
-    "CR-X8": "CR-SD18",
     "CR-X7": "CR-SD19",
 }
 SEV_MAP = {

@@ -3,6 +3,20 @@
 ## [Unreleased]
 
 ### Fixed
+- **Round-5 audit follow-ups**:
+  - `common/templates/design-readme-template.md`: removed the stale
+    `CR-D07` reference in the cross-module interactions matrix
+    commentary. `CR-D07` does not appear anywhere in
+    `common/review-criteria.md`; reworded as descriptive text so writer
+    subagents don't try to look up a non-existent criterion.
+  - `scripts/lib/sd_emit.sh`: docstring still listed `readme-references`
+    as a caller of this helper, and `CR_MAP` still carried the
+    `CR-X8 → CR-SD18` remap; both are dead since the python3 port of
+    `check-readme-references.sh` (912fb4e) emits `CR-SD18` directly via
+    `sd_lint.emit()`. Removed the stale entries to avoid sending
+    debuggers chasing a phantom emitter.
+
+### Fixed
 - **Round-4 audit follow-ups**:
   - `SKILL.md` Configuration & Subagent Files: `check-revisions.sh` was
     catalogued under "Pipeline-stage scripts" with the wrong description

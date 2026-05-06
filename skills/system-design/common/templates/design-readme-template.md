@@ -304,7 +304,7 @@ graph LR
                                "HTTP REST"
                                "gRPC"
                                "consumer-side interface (Wire-injected)"
-                              This column satisfies CR-D07's sync/async classification requirement.
+                              This column disambiguates the call contract for the cross-module interactions matrix.
      {{IDEMPOTENCY_N}}      = "idempotent" | "non-idempotent" | "at-least-once safe".
      {{RETRY_POLICY_N}}     = retry behaviour (e.g. "caller retries 3×, then fails with
                                ErrXxx" or "dead-letter queue after 5 failures").
