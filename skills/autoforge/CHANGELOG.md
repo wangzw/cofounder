@@ -3,6 +3,17 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.0.0] — 2026-05-07
+
+First stable release. Round-2 audit (commit-pending) verified zero
+residual findings via line-by-line cross-checks of all eight round-1
+fix categories. Convergence achieved in a single fix iteration — the
+skill's contract surface (11 markdown files; orchestrator + 7
+sub-agent prompts + 3 templates) is now internally consistent,
+aligned with the released `system-design` v1.0.0 contracts, and
+follows the same audit guardrails proven on `prd-analysis` and
+`system-design`.
+
 ## [0.1.0] — 2025-05-29
 
 ### Fixed
