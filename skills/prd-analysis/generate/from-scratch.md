@@ -138,7 +138,57 @@ Fan-out one writer per entry in `plan.add`. Each writer:
 - Returns single-line ACK.
 
 Orchestrator: collect `self_review_status` and `fail_count` from each
-ACK. Proceed to Step 9.
+ACK. Proceed to Step 8c.
+
+Per `generate/writer-subagent.md` Formal pre-check rule, writers
+OMIT the `#### Frontend Draft Reference` subsection on every `add`
+row's user-facing feature; Step 8c (below) populates it post-fan-out.
+
+### Step 8c — Phase 5: Frontend Draft (HITL, per affected feature)
+
+**Trigger condition (per affected row):** the row in `plan.add`
+carries `frontend_draft.must_run_phase_5: true` (per
+`generate/planner-subagent.md` Output Contract) AND the corresponding
+feature file does NOT yet have a populated `#### Frontend Draft
+Reference` subsection. The populated-guard makes Step 8c idempotent —
+re-entering Step 8c (e.g. after a HITL pause) does not re-run Phase 5
+on features whose draft was already validated and recorded by a prior
+Step-8c run. If no row triggers, this step is a no-op.
+
+This step is interactive and runs in the orchestrator's main session
+(not a sub-agent) because Phase 5 requires real-time user
+confirmation of layout, navigation, state-machine reachability, and
+visual look-and-feel — see `generate/questioning-phases.md` → Phase 5.
+
+For each triggering row:
+
+1. Confirm the Frontend Implementation Path with the user (already
+   recorded in `architecture/tech-stack.md`; re-confirm only if the
+   row's `frontend_draft.target_path` overrides it).
+2. Generate or update the runnable draft at the target path. For web
+   UI, dispatch the `frontend-design` skill; for TUI, write directly
+   using the chosen framework. Use `playwright-cli` (web) or the
+   framework's snapshot tooling (TUI) for live validation.
+3. Walk the user through the draft. Record the date the user
+   validates the experience.
+4. Edit the corresponding feature file IN PLACE to populate its
+   `#### Frontend Draft Reference` subsection:
+   - `Draft path:` `<repo-relative path under Frontend Implementation Path>`
+   - `Confirmed (experience):` `<YYYY-MM-DD>` — the date the user
+     validated the draft.
+5. If the user explicitly defers the draft for a feature, set
+   `Confirmed (experience): null` and add a sibling `Drift:` line in
+   the same subsection stating the deferral reason. The
+   convergence-time gate accepts this form.
+
+**Convergence-time gate:** `scripts/check-frontend-draft.sh`
+(rule **CR-PP-FD01**) is auto-discovered by `run-checkers.sh` and
+fires inside `verify-phase-entry.sh read` (Step 9). A delivery whose
+plan added a user-facing feature CANNOT enter the review phase
+until every affected feature file's Frontend Draft Reference is
+populated (or explicitly deferred via `null + Drift:`). Skipping
+this step therefore manifests as a Step 9 hard-gate failure rather
+than a silent pass.
 
 ### Step 9 — Enter Review Loop
 

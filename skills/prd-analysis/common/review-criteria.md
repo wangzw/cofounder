@@ -175,6 +175,47 @@ break downstream consumption (system-design + autoforge both index features by f
 
 ---
 
+## CR-PP-FD01 frontend-draft-reference-populated
+
+Every feature file whose body contains a `## Interaction Design` section
+(i.e. every user-facing feature) MUST contain a populated
+`#### Frontend Draft Reference` subsection. The subsection MUST carry:
+
+- A `Draft path:` line bearing a concrete repo-relative directory under the
+  Frontend Implementation Path declared in `architecture/tech-stack.md`. The
+  `feature-template.md` placeholder
+  (`{repo-root}/{frontend-implementation-path}/{feature-area}/`) is FORBIDDEN.
+- A `Confirmed (experience):` line bearing a `YYYY-MM-DD` date OR the literal
+  `null`. When `null`, a sibling `Drift:` line MUST explain why the
+  experience-confirmation is deferred (records the gap rather than hiding it).
+
+The check is the convergence-time backstop for Phase 5 (Frontend Draft) of
+both `--evolve` and from-scratch generation. Without this rule, a delivery
+can converge with `formal_pass: true` while user-facing features carry a
+complete interaction-design schema but no human-confirmed draft — a state in
+which downstream system-design / autoforge consumers receive a feature spec
+whose visual contract has never been seen by a human.
+
+This script is auto-discovered by `run-checkers.sh` and therefore participates
+in the formal hard gate at `verify-phase-entry.sh read`. It is intentionally
+NOT in the writer-subagent's per-leaf pre-check table — `feature-template.md`
+instructs writers to OMIT the Frontend Draft Reference subsection during
+initial generation; Phase 5 (run by the orchestrator after the writer
+fan-out) is responsible for filling it.
+
+```yaml
+- id: CR-PP-FD01
+  name: "frontend-draft-reference-populated"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-frontend-draft.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+```
+
+---
+
 ## CR-IS01 issue-schema-conformance
 
 Every issue file under `<artifact-root>/.review/round-<N>/issues/` MUST conform to the on-disk

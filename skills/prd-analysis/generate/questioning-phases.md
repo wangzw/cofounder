@@ -355,7 +355,7 @@ Do **not** treat lint output, missing tests, or perf metrics as Phase 5 feedback
 
 After user confirms the draft:
 
-1. Record the draft path and confirmation date in each feature file's **Frontend Draft Reference** section (`{repo-root}/{frontend-implementation-path}/{feature-area}/`, `Confirmed: YYYY-MM-DD`)
+1. Record the draft path and confirmation date in each feature file's **Frontend Draft Reference** section. Phase 5 runs AFTER the writer fan-out, in the orchestrator's main session: the orchestrator's post-fan-out Step 8c (defined in `generate/from-scratch.md` and `generate/new-version.md`) edits each affected feature file in place to populate `#### Frontend Draft Reference` with `Draft path:` (repo-relative under the Frontend Implementation Path) and `Confirmed (experience): YYYY-MM-DD`. Writers themselves OMIT the subsection on `add` rows and on `modify` rows whose `frontend_draft.must_run_phase_5: true`; on `modify` rows whose `must_run_phase_5: false`, writers preserve the existing populated subsection verbatim. CR-PP-FD01 (`scripts/check-frontend-draft.sh`) is the convergence-time backstop.
 2. The draft remains in the project source tree as the visual record and as the seed for system-design's Production Promotion Plan. **Do not** copy source code or screenshots into `{prd-dir}/` — there is no `prototypes/` directory under the PRD
 
 ### Phase 6 Deep-Dive: Authorization & Permissions

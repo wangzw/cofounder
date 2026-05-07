@@ -209,6 +209,40 @@ The self-review archive (Write 2 below) covers **substantive** CRs only
 — formal violations are already handled by the loop above, not recorded
 as FAIL rows.
 
+> **CR-PP-FD01 (frontend-draft-reference-populated) is intentionally
+> NOT in the writer pre-check table above.** It is enforced at the
+> bundle level by `scripts/check-frontend-draft.sh` — auto-discovered
+> by `run-checkers.sh` and fired inside `verify-phase-entry.sh read`.
+> Writers handle the `#### Frontend Draft Reference` subsection by case:
+>
+> 1. **Initial `add` rows in either mode** — OMIT the subsection
+>    entirely. The orchestrator's post-fan-out Step 8c (in
+>    `generate/from-scratch.md` and `generate/new-version.md`)
+>    populates it interactively after the user validates the
+>    runnable draft.
+> 2. **Evolve `modify` rows on a user-facing feature whose existing
+>    file already carries a populated FD reference** — when
+>    `frontend_draft.must_run_phase_5: false` (or the row carries no
+>    `frontend_draft` block at all), the writer is doing a
+>    template-driven rewrite and MUST extract the existing
+>    `#### Frontend Draft Reference` subsection's three lines
+>    (`Draft path:`, `Confirmed (experience):`, and any sibling
+>    `Drift:`) from the supplied existing-file context and re-emit
+>    them VERBATIM into the rewritten file's
+>    `#### Frontend Draft Reference` subsection. Byte-for-byte
+>    preservation of the lines themselves — including any Markdown
+>    decoration (e.g. `**Draft path:**` bold-key) — overrides the
+>    surrounding template form for these specific lines; CR-PP-FD01
+>    accepts both decorated and plain forms. When
+>    `must_run_phase_5: true`, OMIT the subsection entirely so the
+>    orchestrator's post-fan-out Step 8c re-populates it after the
+>    user re-validates the new draft.
+> 3. **Never invent `Draft path:` or `Confirmed (experience):`
+>    values.** A path or date that did not come from an existing
+>    populated FD reference (case 2 preserve) MUST NOT be written by
+>    the writer. Inventing values defeats the gate's purpose:
+>    CR-PP-FD01 will pass with values nobody confirmed.
+
 ### Output Contract — Write 2: Self-Review Archive (PARTIAL only)
 
 **Conditional**: emit this write **only when at least one FAIL row exists** (i.e. you are
@@ -361,7 +395,13 @@ noted as conditional):
 7. **Interaction Design** — REQUIRED for all user-facing features. Sub-sections: Screen & Layout,
    Component Contracts, Interaction State Machine, Form Specification (if form), Micro-Interactions
    & Motion, Accessibility, Internationalization (Frontend), Internationalization (Backend, if
-   applicable), Responsive Behavior. FORBIDDEN to omit for user-facing features.
+   applicable), Responsive Behavior. FORBIDDEN to omit for user-facing features. The
+   `#### Frontend Draft Reference` subsection (defined in `feature-template.md`) MUST be handled
+   per the three-case rule in the "Formal pre-check" callout above: OMIT for initial `add` rows
+   (Step 8c populates) OR preserve existing values verbatim from a `modify` row's prior content
+   OR omit when `must_run_phase_5: true` (Step 8c re-populates). Inventing `Draft path:` /
+   `Confirmed (experience):` values is FORBIDDEN — it defeats CR-PP-FD01's purpose by passing
+   values nobody confirmed.
 8. **State Flow** — for features with domain-object lifecycle; omit for stateless CRUD.
 9. **Edge Cases** — Given/When/Then; if Permission line present, MUST include unauthorized access.
 10. **Test Data Requirements** — for features with non-trivial test setup.

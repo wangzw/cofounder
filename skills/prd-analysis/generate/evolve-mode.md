@@ -150,10 +150,12 @@ initial analysis (interactive questioning, or parsed from a user-provided docume
 - **ID numbering:** new features continue from baseline max (e.g. if baseline has F-001 through
   F-011, new features start at F-012). IDs are never reused.
 
-**Phase 5 — Frontend Draft** *(skip if no user-facing features)*
+**Phase 5 — Frontend Draft** *(REQUIRED for every new/modified user-facing feature; skip only if no user-facing features in this delivery's plan)*
 - **Review:** list baseline features and their recorded Frontend Draft paths.
-- **Ask:** "Do new/modified user-facing features need a frontend draft now?"
-- **Deep-dive:** run the Phase 5 flow (`generate/questioning-phases.md` → Phase 5: Frontend Draft) for new and modified user-facing features only. Modify their code at the baseline's Frontend Implementation Path **in place** — do not create a `prototypes/` directory under the evolved PRD. Unchanged features' drafts remain untouched and are referenced by their existing path. Production hardening (i18n / a11y / tests / lint / perf) for the modified draft is **not** a Phase 5 concern; it is folded into system-design's Production Promotion Plan.
+- **Run for every user-facing add/modify in the plan.** The orchestration hook lives in `generate/new-version.md` Step 8c (post-writer-fan-out, pre-review-entry); see that file for the dispatch sequence. This file describes only the domain content the user produces during the phase.
+- **Deep-dive:** run the Phase 5 flow (`generate/questioning-phases.md` → Phase 5: Frontend Draft) for every new and modified user-facing feature. Modify their code at the baseline's Frontend Implementation Path **in place** — do not create a `prototypes/` directory under the evolved PRD. Unchanged features' drafts remain untouched and are referenced by their existing path. Production hardening (i18n / a11y / tests / lint / perf) for the modified draft is **not** a Phase 5 concern; it is folded into system-design's Production Promotion Plan.
+- **Record outcome on the feature file.** After the user confirms the draft, populate the feature's `#### Frontend Draft Reference` subsection with `Draft path:` (concrete repo-relative path) and `Confirmed (experience): YYYY-MM-DD`. When the user explicitly defers the draft, set `Confirmed (experience): null` and add a sibling `Drift:` line explaining the deferral.
+- **Convergence-time backstop:** `scripts/check-frontend-draft.sh` (rule **CR-PP-FD01**, registered in `common/review-criteria.md`) is auto-discovered by `run-checkers.sh` and fires inside `verify-phase-entry.sh read`. A delivery whose plan touched a user-facing feature CANNOT enter the review phase — and therefore cannot converge with `formal_pass: true` — until every affected feature file's Frontend Draft Reference is populated (or explicitly deferred via `null + Drift:`).
 
 **Phase 6 — Technical Architecture**
 - **Review:** list all baseline architecture topic files with one-line key-decision summaries.
@@ -201,7 +203,7 @@ Generate files using the standard templates, with the following evolve-specific 
    topic structure, plus evolve metadata header and inline markers.
 7. **`architecture/` index** — incremental index listing all topics. Changed topics link to
    local files; unchanged topics link to baseline.
-8. **Frontend draft** — only for new/modified user-facing features; modify the code at the baseline's Frontend Implementation Path in place. Update each affected feature file's Frontend Draft Reference (path + new Confirmed date). Do not create a `prototypes/` directory under the evolved PRD.
+8. **Frontend draft** — REQUIRED for every new/modified user-facing feature; modify the code at the baseline's Frontend Implementation Path in place. Update each affected feature file's `#### Frontend Draft Reference` (`Draft path:` + `Confirmed (experience): YYYY-MM-DD`). When Phase 5 is explicitly deferred for a feature, write `Confirmed (experience): null` plus a sibling `Drift:` line stating why. Do not create a `prototypes/` directory under the evolved PRD. Enforced at convergence time by **CR-PP-FD01**.
 9. **Cross-links** — same as initial creation: backfill journey Mapped Feature columns, feature
    Deps, Cross-Journey Patterns. For items referencing baseline features/journeys, use relative
    paths to the baseline PRD directory.
@@ -258,6 +260,11 @@ to what actually changed in this evolve cycle.
   (CR-PP24).
 - **Accessibility per-feature** — modified user-facing features have Accessibility sub-sections
   (CR-PP29).
+- **Frontend Draft Reference populated** — every new/modified user-facing feature carries a
+  populated `#### Frontend Draft Reference` (or an explicit `Confirmed (experience): null` plus a
+  sibling `Drift:` deferral). Mechanically enforced by **CR-PP-FD01** at the formal hard gate;
+  the Layer-1 reviewer's role is only to confirm the recorded path matches what the user actually
+  validated in Phase 5.
 
 **Layer 2 — Evolve-specific checks:**
 

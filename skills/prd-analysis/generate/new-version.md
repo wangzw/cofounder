@@ -110,6 +110,62 @@ review pipeline will re-confirm).
   leaf type (per `generate/writer-subagent.md`); fixes failures on its
   own leaf in place; substantive CRs go into the self-review
 
+Per the `feature-template.md` instruction, writers OMIT the
+`#### Frontend Draft Reference` subsection on user-facing features
+during initial generation. Step 8c (below) is responsible for
+populating it.
+
+### Step 8c — Phase 5: Frontend Draft (HITL, per affected feature)
+
+**Trigger condition (per affected row):** the row in `plan.add` or
+`plan.modify` carries `frontend_draft.must_run_phase_5: true` (per
+`generate/planner-subagent.md` Output Contract) **AND** the
+corresponding feature file does NOT yet have a populated
+`#### Frontend Draft Reference` subsection. The populated-guard
+covers two cases: (a) `modify` rows whose writer preserved the prior
+delivery's FD reference verbatim (writer rule case 2 with
+`must_run_phase_5: false`) — these never reach Step 8c because their
+flag is false; (b) idempotent re-entry into Step 8c after a HITL
+pause — features whose draft was already validated and recorded by a
+prior Step-8c run within this delivery are not re-prompted. If no
+row triggers, this step is a no-op.
+
+This step is interactive and runs in the orchestrator's main session
+(not a sub-agent) because Phase 5 requires real-time user
+confirmation of layout, navigation, state-machine reachability, and
+visual look-and-feel — see `generate/questioning-phases.md` → Phase 5.
+
+For each triggering row:
+
+1. Confirm the Frontend Implementation Path with the user (already
+   recorded in `architecture/tech-stack.md`; re-confirm only if the
+   row's `frontend_draft.target_path` overrides it).
+2. Generate or update the runnable draft at the target path. For web
+   UI, dispatch the `frontend-design` skill; for TUI, write directly
+   using the chosen framework. Use `playwright-cli` (web) or the
+   framework's snapshot tooling (TUI) for live validation.
+3. Walk the user through the draft. Record the date the user
+   validates the experience.
+4. Edit the corresponding feature file IN PLACE to populate its
+   `#### Frontend Draft Reference` subsection:
+   - `Draft path:` `<repo-relative path under Frontend Implementation Path>`
+   - `Confirmed (experience):` `<YYYY-MM-DD>` — the date the user
+     validated the draft.
+5. If the user explicitly defers the draft for a feature (e.g.
+   "regenerate in delivery-N+1, current baseline is acceptable
+   for now"), set `Confirmed (experience): null` and add a sibling
+   `Drift:` line in the same subsection stating the deferral reason.
+   The convergence-time gate accepts this form.
+
+**Convergence-time gate:** `scripts/check-frontend-draft.sh`
+(rule **CR-PP-FD01**) is auto-discovered by `run-checkers.sh` and
+fires inside `verify-phase-entry.sh read` (Step 9). A delivery whose
+plan touched a user-facing feature CANNOT enter the review phase
+until every affected feature file's Frontend Draft Reference is
+populated (or explicitly deferred via `null + Drift:`). Skipping
+this step therefore manifests as a Step 9 hard-gate failure rather
+than a silent pass.
+
 ### Step 9 — Enter Review Loop
 
 Load `review/index.md` and execute the review-mode steps with

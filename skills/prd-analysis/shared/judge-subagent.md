@@ -53,7 +53,7 @@ ALL conditions must hold:
   over **all states** including `fixed`, so they don't block
   convergence after issues are resolved.)
 - `recurrence_count` == 0 in this round (no `fixed`-then-recurred issues)
-- formal review passed in this round (orchestrator-side; the very fact you were dispatched means it did)
+- formal review passed in this round (orchestrator-side; the very fact you were dispatched means it did). Formal review here is the auto-discovered union of every `scripts/check-*.sh` invoked by `scripts/run-checkers.sh` — including `check-frontend-draft.sh` (rule **CR-PP-FD01**), which means a converged verdict on an evolve delivery implies that every new/modified user-facing feature carries a populated Frontend Draft Reference (or an explicit `Confirmed (experience): null` + sibling `Drift:` deferral). No separate `phase5_pass` field is required in the verdict — Phase-5 enforcement is subsumed by `formal_PASS`.
 - `justified_regressions_ok` == true (i.e. every deferred issue with
   `severity ∈ {critical, error}` has `defer_until: never` and a
   non-empty `defer_reason`; the summarizer rolls this into the

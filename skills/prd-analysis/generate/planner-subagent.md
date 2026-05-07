@@ -113,6 +113,9 @@ plan:
     - path: "features/F-001-checkout.md"
       template: "common/templates/feature-template.md"
       description: "Cart checkout feature — covers payment + receipt screens"
+      frontend_draft:                           # OMIT for non-user-facing features
+        must_run_phase_5: true
+        target_path: "frontend/src/pages/checkout/"
     - path: "journeys/J-001-onboarding.md"
       template: "common/templates/journey-template.md"
       description: "First-time-user onboarding from signup through first transaction"
@@ -126,6 +129,10 @@ Each entry in `add` and `modify` MUST include:
 - `path`: PRD-relative path of the file to create or update (relative to `<target>` artifact root)
 - `template`: path to the template the writer should use (relative to this skill root); use `null` if no template applies
 - `description`: one sentence describing the file's purpose in the PRD bundle
+- `frontend_draft` (REQUIRED for any feature row whose Interaction Design will be populated; OMIT entirely for backend-only features, journey rows, README, and architecture topics):
+  - `must_run_phase_5: true` — signals the orchestrator to run Phase 5 (Frontend Draft) for this feature in `generate/new-version.md` Step 8c (or the equivalent step in from-scratch generation), AFTER the writer fan-out and BEFORE entering the review loop.
+  - `target_path`: repo-relative path under `architecture/tech-stack.md` → "Frontend Implementation Path" where the runnable draft will live (e.g. `frontend/src/pages/<feature-area>/`). The orchestrator passes this to the `frontend-design` skill (or the chosen TUI framework) and later writes it back into the feature file's `#### Frontend Draft Reference` `Draft path:` line.
+  - When the user opts to defer Phase 5 for this feature during plan approval, the orchestrator MAY downgrade `must_run_phase_5` to `false` and record the deferral in the rationale; the convergence-time gate (CR-PP-FD01) will then accept the feature's Frontend Draft Reference written as `Confirmed (experience): null` plus a sibling `Drift:` line.
 
 ### Reasoning Guidelines
 
@@ -137,6 +144,24 @@ Each entry in `add` and `modify` MUST include:
   which existing files are affected. Files not mentioned in the change scope go to `keep`.
 - For novel files outside the canonical bundle (e.g. a glossary, a migration plan), add them to
   `add` with `template: null` and explain in `rationale` why the standard PRD shape is insufficient.
+- For every feature row in `add` or `modify`, decide whether the feature is user-facing. A feature
+  is user-facing iff its template will be filled with an `## Interaction Design` section (i.e. it
+  involves screens, components, or interactions visible to a human user). For each such row, emit
+  the `frontend_draft` block with `must_run_phase_5: true` and a concrete `target_path` under the
+  Frontend Implementation Path. For backend-only features (workers, ETL, API-only services), OMIT
+  the block entirely. The orchestrator uses this signal in Step 8c to decide which features need
+  Phase 5; the convergence-time gate (**CR-PP-FD01**) then verifies that every feature carrying
+  Interaction Design also carries a populated Frontend Draft Reference.
+- **Setting `must_run_phase_5` on `modify` rows** (NewVersion only): the planner cannot read
+  feature content (orchestrator constraint), so the decision is a heuristic from the change
+  description in `input.md` and the prior delivery's `versions/<N-1>.md`. Set
+  `must_run_phase_5: true` when the change description references screen/layout/component/
+  state-machine concerns (e.g. "rewrite the per-provider toggle UI", "add a new tab to the
+  admin page", "change the loading spinner to a skeleton"). Set `must_run_phase_5: false` (or
+  omit the block) when the change is non-UI (e.g. "tighten the AC for unauthorized access",
+  "add a new analytics event", "rename a backend field"). The user can downgrade or upgrade at
+  the HITL plan-approval gate; the rationale should call out any UI-touching modify row whose
+  flag is `false` (e.g. "F-021 modifies AC text only — no Phase 5 needed").
 
 ### ACK Format
 
