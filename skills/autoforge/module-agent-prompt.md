@@ -20,6 +20,16 @@ You will receive these parameters from the main Orchestrator:
 - `stall_threshold`: consecutive non-progress rounds before changing strategy (default: 3)
 - `hard_ceiling`: absolute maximum retries as safety net (default: 20)
 
+**Evolution-only parameters** (set when `--evolve` is in use; absent or empty otherwise):
+
+- `is_evolution`: boolean — true if this Module Agent is being spawned for an `--evolve` delivery
+- `evolution_delivery_n`: integer — the autoforge delivery number (N≥2)
+- `evolution_class`: `revised-direct | revised-downstream | added` — matches the Planner's classification
+- `parent_commit`: SHA of the prior delivery's tip (`autoforge-delivery-{N-1}-{slug}`); use `git show {parent_commit}:{path}` to read the prior implementation of this module
+- `previous_plan_path`: path to the prior delivery's plan file for this module (empty for `added` modules)
+- `baseline_design_tag` / `target_design_tag`: design tags bracketing this evolution
+- `design_delta_summary_path`: path to `<plan_dir>/.evolve-{N}/impact.md`
+
 ## Setup
 
 Before spawning any role:
@@ -27,13 +37,19 @@ Before spawning any role:
 1. Change to the worktree directory: `cd {worktree_path}`
 2. Ensure the report directory exists: `mkdir -p {report_dir}`
 3. **Load sub-agent prompt templates once** — read these three files and keep their contents in working memory; you will reuse them across every round of this module:
-   - `module-developer-prompt.md` — four Developer variants (initial, retry-from-Tester, retry-from-Reviewer, replan)
+   - `module-developer-prompt.md` — five Developer variants (initial, retry-from-Tester, retry-from-Reviewer, replan, evolve-from-existing-code)
    - `module-tester-prompt.md` — Tester template
    - `module-reviewer-prompt.md` — Reviewer template
 
    Do not re-read these on every spawn — they are static templates. Substitute `{placeholders}` per spawn from your context (module_design_path, report_dir, etc.) and the prior round's outputs.
 4. If `project_coding_standards` is provided, include it in **every sub-agent prompt** as a `## Project Coding Standards` section appended after the variant body. These are non-negotiable project rules (merged from CLAUDE.md/AGENTS.md, design README Implementation Conventions, and PRD architecture.md) that take precedence over conventions.md for style/pattern choices.
 5. Pass `conventions_path` to the Developer prompt so the Developer can reference conventions.md for project conventions (naming, error handling, security patterns, test isolation).
+6. **Evolution setup** (only if `is_evolution` = true and `evolution_class` ∈ {`revised-direct`, `revised-downstream`}):
+   - Resolve the prior delivery's source files for this module via `git show {parent_commit}:{path}` for each path the previous plan owned. Materialise them into the worktree if they are not already present (the worktree was branched from `{parent_commit}` so usually they are already there).
+   - Read `previous_plan_path` and the new `module_plan_path`'s "Evolution Notes" section.
+   - Read `design_delta_summary_path` to confirm classification and intended change scope.
+   - The first Developer spawn must use **Variant 5 — Evolve from Existing Code**, not Variant 1.
+   - For `evolution_class = added`, evolution setup is skipped — proceed as a fresh module (Variant 1).
 
 All file operations and git commands run inside the worktree. Spawned sub-agents (Developer, Tester, Reviewer) inherit this working directory.
 
@@ -98,12 +114,25 @@ Pick the variant and tier by trigger:
 
 | Trigger | Variant | `model` tier |
 |---------|---------|--------------|
-| First attempt on this module | Variant 1 — Initial Run | `sonnet` |
+| First attempt, `is_evolution` = true and `evolution_class` ∈ {`revised-direct`, `revised-downstream`} | Variant 5 — Evolve from Existing Code | `sonnet` |
+| First attempt on this module (initial delivery, or `evolution_class = added`) | Variant 1 — Initial Run | `sonnet` |
 | Tester returned FAIL | Variant 2 — Retry From Tester Failure | `sonnet` |
 | Reviewer returned REJECT | Variant 3 — Retry From Reviewer Rejection | `sonnet` |
 | Replan Mode triggered | Variant 4 — Replan Mode (New Strategy) | `opus` |
 
 Always use tier aliases (`sonnet` / `opus` / `haiku`); never pin a specific model version. Aliases track the current tier member and avoid rot as models evolve. See the parent skill's Model Tier Policy section for the full rationale.
+
+### Evolution Mode (only when `is_evolution` = true)
+
+When operating in evolution mode, the standard Execution Flow is unchanged in shape but with these substitutions:
+
+- **Step 2** uses Variant 5 (Evolve from Existing Code) for `revised-direct` and `revised-downstream` modules, and Variant 1 for `added` modules. Variants 2–4 still trigger normally on Tester/Reviewer feedback or Replan.
+- **Step 3** (Tester) is invoked with `is_rerun: true` for `revised-*` modules so the Tester knows existing tests must be re-evaluated against the new plan, not silently regenerated. For `added` modules, `is_rerun: false`.
+- **Step 4** (Reviewer) is unchanged — design spec compliance is the same gate regardless of delivery.
+- **Commit messages** for the first successful Developer commit on `revised-*` modules use `feat(M-{id}): evolve to delivery-{N} — {summary}` (Variant 5 enforces this); subsequent fix commits keep the standard `fix(M-{id}): …` pattern.
+- **Module reports** (`developer-notes-M-{id}.md`, `test-report-M-{id}.md`, `review-M-{id}.md`) are overwritten in place; the prior delivery's reports for this module are not preserved (the corresponding git tag is the historical record). The Module Agent must include an "Evolution Summary" section at the top of `developer-notes-M-{id}.md` listing the steps changed/added/removed.
+
+Pass `is_evolution`, `evolution_class`, `evolution_delivery_n`, `parent_commit`, `previous_plan_path`, `baseline_design_tag`, `target_design_tag`, and `design_delta_summary_path` to **every** Developer spawn (Variants 1–5) so retry / replan paths can still reason about the evolution context. Tester receives `is_rerun` and `evolution_delivery_n`. Reviewer receives `is_evolution` and `evolution_delivery_n` for context-aware review notes but applies the same compliance criteria.
 
 ### Infrastructure Failures
 

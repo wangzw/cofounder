@@ -23,6 +23,17 @@ You will receive these parameters from the Orchestrator:
 - `draft_source_path`: path to the PRD-stage frontend draft for this module's user-facing features (empty if Promotion action = Rewrite or the module is backend / shared-library). The draft already lives in the project source tree at the path recorded in PRD `architecture/tech-stack.md` → "Frontend Implementation Path" — autoforge does NOT copy it elsewhere; it hardens it in place
 - `promotion_action`: `Promote | Extend | Rewrite | None` for this module. `None` means the module is backend or shared-library (no UI Architecture). For frontend modules, this matches the design spec's `Promotion action` field
 
+**Evolution-only parameters** (set when `--evolve` is in use; absent or empty otherwise):
+
+- `is_evolution`: boolean — true if this Planner is being spawned to re-plan a module for an `--evolve` delivery
+- `evolution_delivery_n`: integer — the autoforge delivery number being planned (N≥2)
+- `previous_plan_path`: path to this module's plan file as it existed at the prior delivery's commit (read via `git show {parent_commit}:{path}` and staged into a temp file). Empty if the module is **added** in this delivery
+- `design_delta_summary_path`: path to `<plan_dir>/.evolve-{N}/impact.md` containing the autoforge-computed module classification, the system-design `versions/<N>.md` summary, and the cosmetic-vs-semantic interface diff
+- `baseline_design_tag`: previous design tag (e.g. `delivery-1-{slug}`)
+- `target_design_tag`: current design tag (e.g. `delivery-2-{slug}`)
+- `removed_modules`: list of module IDs being removed in this delivery — your plan **must not** reference any of them as a dependency or import target
+- `evolution_class`: `revised-direct | revised-downstream | added` for this module. `revised-direct` = its own design file changed semantically; `revised-downstream` = its design is unchanged but a dependency's interface changed; `added` = brand-new module in this delivery
+
 ## Execution
 
 ### 1. Read All Inputs
@@ -70,6 +81,26 @@ Read in this order:
    - Empty list is normal for Phase 1 leaves — rely on `conventions.md` and the design spec instead
 
 7. **Implemented code** (`{implemented_module_paths}`, if any) — for modules already merged to the feature branch, read their **actual source code**, not just their plans. Actual code is the source of truth: it may differ from the plan in parameter types, error handling, async behavior, or edge cases. When a plan and its implementation diverge, plan for the code as it actually is.
+
+8. **Evolution context** (only if `is_evolution` = true):
+   - `previous_plan_path` — your prior plan from delivery N−1; treat each step as `keep`, `change`, `add`, or `remove` for the new delivery
+   - `design_delta_summary_path` — the autoforge-computed impact summary; cross-check that your classification of each step matches the recorded module class
+   - `removed_modules` — never depend on or import these
+   - `baseline_design_tag` / `target_design_tag` — when in doubt about a behaviour change, run `git diff {baseline_design_tag}..{target_design_tag} -- <design-file>` to read the canonical delta
+   - `implemented_module_paths` for kept upstream modules will point to the **prior delivery's merged code**; that code is the contract you must integrate against, even if its plan also changed
+
+### 1b. Evolution Planning (only if `is_evolution` = true)
+
+When evolving an existing module plan:
+
+1. **Preserve stable IDs.** Step IDs and slugs that survive the delta keep their original values; do not renumber unrelated steps. Append new step IDs at the end (e.g., if delivery-1 ended at step 12, new steps start at 13).
+2. **Classify every step** with one of: `keep` (no change), `change` (edit in place — describe the diff), `add` (new step), `remove` (drop the step — record a one-line tombstone in the plan's "Evolution Notes" section). Never silently delete steps.
+3. **Minimum-viable change.** Do NOT introduce unrelated refactors. If a step still satisfies the new design, keep it verbatim. The Developer (Variant 5) will refuse to apply gratuitous edits.
+4. **Cross-module signature integration.** When a kept upstream module's interface changed semantically (it appears in `revised-direct` or its plan delta touched public types), pull signatures from `implemented_module_paths` (real code at `parent_commit`) — not from prose. The integration tests run against real code.
+5. **`revised-downstream` modules** must change *only* the integration points with the upstream interface. If your delta is touching internal logic too, you have misclassified — either escalate to the Orchestrator (causing reclassification to `revised-direct`) or stop and report.
+6. **`added` modules** plan from scratch following the normal flow, but read `implemented_module_paths` for any kept upstream modules they consume.
+7. **Test step deltas.** For each `change` or `add` step, identify the corresponding test step(s) and decide: `keep | augment | replace`. Tests are first-class steps; do not let them rot.
+8. **Acceptance.** Add an "Evolution Notes" section at the top of the plan summarising: classification, changed step count, removed step count, baseline/target tags. The Module Agent will use this as Variant 5's input.
 
 ### 2. Establish or Follow Conventions
 
@@ -199,6 +230,7 @@ Before finishing, verify:
 - [ ] Integration points for planned-only modules use exact signatures from those plans
 - [ ] Integration points for not-yet-planned modules clearly state the expected interface
 - [ ] If `promotion_action` = `Promote` or `Extend`: plan does **NOT** include a "copy from prototype to production path" step (the draft is already at the production path); plan starts with a draft-vs-contract reconciliation step; every row in the design spec's Promotion Requirements table (i18n, a11y, perf, tests, coding-standard) is covered by at least one explicit hardening step; for `Extend`, every net-new screen/state in the Component Tree / Routing tables has a build step
+- [ ] If `is_evolution` = true: every step has an explicit `keep | change | add | remove` classification; no step references any module ID in `removed_modules`; Evolution Notes section is present; for `revised-downstream` modules, the only changed steps are integration points with revised upstream interfaces; step IDs from delivery N−1 that survive are preserved verbatim
 
 ## Output
 
@@ -213,4 +245,5 @@ KEY_DECISIONS: {list any decisions not directly derivable from the design spec}
 INTEGRATION:
   - Consumes from {M-xxx}: {interface} [concrete from plan / expected from design]
   - Exposes to {M-yyy}: {interface}
+EVOLUTION: {only if is_evolution} delivery={N}; class={revised-direct|revised-downstream|added}; steps_kept={count}; steps_changed={count}; steps_added={count}; steps_removed={count}
 ```

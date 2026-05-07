@@ -3,6 +3,79 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.1.0] — 2026-05-07
+
+Adds **`--evolve` mode** so autoforge can absorb in-place mutations made by
+`system-design --evolve` and re-implement only the affected modules without
+rebuilding from scratch. The plan directory is mutated in place, mirroring the
+design directory's lifecycle; per-delivery identity lives in `versions/<N>.md`,
+`CHANGELOG.md`, and `autoforge-delivery-<N>-<slug>` annotated git tags.
+
+### Added
+
+- **Input Modes:** `--evolve`, `--evolve --plan-only`, `--evolve --from`,
+  `--evolve --fresh`. Mode Routing rows added.
+- **`--evolve Mode` section in `SKILL.md`** with steps E0–E6:
+  - E0 Locate prior delivery + plan (auto-discover via tags; refusal gates).
+  - E1 Compute affected module set (`removed / added / revised-direct /
+    revised-downstream / kept`) using a sonnet subagent for semantic-vs-
+    cosmetic interface diffing; user approval gate.
+  - E2 Create evolution branch `autoforge/{name}-{hash4}-d{N}`.
+  - E3 Apply removals (with deferred-deletion when `kept` consumers would break).
+  - E4 Re-plan affected modules in place.
+  - E5 Execute affected modules in parallel batches.
+  - E6 Acceptance + `versions/{N}.md` + `CHANGELOG.md` +
+    `autoforge-delivery-{N}-<slug>` tag.
+- **Variant 5 — Evolve from Existing Code** in `module-developer-prompt.md`:
+  minimum-viable-diff Developer prompt that reads delivery N−1 source and
+  applies only the changes the revised plan classifies as `change` / `add` /
+  `remove`. Refuses gratuitous refactors.
+- **Module Agent evolution mode**: `is_evolution`, `evolution_class`,
+  `parent_commit`, `previous_plan_path`, `baseline_design_tag`,
+  `target_design_tag`, `design_delta_summary_path`, `evolution_delivery_n`
+  context parameters. Variant 5 dispatch on first Developer spawn.
+- **Planner evolution context**: same parameters surface in
+  `planner-prompt.md`, plus a new "Evolution Planning" sub-section requiring
+  every step to carry an explicit `keep | change | add | remove`
+  classification, stable step IDs, and an Evolution Notes section in the plan.
+- **Plan README schema** (`plan-readme-template.md`): new Design Input rows
+  (`Feature Branch Family`, `Current Design Delivery`, `Autoforge Delivery`,
+  `Autoforge Delivery Tag`); new `## Evolution History` table; `Kept` and
+  `Removed` Module Status legend entries; in-place-mutation footer note.
+- **Output Structure** documents `versions/`, `CHANGELOG.md`, `.evolve-{N}/`,
+  archived `acceptance-d{N-1}.md`.
+- **Branch / tag conventions:** `autoforge/{name}-{hash4}-d{N}` evolution
+  branch family; `autoforge-delivery-{N}-<slug>` annotated tag.
+- **Commit messages** for evolution-specific operations:
+  `chore(plan): remove modules in delivery-{N}`, `docs(plan): refresh
+  conventions for delivery-{N}`, `docs(plan): re-plan for delivery-{N}`,
+  `docs(plan): archive delivery-{N-1} acceptance report`, `docs(plan):
+  finalize autoforge delivery-{N}`, `feat(M-{id}): evolve to delivery-{N}`.
+- **Key Principle:** "In-place evolution mirrors system-design" plus "Evolution
+  scope is module-level, not file-level".
+
+### Changed
+
+- `--cleanup Mode` refuses to delete a plan directory when `versions/<N>.md`,
+  `CHANGELOG.md`, or `autoforge-delivery-*` tags exist (delivery history would
+  be destroyed). User must manually remove tags + `versions/` if they really
+  want to discard the chain.
+- `module-agent-prompt.md` Spawning Developer table now lists Variant 5 first.
+- `planner-prompt.md` Self-Check adds evolution-specific bullets; Output Report
+  emits an `EVOLUTION:` line when planning under `--evolve`.
+
+### Migration
+
+- Existing v1.0.0 plan directories without an `Autoforge Delivery` field are
+  treated as delivery 1; the first `--evolve` run will populate the field and
+  start at N=2.
+- `--evolve --from <delivery-N-slug>` overrides auto-discovery if multiple
+  design deliveries have accumulated since the last autoforge run, allowing
+  catch-up evolution.
+- `--evolve --fresh` is an explicit opt-out for cases where in-place mutation
+  would be more confusing than starting over (e.g. >70% modules revised); it
+  falls through to default mode with a new plan dir. Discouraged.
+
 ## [1.0.0] — 2026-05-07
 
 First stable release. Round-2 audit (commit-pending) verified zero

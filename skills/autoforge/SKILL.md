@@ -1,7 +1,7 @@
 ---
 name: autoforge
-version: 1.0.0
-description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules'."
+version: 1.1.0
+description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
 # Autoforge — Multi-Role Automated Development
@@ -14,6 +14,11 @@ Orchestrate agent teams to turn a system design into tested, PRD-validated code.
 /autoforge docs/raw/design/2026-04-09-agent-team/              # full flow (plan → execute → accept)
 /autoforge --plan-only docs/raw/design/2026-04-09-agent-team/   # generate plans only, stop for human review
 /autoforge --execute docs/raw/plans/2026-04-09-agent-team-a3f1/     # execute existing plans (reads design/PRD paths from plan README)
+/autoforge --evolve docs/raw/design/2026-04-09-agent-team/      # follow a `system-design --evolve` delivery: in-place mutate the
+                                                                #   prior plan dir, re-plan only impacted modules, re-execute
+/autoforge --evolve --plan-only docs/raw/design/2026-04-09-agent-team/   # stop after evolution re-plan, before execution
+/autoforge --evolve --from docs/raw/plans/<plan-dir>/ docs/raw/design/<design-dir>/   # explicit prior plan dir (skip auto-discovery)
+/autoforge --evolve --fresh docs/raw/design/2026-04-09-agent-team/       # escape hatch: NEW plan dir instead of in-place evolve
 /autoforge --status docs/raw/plans/2026-04-09-agent-team-a3f1/      # show progress
 /autoforge --cleanup docs/raw/plans/2026-04-09-agent-team-a3f1/     # abandon run: remove worktrees, branches, optionally plans
 ```
@@ -27,6 +32,9 @@ Detect the mode first. Read the routing files for that mode only — do not load
 | **Default** | `/autoforge <dir>` | Load per-step as needed (see loading notes in Steps 1–3 below) |
 | **Plan only** | `--plan-only` | Same — stops after Step 1; only planner files are ever loaded |
 | **Execute** | `--execute <plan-dir>` | Same — skip planner files unless re-plan is triggered |
+| **Evolve** | `--evolve <design-dir>` | Load `--evolve Mode` section; same step files as Default but driven by Steps E0–E6 (planner + module-agent + execution prompts; same templates) |
+| **Evolve plan-only** | `--evolve --plan-only` | Same as Evolve — stops after Step E4 |
+| **Evolve fresh** | `--evolve --fresh` | Falls through to Default with a forced new plan directory; not the recommended path |
 | **Status** | `--status <plan-dir>` | No additional files (read-only query) |
 | **Cleanup** | `--cleanup <plan-dir>` | No additional files |
 
@@ -746,6 +754,203 @@ This mode is useful for:
 - Executing plans that were generated with `--plan-only`
 - Retrying after human-resolved decision requests
 
+## --evolve Mode
+
+> **Load on entry:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`, `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `integration-tester-prompt.md`, `acceptance-tester-prompt.md`, `acceptance-report-template.md`
+
+When invoked with `--evolve docs/raw/design/<design-dir>/ [--from <plan-dir>] [--plan-only] [--fresh]`:
+
+The design directory has been evolved in place by `system-design --evolve` and now carries a new `delivery-<N>-<slug>` annotated tag (see system-design `SKILL.md` Phase Contract: design history is preserved via tags + `.review/versions/<N>.md` + the design `CHANGELOG.md`). autoforge follows the same convention on the implementation side: **the existing plan directory is mutated in place** — `--evolve` does NOT create a new plan directory. Plan history is preserved via:
+
+- Annotated git tag `autoforge-delivery-<N>-<slug>` at each delivery's converged commit on the feature branch
+- Per-delivery summary file `docs/raw/plans/{plan-dir}/versions/<N>.md`
+- `docs/raw/plans/{plan-dir}/CHANGELOG.md` author-curated change log
+- `docs/raw/plans/{plan-dir}/README.md` "Evolution History" section
+
+This symmetry means the design directory and the plan directory have a 1:1 relationship across all deliveries, and any past delivery's plan + code can be reproduced via `git checkout autoforge-delivery-<N>-<slug>`.
+
+### Why in-place (not a new plan dir)
+
+1. **Symmetry with system-design** — system-design already mutates the design dir in place; mirroring it on the implementation side keeps a 1:design × 1:plan mapping and avoids an N×M discovery problem on subsequent evolutions.
+2. **Plan ↔ code coupling** — the implementation lives on the feature branch and evolves on a child branch; the plan files are the design intent for that code. Decoupling them into separate directories per delivery would force readers to reconcile two trees during code review.
+3. **Kept-module noise minimisation** — most evolutions touch a small subset of modules. Copying every `kept` module's plan into a new directory creates churn that doesn't reflect any real design change.
+4. **Conventions accumulate** — `conventions.md` is already designed for in-place incremental updates via the `conventions-additions/` flow. Plan files follow the same model.
+5. **History via tags, not via directory forks** — the same convention system-design uses; readable with standard `git log --oneline autoforge-delivery-1-foo..autoforge-delivery-2-bar`.
+
+If a particular evolution is so heavy that in-place mutation would be misleading (e.g. >70% of modules `revised` plus large convention overhaul), the user can opt into `--evolve --fresh`, which falls back to Default mode with a new plan directory; this is an explicit user choice, never the default.
+
+### Step E0 — Locate Prior Delivery and Plan
+
+1. **Find the prior plan directory** — look for `docs/raw/plans/{design-dir-name}-*/` directories whose `README.md` `Source Design` field matches `<design-dir>`. Pick the one with the highest `Autoforge Delivery` field. If `--from <plan-dir>` is supplied, use it explicitly. Refuse if none matches: "no prior autoforge delivery for this design — run `/autoforge <design-dir>` from scratch first".
+
+2. **Read the plan README** — extract the Design Input table fields:
+   - `Source Design` (verify equals `<design-dir>`)
+   - `Source PRD`
+   - `Feature Branch Family` (e.g. `autoforge/{design-dir-name}-{hash4}`)
+   - `Worktree Root`
+   - `Current Design Delivery` (e.g. `delivery-2-tooling`) — the **baseline design tag**
+   - `Autoforge Delivery` (integer; this is delivery `N-1`; the new delivery is `N`)
+   - `Acceptance Threshold`
+
+3. **Resolve the design's target delivery tag** — list `delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
+
+4. **Refuse on dirty / mid-flight states** (same gate as Step 0):
+   | Condition | Action |
+   |-----------|--------|
+   | Working tree has uncommitted changes | Refuse; ask user to commit/stash |
+   | Prior plan dir has any module not in `Merged = Yes` / `Skipped` and no acceptance verdict | Refuse; tell user to resume with `--execute` first |
+   | `target == baseline` | Refuse; "no design changes since last autoforge delivery" |
+
+### Step E1 — Compute the Affected Module Set
+
+system-design's evolution emits four file-level lists (`delete | modify | add | keep`) inside `<design-dir>/.review/round-K+1/plan.md`, but those classify **design files**. autoforge translates them into **module impact classes**, which is broader because cross-module interface effects propagate downstream.
+
+1. **Read the design diff inputs**:
+   - `<design-dir>/.review/versions/<N>.md` — change summary written by `system-design --evolve` (contains the planner's delete/modify/add/keep lists for the new delivery)
+   - `<design-dir>/CHANGELOG.md` — human-readable timeline
+   - `git diff <baseline-design-tag>..<target-design-tag> -- <design-dir>` — concrete file diff
+   - The prior `Module Index` in the plan README (so we know which modules existed and their `Deps`)
+
+2. **Classify each module** — output `docs/raw/plans/{plan-dir}/.evolve-N/impact.md`:
+
+   | Class | Source signal | Implementation action |
+   |-------|---------------|----------------------|
+   | **removed** | `modules/M-xxx-*.md` deleted in the design diff | Delete plan file, delete owned source files, drop from Module Index |
+   | **added** | `modules/M-xxx-*.md` newly added | Plan from scratch, execute as a new module |
+   | **revised (direct)** | `modules/M-xxx-*.md` modified, OR a consumed `api/*.md` modified, OR a Module Interaction Protocol section in the design README that names this module modified, OR a Tech Stack change forces this module to switch frameworks/libraries | Re-plan in place, re-execute in evolution mode |
+   | **revised (downstream)** | M is in `closure(N)` for some `revised (direct)` or `added` N whose **public interface or data model** changed semantically | Same as direct revised |
+   | **kept** | None of the above | Plan unchanged; module code inherited from the parent feature-branch commit; participates in phase integration test + acceptance |
+
+3. **Compute the downstream closure** — for each `revised (direct)` and `added` module, dispatch a small `sonnet` subagent to compare the module spec's `## Public Interfaces` and `## Data Models` sections between the baseline and target design tags and decide whether the change is *semantic* (signature, type, semantics, error contract) or *cosmetic* (typo, doc rewording). Mark every module N in the DAG with `M ∈ closure(N)` as `revised (downstream)` only when at least one upstream change is semantic. This avoids churning every transitive consumer when an upstream module only updated its prose.
+
+4. **Refresh conventions baseline** — re-read the design README's `Implementation Conventions` and `Key Technical Decisions`, plus the PRD's `architecture.md` developer convention sections. Diff against the current `plans/conventions.md`. Emit any added/changed convention text as `plans/conventions-additions/_evolve-{N}.md`, to be merged after re-planning (Step E4.1).
+
+5. **Present impact summary to user** — table per module (class + reason), cross-module interface deltas, conventions diff, removed-module fallout (orphaned consumers from `kept` modules — these are surfaced as "downgrade-blocking" and force the consumer into `revised`). The user may explicitly downgrade an `auto-revised (downstream)` module to `kept` (with rationale captured in `versions/<N>.md`) or upgrade a `kept` to `revised`. Approval gate before proceeding.
+
+### Step E2 — Create Evolution Branch
+
+Each evolution gets a fresh feature branch — `autoforge/<design-dir-name>-<hash4>` from the original delivery is typically already merged to main and has been deleted. Naming preserves the family root for traceability:
+
+```
+N = autoforge delivery counter for this run (e.g. 2 for the second delivery)
+new_feature_branch  = autoforge/{design-dir-name}-{hash4}-d{N}
+new_worktree_root   = {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}-d{N}
+```
+
+Branch from the most recent ancestor that contains the prior delivery's code:
+
+```bash
+# Common case — prior delivery (N-1) merged to main:
+git branch {new_feature_branch} main
+
+# Edge case — prior delivery not yet merged (rare; --evolve usually follows merge):
+git branch {new_feature_branch} autoforge-delivery-{N-1}-<prev-slug>
+
+git worktree add {new_worktree_root}/main {new_feature_branch}
+```
+
+The new branch and worktree replace the original ones for this delivery; original worktrees were already cleaned up at the end of delivery N-1 (`Step 4 — Merge to Main`).
+
+### Step E3 — Apply Removals (Pre-Replan)
+
+For each module classified `removed`:
+
+1. `git rm docs/raw/plans/{plan-dir}/plans/plan-M-{id}-{slug}.md` (in primary worktree)
+2. `git rm` the module's owned source files. Owned files are listed in the prior plan's `## Files Created` / `## Public Interfaces` sections; the design module file is gone but the prior plan still records exact paths.
+3. Update `README.md`: drop the row from Module Index, Module Status, Phase Breakdown, dependency graph mermaid block (also delete dangling edges into removed module from sibling rows).
+4. Single commit: `chore(plan): remove modules in delivery-{N} — {removed-module-list}`
+
+If removing a module would break the build (orphan imports from a `kept` consumer), upgrade that consumer to `revised` instead and **defer the source file deletion** until after Step E5; the revised plan must include a "rewire/replace consumer of removed M-xxx" step.
+
+### Step E4 — Re-Plan Affected Modules (In Place)
+
+Restricted form of Step 1: only `revised` and `added` modules are re-planned. `kept` plans stay verbatim.
+
+1. **Conventions update** — if Step E1.4 produced `_evolve-{N}.md`, merge it into `conventions.md` first via a single `sonnet` subagent, then `git rm` the addition file. Commit: `docs(plan): refresh conventions for delivery-{N}`.
+2. **Re-build phase order** — recompute the topological sort over the post-removal DAG (added modules joined; removed modules dropped). Preserve prior phase numbering for any module whose phase didn't change; only re-stamp phases that genuinely shifted.
+3. **Spawn Planners** — phase-by-phase with within-phase parallelism (same rules as Step 1). Each Planner receives the standard inputs PLUS:
+
+   | Param | Source |
+   |-------|--------|
+   | `is_evolution` | `true` |
+   | `previous_plan_path` | The existing `plan-M-{id}-{slug}.md` — for `revised` modules; omit for `added` |
+   | `design_delta_summary_path` | `<design-dir>/.review/versions/<N>.md` |
+   | `baseline_design_tag` / `target_design_tag` | For `git diff` / `git show` commands the Planner may need |
+   | `removed_modules` | List of removed module IDs — Planner must not reference them |
+   | `implemented_module_paths` | Source files for ALL modules in this module's dependency closure that are `kept` (already on the new feature branch — actual code is the source of truth, not the prior plan) |
+   | `evolution_class` | `revised-direct` / `revised-downstream` / `added` |
+
+   Planners overwrite (not append to) `plan-M-{id}-{slug}.md` for `revised` modules, and create new files for `added` modules. `kept` plan files are not opened.
+
+4. **Update plan README** in the same commit window:
+   - Set `Current Design Delivery` to the new target tag, increment `Autoforge Delivery` to `N`
+   - Append a row to the `## Evolution History` table
+   - Update Module Index, Module Status, Phase Breakdown for post-evolution state
+   - For `kept` modules: keep `Merged = Yes` (they remain merged across the new branch since the branch is forked from a commit containing their code)
+   - For `revised` and `added` modules: reset Plan/Dev/Test/Review/Merged to `—` (a fresh execution cycle will fill these)
+   - For `removed` modules: drop the row (traceability lives in `versions/{N}.md`)
+
+5. **Commit re-plan** — `docs(plan): re-plan for delivery-{N} — {target-design-tag}`
+
+6. **Human review gate** — same review summary format as Step 1, with explicit "What changed and why" emphasis per module. The user can edit plans before execution.
+
+7. **`--evolve --plan-only` exit** — if invoked, stop here. The plan dir is now in a coherent "delivery-{N} planned, awaiting execution" state and can later be resumed via `/autoforge --execute <plan-dir>`.
+
+### Step E5 — Execute Affected Modules
+
+Standard Step 2 flow with two adjustments:
+
+1. **Module Agent receives `is_evolution: true`** — see "Evolution Mode in Module Agent" below. The agent starts from the existing module code (already present on the new feature branch via the parent commit) and applies the revised plan as a delta, not from scratch.
+2. **Unaffected `kept` modules are NOT spawned** — their code is inherited from the parent commit. They DO participate in:
+   - **Phase integration tests** — Integration Tester runs against the union of `revised + added + kept` modules in each phase; the integration test set itself may have been revised by Step E4 (the design's Test Strategy or interaction protocols changed)
+   - **Acceptance** — full PRD acceptance validates the assembled system
+
+   If a phase contains only `kept` modules (no revised, no added), skip module execution but still run the phase integration test (PRD acceptance criteria for that phase may have changed).
+
+3. **Worktree lifecycle** is unchanged — per-module worktrees are created only for `revised + added` modules. After their Module Agent returns APPROVE, the standard merge sequence applies.
+
+4. **Replan / Diagnosis Mode** — `revised` modules can still hit Replan Mode and Diagnosis Mode (and PLAN_REVISION_NEEDED) within their Module Agent loop. Those internal escalations are unchanged from the default flow.
+
+### Step E6 — Acceptance, Versions File, Delivery Commit
+
+1. **Acceptance** — Step 3 with `is_rerun: true`. Before the run:
+   - Rename the prior `reports/acceptance.md` → `reports/acceptance-d{N-1}.md` (single commit: `docs(plan): archive delivery-{N-1} acceptance report`)
+   - Pass `previous_report_path: reports/acceptance-d{N-1}.md`
+
+2. **Write the delivery summary** — `docs/raw/plans/{plan-dir}/versions/{N}.md` capturing baseline tag, target tag, autoforge tag, branch, module impact table (including auto-revised → user-downgraded entries with rationale), conventions diff, acceptance verdict + delta vs prior run.
+
+3. **Update CHANGELOG.md** — `docs/raw/plans/{plan-dir}/CHANGELOG.md` gets a new section header `## delivery-{N} — {YYYY-MM-DD} — {target-tag}` with bullet summary referencing `versions/{N}.md`.
+
+4. **Commit-delivery** — single commit on the feature branch: `docs(plan): finalize autoforge delivery-{N}` and create annotated tag:
+
+   ```bash
+   git tag -a autoforge-delivery-{N}-<slug> -m "autoforge delivery {N}: {target-design-tag}"
+   ```
+
+   `<slug>` matches the design's `delivery-{N}-<slug>` slug for 1:1 traceability.
+
+5. **Step 4 (Merge to main)** — runs as in the default flow, but on `{new_feature_branch}` instead of the original.
+
+### Evolution Mode in Module Agent
+
+When the Orchestrator spawns a Module Agent with `is_evolution: true`, the agent's behaviour changes in three places:
+
+- **Setup** also reads the prior implementation from the parent commit (`git show {parent-commit}:src/...` for files the module owns per the prior plan), and assembles a brief "what's already there" summary.
+- **First Developer spawn** uses **Variant 5 — Evolve from Existing Code** (see `module-developer-prompt.md`), not Variant 1. The Developer reads the revised plan + existing module source, identifies the deltas, applies them, and commits with `feat(M-{id}): evolve to delivery-{N} — {summary}`. Variants 2/3/4 (retry-from-Tester, retry-from-Reviewer, Replan) are reused unchanged after the first round.
+- **Tester** is invoked with `is_rerun: true` (previous tests exist on the parent commit; review them against the revised plan, update or extend, then run the full suite). For `added` modules, `is_rerun: false` (no prior tests).
+
+Reviewer behaviour is unchanged — it always reviews the current code against the current plan.
+
+### Refusal Conditions Summary
+
+| Condition | Reason |
+|----------|--------|
+| No prior plan directory matches the design | Run from scratch first (no `--evolve` baseline) |
+| Prior plan directory is mid-execution | Resume the in-flight run with `--execute` first |
+| Target design delivery tag equals the prior plan's recorded baseline | Nothing to evolve |
+| Working tree is dirty | Same gate as default Step 0 |
+| `--evolve --fresh` selected | Documented escape hatch — proceeds via Default Mode against a new plan directory |
+
 ## --status Mode
 
 When invoked with `--status docs/raw/plans/{plan-dir}/`:
@@ -792,7 +997,12 @@ Abandon the autoforge run and remove all artifacts. **This is destructive — co
    ```
 8. **Optionally remove plan files** — ask user:
    - "Keep plan files at `docs/raw/plans/{plan-dir}/` for reference?" (default: keep)
-   - If user says remove: `git rm -rf docs/raw/plans/{plan-dir}/` + commit on current branch
+   - **Refuse to remove the plan directory** if any of the following exist (the plan has historical deliveries that would be destroyed):
+     - One or more `versions/<N>.md` files
+     - A `CHANGELOG.md`
+     - One or more `autoforge-delivery-<N>-<slug>` annotated tags reachable from any preserved branch
+     In those cases, reply: "this plan dir contains delivery history; refusing to remove. Use `git tag -d autoforge-delivery-*` and remove `versions/` manually if you genuinely want to discard the chain."
+   - If user still says remove and no history exists: `git rm -rf docs/raw/plans/{plan-dir}/` + commit on current branch
 9. **Report** — print what was cleaned up: worktrees removed, branches deleted, disk space freed
 
 ## Git Strategy
@@ -800,17 +1010,28 @@ Abandon the autoforge run and remove all artifacts. **This is destructive — co
 ### Branch Naming
 
 ```
-Feature branch (created by Orchestrator in Step 0):
+Feature branch (created by Orchestrator in Step 0 — initial delivery):
   autoforge/{design-dir-name}-{hash4}
   Example: autoforge/2026-04-09-agent-team-a3f1
 
+Feature branch (created by Orchestrator in Step E2 — evolution delivery N≥2):
+  autoforge/{design-dir-name}-{hash4}-d{N}
+  Example: autoforge/2026-04-09-agent-team-a3f1-d2
+
 Module branches (created by Orchestrator before spawning Module Agent):
-  autoforge/{design-dir-name}-{hash4}/p{phase}/M-{id}-{slug}
-  Example: autoforge/2026-04-09-agent-team-a3f1/p1/M-001-task-split
+  autoforge/{design-dir-name}-{hash4}/p{phase}/M-{id}-{slug}                  (delivery 1)
+  autoforge/{design-dir-name}-{hash4}-d{N}/p{phase}/M-{id}-{slug}             (delivery N≥2)
+  Example: autoforge/2026-04-09-agent-team-a3f1-d2/p1/M-001-task-split
+
+Annotated tags (created on converged delivery commit):
+  autoforge-delivery-{N}-{slug}
+  Example: autoforge-delivery-2-cancel-flow
+  The slug matches the design's delivery-{N}-{slug} for 1:1 traceability.
 ```
 
 - `{design-dir-name}` = design directory name, directly traceable to `docs/raw/design/{name}/`
-- `{hash4}` = `$(git rev-parse --short=4 HEAD)` at creation time — prevents collision on reruns
+- `{hash4}` = `$(git rev-parse --short=4 HEAD)` at **initial plan creation** — prevents collision on first runs; **never bumped on `--evolve`** (the `-d{N}` suffix carries delivery identity)
+- `-d{N}` = autoforge delivery counter (N≥2), introduced by `--evolve`
 - `p{phase}` = phase number — groups modules by execution batch
 - `M-{id}-{slug}` = module ID and slug — matches design document naming
 - Module branches are forked from the feature branch
@@ -823,6 +1044,7 @@ Module branches (created by Orchestrator before spawning Module Agent):
 chore: initialize project
 docs(plan): add implementation plans for {project}
 feat(M-001): implement {module} interfaces and core logic
+feat(M-001): evolve to delivery-{N} — {summary}
 test(M-001): add unit tests for {module}
 test(M-001): add integration tests for {module}
 fix(M-001): fix {test failure description}
@@ -839,6 +1061,13 @@ fix(M-001): {acceptance criterion description}
 docs(plan): add acceptance report
 docs(plan): mark implementation complete
 log: {brief event description}
+
+# --evolve specific:
+chore(plan): remove modules in delivery-{N} — {removed-list}
+docs(plan): refresh conventions for delivery-{N}
+docs(plan): re-plan for delivery-{N} — {target-design-tag}
+docs(plan): archive delivery-{N-1} acceptance report
+docs(plan): finalize autoforge delivery-{N}
 ```
 
 ### Merge Rules
@@ -870,18 +1099,19 @@ Consider squashing `state()` commits during the merge to keep the feature branch
 ### Worktree Convention
 
 ```
-Worktree root (sibling to project, one per autoforge run):
-  {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}/
-  Example: ../myapp-worktrees/autoforge-2026-04-09-agent-team-a3f1/
+Worktree root (sibling to project, one per autoforge feature branch):
+  Initial delivery: {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}/
+  Delivery N≥2:     {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}-d{N}/
+  Example: ../myapp-worktrees/autoforge-2026-04-09-agent-team-a3f1-d2/
 
 Primary worktree (feature branch — planning, bootstrap, integration, acceptance):
   {worktree-root}/main/
-  Example: ../myapp-worktrees/autoforge-2026-04-09-agent-team-a3f1/main/
 
 Per-module worktree (one per module during phase execution):
   {worktree-root}/p{phase}-M-{id}-{slug}/
-  Example: ../myapp-worktrees/autoforge-2026-04-09-agent-team-a3f1/p1-M-001-task-split/
 ```
+
+Each delivery uses its own `worktree-root` so concurrent inspection of the prior delivery (via the persisted plan dir + tag) does not conflict with the in-flight evolution. After Step 4 (Merge to Main), the evolution worktree root is removed; the prior delivery's tag remains on main.
 
 Worktrees are placed outside the project directory to avoid nesting. The **main project directory is never checked out to the feature branch** — it stays on its original branch, so other work can proceed in parallel.
 
@@ -915,7 +1145,7 @@ Plan README.md maintains a live status table (updated after each phase):
 | M-002  | 1     | Done | Retry 2 | — | — | — | Test failure: null check |
 | M-003  | 2     | Done | — | — | — | — | Waiting for Phase 1 |
 
-Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Replan {n}` = in replan mode (n = replan attempt), `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip
+Legend: `—` = not started, `Done` = complete, `Retry {n}` = in retry cycle, `Replan {n}` = in replan mode (n = replan attempt), `Revision` = plan being revised, `Decision` = waiting for human decision, `Skipped` = human decided to skip, `Removed` = module deleted in this delivery (row dropped after delivery commit), `Kept` = unchanged this delivery, inherited from parent commit (only used during `--evolve`)
 
 ## Phase Status
 
@@ -1027,19 +1257,28 @@ If an Agent tool call fails due to infrastructure issues (timeout, context overf
 - **Status is visible** — plan README is updated after every phase; execution log records every decision and state change; design doc Impl columns reflect actual progress
 - **Autonomous first** — continue iterating while progress is being made; when stalled, try alternative approaches before involving a human; request human decision only when reasonable options are exhausted and remaining choices involve quality trade-offs
 - **Human decides trade-offs, agent decides implementation** — when genuinely stuck, the agent presents concrete options for human choice, then continues with the chosen approach — never dumps unstructured problems or gives up prematurely
+- **In-place evolution mirrors system-design** — `--evolve` mutates the existing plan directory in place; per-delivery identity lives in `versions/<N>.md`, `CHANGELOG.md`, and the `autoforge-delivery-<N>-<slug>` annotated tag. Plan directories are 1:1 with design directories across all deliveries.
+- **Evolution scope is module-level, not file-level** — system-design's `delete/modify/add/keep` is a *file* classification; autoforge translates it to a *module* classification, expanding the set via downstream-closure analysis on semantic interface changes. A typo fix in an upstream module does NOT cascade; a signature change does.
 
 ## Output Structure
 
 ```
 docs/raw/plans/{design-dir-name}-{hash4}/
-├── README.md                              # Dependency graph + phases + live status
+├── README.md                              # Dependency graph + phases + live status + Evolution History
+├── CHANGELOG.md                           # Per-delivery curated changelog (added in delivery-2+)
 ├── execution-log.md                       # Chronological event log (append-only)
+├── versions/                              # Per-delivery summaries (added in delivery-2+)
+│   ├── 2.md
+│   └── 3.md
+├── .evolve-{N}/                           # Transient: per-evolution scratch (impact.md, classification rationale);
+│                                          #   committed for traceability, not consumed by the runtime after E6
 ├── plans/
 │   ├── conventions.md                     # Project-wide implementation conventions
 │   ├── conventions-additions/             # Transient: per-module convention extensions,
 │   │                                      #   merged into conventions.md and deleted
-│   │                                      #   between phases (empty at end of planning)
-│   ├── plan-M-001-{slug}.md               # Module implementation plan
+│   │                                      #   between phases (empty at end of planning).
+│   │                                      #   Also receives `_evolve-{N}.md` during --evolve runs
+│   ├── plan-M-001-{slug}.md               # Module implementation plan (mutated in place across deliveries)
 │   ├── plan-M-002-{slug}.md
 │   └── ...
 ├── reports/
@@ -1049,10 +1288,14 @@ docs/raw/plans/{design-dir-name}-{hash4}/
 │   ├── decision-request-M-001.md          # DECISION_REQUEST details (if stalled)
 │   ├── plan-revision-M-001.md             # PLAN_REVISION_NEEDED details (if plan issue)
 │   ├── module-state-M-001.json            # Module Agent state (retries, stall count, history)
-│   ├── integration-phase-1.md             # Phase integration test report
+│   ├── integration-phase-1.md             # Phase integration test report (overwritten per delivery;
+│   │                                      #   archived as integration-phase-1-d{N-1}.md before reruns)
 │   ├── integration-phase-2.md
-│   └── acceptance.md                      # PRD acceptance report
+│   ├── acceptance.md                      # Current delivery's PRD acceptance report
+│   └── acceptance-d{N-1}.md               # Archived acceptance report from previous delivery
 ```
+
+The plan directory name uses the **original** `{design-dir-name}-{hash4}` from the first delivery — `--evolve` does NOT bump `{hash4}`. `{hash4}` is a one-time collision-avoidance disambiguator, not a delivery counter; per-delivery identity lives in `versions/<N>.md` + the `autoforge-delivery-<N>-<slug>` git tag.
 
 ## Templates
 
@@ -1060,7 +1303,7 @@ docs/raw/plans/{design-dir-name}-{hash4}/
 - `planner-prompt.md` — Planner agent instructions (sequential planning with context accumulation)
 - `module-plan-template.md` — per-module implementation plan with atomic steps
 - `module-agent-prompt.md` — Module Agent instructions (second-level orchestrator)
-- `module-developer-prompt.md` — Developer sub-agent prompt variants (initial, retry-from-tester, retry-from-reviewer, replan)
+- `module-developer-prompt.md` — Developer sub-agent prompt variants (initial, retry-from-tester, retry-from-reviewer, replan, evolve-from-existing-code)
 - `module-tester-prompt.md` — Tester sub-agent prompt
 - `module-reviewer-prompt.md` — Reviewer sub-agent prompt
 - `integration-tester-prompt.md` — Phase-level integration tester instructions
