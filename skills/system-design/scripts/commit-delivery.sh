@@ -71,14 +71,22 @@ if git -C "$TARGET" rev-parse "$TAG" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Stage target dir (including .review/)
-git -C "$TARGET" add --all
+# Stage target dir (including .review/), scoped via the `.` pathspec so we
+# do not sweep up parallel work elsewhere in the surrounding repo.
+# Bare `git add --all` (without a pathspec) is repo-wide even with `-C` —
+# the `-C` only changes cwd, it does not scope `--all`. The trailing `.`
+# limits the operation to the cwd subtree (= TARGET).
+git -C "$TARGET" add --all .
 
 # Scope is the target skill's own dir basename (Conventional Commits) so generated
 # skills get their own-name scope (e.g., feat(prd-analysis): ...) and skill-forge's
 # own deliveries get feat(skill-forge): ... automatically.
 SKILL_SCOPE="$(basename "$(cd "$TARGET" && pwd)")"
-git -C "$TARGET" commit -m "feat(${SKILL_SCOPE}): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}"
+
+# Pathspec on `git commit` keeps any pre-existing index entries outside
+# TARGET (e.g. caller's parallel staged work) out of this commit. Without
+# the pathspec, `git commit` would record the entire index.
+git -C "$TARGET" commit -m "feat(${SKILL_SCOPE}): delivery-${DELIVERY_ID}: ${CHANGE_SUMMARY}" -- .
 
 # Annotated tag
 git -C "$TARGET" tag -a "$TAG" -m "${CHANGE_SUMMARY}"

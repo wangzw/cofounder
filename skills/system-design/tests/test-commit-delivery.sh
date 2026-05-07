@@ -72,4 +72,49 @@ tag=$(cd "$FIXTURE" && git tag --list | head -1)
 echo "$tag" | grep -qE "^delivery-2-cleanup" && _record_pass || _record_fail "expected tag prefix 'delivery-2-cleanup', got '$tag'"
 teardown_fixture
 
+# Regression: parallel work in the surrounding repo MUST NOT leak into the
+# delivery commit. TARGET is the design bundle (a subdirectory); the caller
+# may have unrelated edits sitting in the working tree or already staged.
+# Bare `git add --all` is repo-wide; the script must scope it.
+
+# Helper: init a repo at a parent dir, with TARGET as a subdirectory.
+setup_parent_repo_with_subdir_target() {
+    setup_fixture
+    ( cd "$FIXTURE" && git init -q && \
+        git -c user.email=t@t -c user.name=t commit --allow-empty -m init -q )
+    TARGET_SUBDIR="$FIXTURE/design"
+    mkdir -p "$TARGET_SUBDIR"
+    echo "delivery content" > "$TARGET_SUBDIR/file.txt"
+}
+
+test_case "scoped: unstaged parallel work outside TARGET is NOT committed"
+setup_parent_repo_with_subdir_target
+echo "parallel work" > "$FIXTURE/parallel.txt"
+run_command "$CHECK" "$TARGET_SUBDIR" "10" "scoped commit"
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
+files_in_head=$(cd "$FIXTURE" && git show --name-only --pretty=format: HEAD)
+echo "$files_in_head" | grep -q "design/file.txt" \
+    && _record_pass || _record_fail "delivery file not in commit; saw: $files_in_head"
+echo "$files_in_head" | grep -q "^parallel.txt$" \
+    && _record_fail "parallel file leaked into commit; saw: $files_in_head" \
+    || _record_pass
+( cd "$FIXTURE" && git status --porcelain parallel.txt | grep -q "^?? parallel.txt" )
+[ $? = 0 ] && _record_pass || _record_fail "parallel file should still be untracked"
+teardown_fixture
+
+test_case "scoped: pre-staged parallel work outside TARGET is NOT committed"
+setup_parent_repo_with_subdir_target
+echo "parallel staged" > "$FIXTURE/parallel.txt"
+( cd "$FIXTURE" && git add parallel.txt )
+run_command "$CHECK" "$TARGET_SUBDIR" "11" "scoped commit"
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
+files_in_head=$(cd "$FIXTURE" && git show --name-only --pretty=format: HEAD)
+echo "$files_in_head" | grep -q "^parallel.txt$" \
+    && _record_fail "staged parallel file leaked into commit; saw: $files_in_head" \
+    || _record_pass
+# parallel.txt should remain staged (in index, not in HEAD)
+( cd "$FIXTURE" && git status --porcelain parallel.txt | grep -q "^A  parallel.txt" )
+[ $? = 0 ] && _record_pass || _record_fail "parallel file should still be staged, not committed"
+teardown_fixture
+
 end_tests
