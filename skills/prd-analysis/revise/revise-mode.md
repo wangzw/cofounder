@@ -262,7 +262,7 @@ Before making any edits, **group all pending changes by target file**. For each 
 
 ### Fix-Subagent Dispatch Rules
 
-**Read `common/parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, model tier, cluster sizing ≤3 files, MultiEdit for >1 edit, forbidden post-edit re-reads, dispatch prompt contract).
+**Read `common/parallel-dispatch.md` first** — it defines the mandatory dispatch rules (single-response parallel emission, model tier, cluster sizing ≤3 files, Read-then-Write pattern for >1 edit on the same file, forbidden post-edit re-reads, dispatch prompt contract).
 
 **Revise-mode-specific rules:**
 
@@ -279,14 +279,14 @@ Each issue file has a `file:` frontmatter field identifying its target file, and
 
 Read each target file and each issue file exactly once (in parallel). For each target file, collect all issue files whose `file:` field matches it, then apply all their fixes in a single pass:
 - file with 1 finding: use `Edit`
-- file with >1 finding: use `MultiEdit` (mandatory — no sequential Edits on the same file)
+- file with >1 finding: merge all fixes in memory, then emit a single `Write` that overwrites the file (sequential `Edit` calls on the same file are FORBIDDEN — each triggers a cache_read replay).
 Write once per file.
 
 **Oscillation guard:** if a finding's Fix would undo content that is clearly the result of a prior remediation (e.g. the Fix removes text that looks like it was added by a prior review pass — inline fixtures, capability statements, extra edge cases), do NOT apply it. Skip that finding and report it with status `skipped: oscillation suspected — <one line why>`. The main agent will resolve oscillations; subagents must not swing content back and forth.
 
 **Forbidden:**
 - Re-reading a target file after editing it (no "verification read").
-- Sequential `Edit` calls on the same file — use `MultiEdit` when >1 edit applies.
+- Sequential `Edit` calls on the same file — when >1 edit applies, merge in memory and overwrite with a single `Write`.
 - Grep/Glob exploration — all paths are listed below.
 - Editing files not listed below.
 - Applying findings for files not in your list.
@@ -312,7 +312,7 @@ Read each file exactly once (in parallel). Apply all edits in a single pass. Wri
 
 **Tool usage (mandatory):**
 - file with 1 edit: use `Edit`
-- file with >1 edit: use `MultiEdit` (one call with all edits). Sequential `Edit` on the same file is FORBIDDEN.
+- file with >1 edit: merge all edits in memory, then emit a single `Write` that overwrites the file. Sequential `Edit` calls on the same file are FORBIDDEN.
 
 **Forbidden:**
 - Re-reading a file after editing it (no "verification read").

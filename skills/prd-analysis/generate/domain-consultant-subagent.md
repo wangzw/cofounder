@@ -16,7 +16,7 @@ The IPC model is **Direct Write + ACK**:
 
 | Role | Write count | Final paths |
 |------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>`; 2) `.review/round-<N>/self-reviews/<trace_id>.md` |
+| `writer` | 1 write (FULL_PASS) \| 2 writes (PARTIAL) | 1) `<artifact-path>`; 2) `.review/round-<N>/self-reviews/<trace_id>.md` — only when `self_review_status: PARTIAL` (see `generate/writer-subagent.md` Output Contract Write 2). |
 | `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
 | `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |

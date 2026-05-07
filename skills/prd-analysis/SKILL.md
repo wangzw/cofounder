@@ -190,8 +190,9 @@ docs/raw/prd/YYYY-MM-DD-{product-slug}/
     │   └── round-N/
     │       └── dispatch-log.jsonl
     ├── round-N/
-    │   └── issues/
-    │       └── I-NNN.md
+    │   ├── issues/
+    │   │   └── I-NNN.md
+    │   └── self-reviews/        # Writer self-review archives — only when self_review_status == PARTIAL; FULL_PASS writers leave no file (status carried by ACK + dispatch-log)
     ├── metrics/
     └── versions/
 ```

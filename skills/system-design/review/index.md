@@ -107,7 +107,10 @@ Dispatch: review/cross-reviewer-subagent.md
 
 - The design bundle leaves (`README.md`, every `modules/M-NNN-*.md`,
   every `api/API-NNN-*.md`)
-- Writer self-review files at `<design-dir>/.review/round-<N>/self-reviews/` (if any)
+- Writer self-review files at `<design-dir>/.review/round-<N>/self-reviews/` (only present
+  for writers that ACKed `self_review_status: PARTIAL`; FULL_PASS writers leave no file —
+  see `generate/writer-subagent.md` Output Contract Write 2). Absence of a file for a given
+  trace_id is the canonical FULL_PASS signal — not a sign the writer skipped self-audit.
 - `<design-dir>/.review/issues/summary.yml` — for fingerprint matching against
   prior issues (guide §7.6). The reviewer MUST check each new finding
   against this list before emitting it; matched findings get

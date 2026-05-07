@@ -25,7 +25,7 @@ The IPC model is **Direct Write + ACK**:
 
 | Role | Write count | Final paths |
 |------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
+| `writer` | 1 write (FULL_PASS) \| 2 writes (PARTIAL) | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` — **only emitted when `self_review_status: PARTIAL`** (i.e. ≥1 FAIL row). FULL_PASS writers omit Write 2 entirely; the ACK + dispatch-log carry the status and `fail_count: 0`. |
 | `reviewer` (cross / adversarial) | 1 write | `.review/round-<N>/reviewer-output/<trace_id>.json` (raw JSON; orchestrator pipes through `scripts/create-issues.sh` to materialize per-issue files) |
 | `reviser` | 1+ writes | `<artifact-path>` + state-transitioned `.review/round-<N>/issues/<id>.md` files |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
@@ -69,6 +69,18 @@ OK trace_id=R3-W-007 role=writer linked_issues=I-012 self_review_status=PARTIAL 
 Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /
 reviser handles the conflicts. This is the writer's normal success path when scope-external
 issues are found (§11.2).
+
+A writer that finds **no** scope-external issues returns:
+
+```
+OK trace_id=R3-W-007 role=writer linked_issues= self_review_status=FULL_PASS fail_count=0
+```
+
+and writes **only** the artifact leaf. The self-review archive is omitted entirely — there are
+no FAIL rows for downstream consumers to act on, and `self_review_status` / `fail_count` are
+already carried in the ACK and the `dispatch-log.jsonl` `completed` event. Absence of a
+self-review file under `.review/round-<N>/self-reviews/` for a given trace_id is therefore the
+canonical signal of FULL_PASS.
 
 ### FORBIDDEN
 
@@ -140,7 +152,8 @@ Path: `<design-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].p
 - Self-contained: all context a coding agent needs to implement or review this leaf MUST be
   copied inline. NEVER say "see README.md" or "see M-002" — copy the relevant excerpt.
 - Use exactly ONE `Write` tool call for the artifact. Sequential Write or Edit calls on the
-  same file are FORBIDDEN.
+  same file are FORBIDDEN (each triggers a cache_read replay per
+  `common/parallel-dispatch.md` Rule 6).
 
 **ID stability rules (MUST enforce):**
 
@@ -180,9 +193,16 @@ to HITL.
 The self-review archive (Write 2 below) covers **substantive** CRs only — formal violations
 are already handled by the loop above, not recorded as FAIL rows.
 
-### Output Contract — Write 2: Self-Review Archive
+### Output Contract — Write 2: Self-Review Archive (PARTIAL only)
 
-Path: `<design-dir>/.review/round-<N>/self-reviews/<trace_id>.md`
+**Conditional**: emit this write **only when at least one FAIL row exists** (i.e. you are
+about to ACK with `self_review_status: PARTIAL`). FULL_PASS writers MUST NOT create this
+file — the ACK + `dispatch-log.jsonl` `completed` event are the canonical FULL_PASS signal,
+and the file's PASS-only checklist has no downstream consumer (cross-reviewer derives the
+applicable-CR set from the leaf type via `generate/in-generate-review.md`; summarizer reads
+`fail_count` / `self_review_status` from the dispatch-log).
+
+Path (PARTIAL only): `<design-dir>/.review/round-<N>/self-reviews/<trace_id>.md`
 
 Content structure:
 
@@ -217,15 +237,21 @@ format. This subagent prompt deliberately does NOT duplicate the table to avoid 
 ### Self-Review Discipline
 
 1. After writing the artifact, perform an honest CR-by-CR check against the applicability table.
-2. Apply only the CRs relevant to this leaf type.
-3. For PASS: brief evidence is sufficient ("module-cohesion: all sections relate to a single
-   responsibility — credential validation").
-4. For FAIL: MUST specify exactly one `blocker_scope` from the taxonomy above.
-5. **PARTIAL ACK trigger: if ANY FAIL row exists in the self-review file, set
-   `self_review_status: PARTIAL` and `fail_count: <N>` in the ACK.**
-6. If ALL rows are PASS → set `self_review_status: FULL_PASS`, `fail_count: 0`.
-7. FORBIDDEN: marking a row PASS when you have genuine uncertainty. If uncertain, mark FAIL with
-   `blocker_scope: input-ambiguity` and let the cross-reviewer adjudicate.
+2. Apply only the CRs relevant to this leaf type. Conduct the check in your own working memory —
+   do NOT begin authoring the self-review file yet.
+3. **Decide the ACK status from the check outcome:**
+   - All applicable CRs PASS → `self_review_status: FULL_PASS`, `fail_count: 0`. **Do not write
+     a self-review file.** ACK only.
+   - Any applicable CR FAIL → `self_review_status: PARTIAL`, `fail_count: <N>`. **Now** author
+     the self-review file at `.review/round-<N>/self-reviews/<trace_id>.md` per the Write 2
+     contract above. The file MUST contain at least one FAIL row (each with a valid
+     `blocker_scope`); PASS rows are optional context.
+4. For each FAIL row: MUST specify exactly one `blocker_scope` from the taxonomy above.
+5. FORBIDDEN: marking a CR PASS when you have genuine uncertainty. If uncertain, mark FAIL with
+   `blocker_scope: input-ambiguity` and let the cross-reviewer adjudicate — this means writing
+   the self-review file (you are PARTIAL, not FULL_PASS).
+6. FORBIDDEN: writing a self-review file when all rows are PASS. The empty-FAIL file would only
+   carry PASS evidence prose with no downstream consumer.
 
 ---
 

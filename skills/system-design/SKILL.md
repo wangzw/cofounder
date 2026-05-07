@@ -46,11 +46,11 @@ state machine.
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
-| generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
-| review | `/cofounder:system-design --review <design-dir>` | `review/index.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
-| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
-| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
+| generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
+| generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
+| review | `/cofounder:system-design --review <design-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
+| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
+| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -178,7 +178,7 @@ docs/raw/design/YYYY-MM-DD-{product-name}/
     │   └── dispatch-log.jsonl           # Per-dispatch launched/completed events
     ├── round-<N>/
     │   ├── issues/                      # Reviewer-written issue files (I-NNN.md per common/issue-schema.md)
-    │   ├── self-reviews/                # Writer self-review archives
+    │   ├── self-reviews/                # Writer self-review archives — only emitted when self_review_status == PARTIAL; FULL_PASS writers leave no file (status carried by ACK + dispatch-log)
     │   ├── plan.md                      # Planner output
     │   └── verdict.yml                  # Judge convergence verdict
     ├── metrics/                         # --diagnose output

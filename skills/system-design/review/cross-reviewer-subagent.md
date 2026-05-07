@@ -28,7 +28,12 @@ waste tokens on structural / format / id-uniqueness / frontmatter issues.
    `<artifact-root>/.review/round-<N>/self-reviews/*.md` (if any). Pay
    particular attention to `blocker_scope: global-conflict` and
    `cross-artifact-dep` entries — those are signals the writer flagged
-   for you.
+   for you. **Absence of a self-review file for a writer's `trace_id` is
+   equivalent to that writer reporting `self_review_status: FULL_PASS`**
+   — there is no scope-external signal to consume; the writer's
+   applicable-CR set can be derived from the leaf type via
+   `generate/in-generate-review.md`. Do NOT infer that a missing
+   self-review file means the writer skipped self-audit.
 4. **Read the review scope** at
    `<artifact-root>/.review/round-<N>/review-scope.yml`. This file is
    produced by `scripts/compute-review-scope.sh` and tells you whether

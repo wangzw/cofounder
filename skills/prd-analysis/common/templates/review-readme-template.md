@@ -77,7 +77,7 @@ presence depends on what step of the round executed.
 | File / dir | Produced by | When |
 |---|---|---|
 | `plan.md` | `planner` (sub-agent) | First round of a delivery; after plan approval it drives writer fan-out. New-version deliveries include `delete`/`modify`/`add`/`keep` lists. |
-| `self-reviews/R<N>-W-<NNN>.md` | `writer` (sub-agent) | One per writer dispatch. Substantive CR PASS/FAIL checklist + `self_review_status` + `fail_count`. Formal CRs are NOT recorded here — `scripts/run-checkers.sh` enforces them as a hard gate before the writer ACKs (guide §4 + §4.1). |
+| `self-reviews/R<N>-W-<NNN>.md` | `writer` (sub-agent) | **One per PARTIAL writer dispatch only** — emitted when the writer ACKs `self_review_status: PARTIAL` (≥1 substantive FAIL row with `blocker_scope`). FULL_PASS writers omit this file entirely; their status + `fail_count: 0` are carried by the ACK and the `dispatch-log.jsonl` `completed` event. Absence of a file for a given trace_id is the canonical FULL_PASS signal. Formal CRs are NOT recorded here — `scripts/run-checkers.sh` enforces them as a hard gate before the writer ACKs (guide §4 + §4.1). |
 | `reviewer-output/<trace_id>.json` | `cross-reviewer` / `adversarial-reviewer` (sub-agent) | One JSON document per reviewer dispatch with the LLM raw-output schema (see `common/issue-schema.md`). The orchestrator pipes this into `scripts/create-issues.sh` to materialize per-issue files. |
 | `issues/I-NNN.md` | `scripts/create-issues.sh` | One file per issue, YAML frontmatter conforming to `common/issue-schema.md`. Schema enforced by `scripts/check-issue.sh` (guide §10 self-closure). |
 | `clarification/<ts>.yml` | `domain-consultant` (sub-agent, new-version deliveries) | Present when a delivery-N start required fresh clarification on top of the previous baseline. |
@@ -160,9 +160,12 @@ free-form YAML with at minimum `decided_at`, `decision`, and `rationale`.
 
 1. **What was asked for?** — `round-0/input.md` + the `clarification/` YAML.
 2. **How was it planned?** — `round-<first>/plan.md` add/modify/delete/keep lists.
-3. **What did each writer produce?** — `self-reviews/` tell you which CRs each writer
-   passed/failed; the artifact leaves are at the parent level (one directory up from
-   `.review/`).
+3. **What did each writer produce?** — `traces/round-<N>/dispatch-log.jsonl` `completed`
+   events tell you the status (`self_review_status` + `fail_count`) of every writer dispatch
+   (FULL_PASS or PARTIAL). For PARTIAL writers, `self-reviews/<trace_id>.md` adds the
+   FAIL-row breakdown with `blocker_scope`. FULL_PASS writers leave no self-review file —
+   their status is in dispatch-log only. The artifact leaves are at the parent level (one
+   directory up from `.review/`).
 4. **What did the checks find?** — `round-<N>/issues/*.md` frontmatter. Start from
    `round-<N>/index.md` for the aggregate view.
 5. **What did the judge decide, and why?** — `round-<N>/verdict.yml` evidence block.

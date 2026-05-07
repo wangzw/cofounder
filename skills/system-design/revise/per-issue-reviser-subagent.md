@@ -44,7 +44,13 @@ For each issue, decide a **state transition** and act on it:
 Use this when you genuinely fix the problem.
 
 1. Read the leaf.
-2. Apply the fix (Edit / Write the leaf).
+2. Apply the fix to the leaf:
+   - **Single issue / single edit on this leaf in this dispatch** → use `Edit`.
+   - **Multiple issues touching the same leaf, or any change spanning >1 region** → merge
+     all changes in memory and emit a **single `Write`** that overwrites the leaf with the
+     final content. Sequential `Edit` calls on the same file are FORBIDDEN — each Edit
+     triggers a cache_read replay of full conversation state (see
+     `common/parallel-dispatch.md` Rule 6).
 3. Update the issue's frontmatter:
    - `state: fixed`
    - `fixed_in_round: <current round>`

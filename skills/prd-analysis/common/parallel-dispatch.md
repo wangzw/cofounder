@@ -92,15 +92,19 @@ reads are needed. This is the mechanical enforcement of the self-contained-file 
 
 ## Rule 6 — Tool Usage Inside Subagents (MANDATORY)
 
-- File with **1 edit** → use `Edit`
-- File with **>1 edit** → use `MultiEdit` (one tool call, all edits)
-- Sequential `Edit` calls on the same file are **FORBIDDEN** — each Edit triggers a cache_read
+- File with **1 edit** → use `Edit`.
+- File with **>1 edit on the same file** → Read the file once, merge every change in memory,
+  and emit a **single `Write`** that overwrites the leaf with the final content. Do NOT issue
+  multiple `Edit` calls on the same file in sequence — each Edit triggers a cache_read
   replay of full conversation state.
 - No post-edit "verification re-read" of a file you just edited.
 - No Grep/Glob exploration inside subagents — all target paths are pre-listed in the dispatch
   prompt.
-- Writer subagents creating a new file use a **single `Write` call** for the artifact and a
-  **single `Write` call** for the self-review archive. Two writes total; no more.
+- Writer subagents creating a new file use a **single `Write` call** for the artifact, plus
+  **at most one** `Write` for the self-review archive — and only when the writer is about to
+  ACK with `self_review_status: PARTIAL` (i.e. ≥1 FAIL row). FULL_PASS writers omit the
+  self-review write entirely and emit only one Write total. See
+  `generate/writer-subagent.md` Output Contract Write 2.
 
 ---
 
@@ -124,8 +128,9 @@ After all writer ACKs for a batch are collected, the orchestrator runs a reduce 
 1. Parse each ACK for `self_review_status` and `fail_count`.
 2. Update `state.yml`: mark each leaf as `written` or `written-partial`.
 3. Update the PRD `README.md` index: add/update the summary row for every leaf whose writer
-   returned `OK`. Use a **single `Edit`** (or `MultiEdit` if multiple rows change) — not one
-   Edit per leaf.
+   returned `OK`. If only one row changes, use a **single `Edit`**. If multiple rows change,
+   Read the README once, merge all row updates in memory, and overwrite via a **single `Write`**.
+   Never issue one Edit per leaf.
 4. If any writer returned `FAIL` (technical failure), log the `trace_id` to `dispatch-log.jsonl`
    with `status: failed` and re-dispatch that writer in the next emission before proceeding.
 5. Writers with `self_review_status: PARTIAL` are flagged for the cross-reviewer in the next

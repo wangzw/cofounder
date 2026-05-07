@@ -124,7 +124,7 @@ The IPC model is **Direct Write + ACK**:
 
 | Role | Write count | Final paths |
 |------|-------------|-------------|
-| `writer` | 2 writes | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` (PASS checklist + brief evidence) |
+| `writer` | 1 write (FULL_PASS) \| 2 writes (PARTIAL) | 1) `<artifact-path>` (pure artifact body — no IPC envelopes); 2) `.review/round-<N>/self-reviews/<trace_id>.md` — **only when `self_review_status: PARTIAL`** (i.e. ≥1 FAIL row). FULL_PASS writers omit Write 2; status + `fail_count: 0` are carried by the ACK and the dispatch-log `completed` event. |
 | `reviewer` | N writes | One `.review/round-<N>/issues/<issue-id>.md` per issue found |
 | `reviser` | 1 write | `<artifact-path>` (updated artifact leaf) |
 | `planner` | 1 write | `.review/round-<N>/plan.md` |
@@ -169,6 +169,17 @@ OK trace_id=R3-W-007 role=writer linked_issues=I-012 self_review_status=PARTIAL 
 Both the artifact leaf and the self-review archive are on disk. Downstream cross-reviewer /
 reviser handles the conflicts. This is the writer's normal success path when scope-external
 issues are found (§11.2).
+
+A writer that finds **no** scope-external issues returns:
+
+```
+OK trace_id=R3-W-007 role=writer linked_issues= self_review_status=FULL_PASS fail_count=0
+```
+
+and writes **only** the artifact leaf. The self-review archive is omitted — `fail_count: 0`
+plus an empty checklist of FAIL rows has no downstream consumer. Absence of a self-review file
+under `.review/round-<N>/self-reviews/` for a given trace_id is the canonical FULL_PASS signal;
+the ACK and the `dispatch-log.jsonl` `completed` event together carry the status.
 
 Mixing `FAIL` ACK with self-review FAIL rows is the §11.2 core anti-pattern.
 

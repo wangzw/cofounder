@@ -24,10 +24,10 @@ Check `state.yml phase` to determine which phase applies.
 |--------|---------|
 | `<artifact-root>/.review/round-<N>/issues/*.md` frontmatter | Per-issue counts by `state` and `severity`, recurrence detection |
 | `<artifact-root>/.review/issues/summary.yml` | Cross-round history (read-only here; `update-summary.sh` is the only writer) |
-| `<artifact-root>/.review/round-<N>/self-reviews/*.md` frontmatter | Writer `fail_count` and `self_review_status` |
+| `<artifact-root>/.review/traces/round-<N>/dispatch-log.jsonl` | **Authoritative source** for writer `self_review_status` and `fail_count` (read from each writer-role `completed` event); also for latency, tier distribution, coverage |
+| `<artifact-root>/.review/round-<N>/self-reviews/*.md` (if any) | Optional supplementary breakdown of `blocker_scope` distribution among PARTIAL writers. NOT the source of `fail_count` / `self_review_status` — those are dispatch-log fields. Files exist only for writers that ACKed PARTIAL; FULL_PASS writers leave no file. |
 | `<artifact-root>/.review/round-<N>/verdict.yml` (if exists) | Verdict reference (post-judge phase) |
 | `<artifact-root>/.review/versions/<N-1>.md` (if exists) | Previous delivery's quality_at_delivery for trend |
-| `<artifact-root>/.review/traces/round-<N>/dispatch-log.jsonl` | Latency, tier distribution, coverage |
 
 **Forbidden**: reading issue bodies, artifact leaves, or any narrative
 prose.
@@ -102,6 +102,15 @@ criterion_id and severity>
   to a non-empty value, NOT the maximum recurrence depth.
 - Severity counts are over **all** issues regardless of state, because
   `false_positive_ratio` and `deferred_ratio` need the full denominator.
+- **Writer aggregation comes from `dispatch-log.jsonl`, not self-review
+  files.** Filter `completed` events with `role == "writer"` for the
+  current round, then derive:
+  - `writer_dispatch_count` = number of such events
+  - `writer_fail_count_sum` = sum of `fail_count` across them
+  - `writer_full_pass_count` = number with `self_review_status: FULL_PASS`
+  Counting via `ls .review/round-<N>/self-reviews/` would
+  **under-count by the number of FULL_PASS writers** (FULL_PASS writers
+  intentionally leave no file) — do not do this.
 
 ---
 
