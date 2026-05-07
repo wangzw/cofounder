@@ -16,23 +16,29 @@ You will receive these parameters from the Orchestrator:
 - `conventions_path`: path to conventions.md (for test organization patterns)
 - `project_coding_standards`: unified project conventions (for test code standards)
 - `is_rerun`: boolean — true if this is a re-run after a fix cycle (review and update existing tests as needed rather than writing from scratch)
+- `discipline_path`: path to autoforge's `delivery-discipline.md` (the same file the Module Agent gives every sub-agent)
 
 ## Execution
 
 ### 1. Read Context
 
-1. **Design README** (`{design_readme_path}`) — focus on:
+1. **Delivery discipline** (`{discipline_path}`) — autoforge's
+   delivery-discipline.md. All sections apply. You enforce A (forbidden
+   test patterns), C (wiring), D (out-of-scope = issue), G (cross-domain
+   contracts), H (full local CI), and J (user-visible reporting).
+
+2. **Design README** (`{design_readme_path}`) — focus on:
    - Module Interaction Protocols — the contracts between modules in this phase
    - Test Strategy — integration testing approach
 
-2. **Module design specs** (`{module_design_paths}`) — for each module in this phase:
+3. **Module design specs** (`{module_design_paths}`) — for each module in this phase:
    - Interface definitions (what each module exposes)
    - Dependencies (which modules in this phase interact)
    - Acceptance criteria related to cross-module behavior
 
-3. **Conventions** (`{conventions_path}`) — test file organization and naming patterns
+4. **Conventions** (`{conventions_path}`) — test file organization and naming patterns; in particular the `Development Workflow` section enumerating the project's full local CI command set.
 
-4. **Existing tests** — scan the test directory structure to understand what unit and integration tests already exist from module-level testing
+5. **Existing tests** — scan the test directory structure to understand what unit and integration tests already exist from module-level testing.
 
 ### 2. Write or Update Cross-Module Integration Tests
 
@@ -58,12 +64,39 @@ Do NOT test:
 
 ### 3. Run All Tests
 
-Run the **complete test suite** — not just your new tests:
+Run the **complete project CI command set** (discipline §H), not just your
+new tests:
 
-- Unit tests from all merged modules (current + previous phases)
+- The project's full build command (e.g., `go build ./...`, `npm run build`)
+- Static analysis / lint (e.g., `go vet`, `npm run lint`, `mypy`)
+- Type-check where separate (e.g., `tsc --noEmit`)
+- Unit tests from all merged modules (current + previous phases), with
+  race / sanitizer flags if conventions specify
 - Module-level integration tests from all merged modules
 - Phase integration tests from previous phases (regression check)
 - Your new cross-module integration tests for this phase
+- Any project-specific check (license headers, generated-code freshness,
+  schema drift) referenced in conventions.md
+
+Even if your new tests pass, a red item in any of the above blocks PASS —
+report FAIL. Soft-pass tests (discipline §A) and silent debt markers
+(discipline §D) discovered during this phase are required findings: flip
+them to strict (§I) or list them as failures.
+
+### 3a. Cross-Domain Contract Check (discipline §G)
+
+If any module in this phase emits a payload consumed by another domain
+(REST → SSE / SPA / mobile / event consumer), assert that producer and
+consumer use a single source of truth (generated types, OpenAPI schema)
+or that a contract test exists asserting shape equivalence. If neither is
+present, write the contract test in this phase. Report FAIL otherwise.
+
+### 3b. Discipline Scan
+
+Grep the diff and source touched by this phase's modules for forbidden
+patterns from delivery-discipline.md sections A, B, D. Any match is a
+required finding to be listed in the report's Failures section even if
+all tests pass.
 
 ### 4. Generate Report
 
@@ -96,7 +129,13 @@ Create `{report_dir}/integration-phase-{phase_number}.md`:
 | Current phase (cross-module) | {n} | {n} | {n} |
 
 ## Failures
-{for each failure: test name, error message, expected vs actual, which modules involved, suggested fix direction}
+{for each failure: test name, error message, expected vs actual, which modules involved, suggested fix direction. Use **journey/user-visible language** (discipline §J): "the cross-module flow X→Y→Z does not deliver state Q to the consumer" rather than "the X module emits the wrong field name". Layer-only language is a finding.}
+
+## Discipline Findings
+{soft-pass tests, silent debt, missing wiring, missing contract tests
+discovered during this phase. Each is a FAIL even if no test errored.
+Out-of-scope items must be tracked GitHub issues — list issue link or
+mark as a blocking finding.}
 ```
 
 Commit test files: `test(p{phase_number}): add phase-{phase_number} integration tests`

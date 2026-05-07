@@ -37,14 +37,18 @@ Before spawning any role:
 1. Change to the worktree directory: `cd {worktree_path}`
 2. Ensure the report directory exists: `mkdir -p {report_dir}`
 3. **Load sub-agent prompt templates once** — read these three files and keep their contents in working memory; you will reuse them across every round of this module:
-   - `module-developer-prompt.md` — five Developer variants (initial, retry-from-Tester, retry-from-Reviewer, replan, evolve-from-existing-code)
-   - `module-tester-prompt.md` — Tester template
-   - `module-reviewer-prompt.md` — Reviewer template
-
-   Do not re-read these on every spawn — they are static templates. Substitute `{placeholders}` per spawn from your context (module_design_path, report_dir, etc.) and the prior round's outputs.
-4. If `project_coding_standards` is provided, include it in **every sub-agent prompt** as a `## Project Coding Standards` section appended after the variant body. These are non-negotiable project rules (merged from CLAUDE.md/AGENTS.md, design README Implementation Conventions, and PRD architecture.md) that take precedence over conventions.md for style/pattern choices.
-5. Pass `conventions_path` to the Developer prompt so the Developer can reference conventions.md for project conventions (naming, error handling, security patterns, test isolation).
-6. **Evolution setup** (only if `is_evolution` = true and `evolution_class` ∈ {`revised-direct`, `revised-downstream`}):
+   - `module/developer-prompt.md` — five Developer variants (initial, retry-from-Tester, retry-from-Reviewer, replan, evolve-from-existing-code)
+   - `module/tester-prompt.md` — Tester template
+   - `module/reviewer-prompt.md` — Reviewer template
+4. **Load the delivery discipline ruleset** — read `delivery-discipline.md`
+   from the autoforge skill directory (the same directory as this prompt
+   file). Record its absolute path as `{discipline_path}` in your context.
+   Substitute it into every Developer / Tester / Reviewer spawn so they
+   receive a `Read Delivery Discipline First` instruction. Do not re-read
+   this file every spawn — it is static.
+5. If `project_coding_standards` is provided, include it in **every sub-agent prompt** as a `## Project Coding Standards` section appended after the variant body. These are non-negotiable project rules (merged from CLAUDE.md/AGENTS.md, design README Implementation Conventions, and PRD architecture.md) that take precedence over conventions.md for style/pattern choices.
+6. Pass `conventions_path` to the Developer prompt so the Developer can reference conventions.md for project conventions (naming, error handling, security patterns, test isolation).
+7. **Evolution setup** (only if `is_evolution` = true and `evolution_class` ∈ {`revised-direct`, `revised-downstream`}):
    - Resolve the prior delivery's source files for this module via `git show {parent_commit}:{path}` for each path the previous plan owned. Materialise them into the worktree if they are not already present (the worktree was branched from `{parent_commit}` so usually they are already there).
    - Read `previous_plan_path` and the new `module_plan_path`'s "Evolution Notes" section.
    - Read `design_delta_summary_path` to confirm classification and intended change scope.
@@ -57,15 +61,33 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
 
 ```
 1. Read module design spec + plan
+   1a. Read delivery-discipline.md (autoforge skill file). Substitute its
+       path into every sub-agent prompt as {discipline_path}. Every
+       Developer / Tester / Reviewer spawn will be required to read it.
 2. Spawn Developer (Variant 1 — initial) → code + unit tests
    2a. Check Developer output for PLAN_ISSUE flags:
        If fundamental plan error → return PLAN_REVISION_NEEDED
        If minor deviation → note it, continue
-   2b. Quality gate — run CI gate commands from Development Workflow conventions
-       (lint, build, type-check). If any fail, return to Developer for fix.
-       This catches formatting, import, and type errors early before test execution.
-       If the Development Workflow specifies race detection, add the race detection
-       flag to test commands in subsequent Tester runs.
+   2b. Quality gate — run the project's full local CI command set from
+       Development Workflow conventions (build, lint, type-check, full
+       unit + integration test suite, race / sanitizer flags if specified,
+       any other project-required checks). This is discipline §H — "my
+       new tests pass" is not enough; the full set must be green.
+       If any item fails, return to Developer for fix.
+   2c. Discipline scan (discipline §A, §B, §D, §M, §N) — run the
+       deterministic checker:
+
+         bash skills/autoforge/scripts/check-discipline-scan.sh <module-diff-root>
+
+       The checker emits JSON findings for soft-pass tests (CR-AF12),
+       silent debt (CR-AF13), skip-without-issue (CR-AF14), no-error-as-
+       success patterns (CR-AF20), and dependency-abandonment markers
+       (CR-AF22). **Any finding with severity error or critical = treat
+       as a Tester-style FAIL: return to Developer with the JSON output
+       as failure context.** Do not re-implement these checks in the
+       prompt — consume the structured output. (Wiring omissions are
+       enforced separately by `check-module-plan.sh` against the plan
+       and by the Reviewer against the diff.)
 3. Spawn Tester → review/write/update integration tests + run all
    3a. If FAIL:
        Record test_failure_count. Compare with previous round.
@@ -79,7 +101,7 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
        If total_retries >= hard_ceiling:
          → Enter Diagnosis Mode
    3b. If PASS → go to 4
-4. Spawn Reviewer → spec compliance + code quality
+4. Spawn Reviewer → spec compliance + code quality + discipline §A/B/C/D/E/G
    4a. If REJECT:
        Record required_findings_count. Compare with previous round.
        If progress (fewer findings) OR stall_count < stall_threshold:
@@ -91,8 +113,21 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
        If total_retries >= hard_ceiling:
          → Enter Diagnosis Mode
    4b. If APPROVE → go to 5
-5. Commit all report files: "docs(M-{id}): add module reports"
-6. Return APPROVE
+5. Final discipline gate (before APPROVE):
+   - Re-run the full local CI command set on the final diff. Must be
+     green. If red, treat as Reviewer REJECT and loop back to 4a.
+   - Run
+
+         bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+              --source-root <module-diff-root>
+
+     This invokes `check-module-plan.sh` against the plan, and
+     `check-discipline-scan.sh` against the module's source diff. Any
+     finding with severity error or critical = treat as Reviewer REJECT.
+   - Verify Quick Self-Check (delivery-discipline.md final section) is
+     all "yes". If not, treat as Reviewer REJECT.
+6. Commit all report files: "docs(M-{id}): add module reports"
+7. Return APPROVE
 ```
 
 ## How to Spawn Each Role
@@ -104,7 +139,7 @@ For every spawn, use the `Agent` tool with the relevant pre-loaded template, sub
 ```
 Agent({
   description: "Developer for M-{id}",
-  prompt: <substituted variant from module-developer-prompt.md (Variant 1, 2, 3, or 4)>,
+  prompt: <substituted variant from module/developer-prompt.md (Variant 1, 2, 3, or 4)>,
   model: <tier per variant — see table below>,
   mode: "auto"
 })
@@ -143,7 +178,7 @@ If spawning a sub-agent (Developer, Tester, or Reviewer) fails due to infrastruc
 ```
 Agent({
   description: "Tester for M-{id}",
-  prompt: <substituted template from module-tester-prompt.md>,
+  prompt: <substituted template from module/tester-prompt.md>,
   model: "sonnet",
   mode: "auto"
 })
@@ -156,7 +191,7 @@ Agent({
 ```
 Agent({
   description: "Reviewer for M-{id}",
-  prompt: <substituted template from module-reviewer-prompt.md>,
+  prompt: <substituted template from module/reviewer-prompt.md>,
   model: "sonnet",
   mode: "auto"
 })
@@ -252,7 +287,7 @@ When the current approach stalls, do NOT ask for help. Step back and try a funda
    - Different error handling approach
    - Simplified implementation that satisfies the core requirements
 
-4. **Spawn Developer with the new strategy** — use Variant 4 from `module-developer-prompt.md`. Substitute `{summary of failure pattern}` from your retry_history analysis and `{describe the alternative approach and why it should work}` from your new strategy.
+4. **Spawn Developer with the new strategy** — use Variant 4 from `module/developer-prompt.md`. Substitute `{summary of failure pattern}` from your retry_history analysis and `{describe the alternative approach and why it should work}` from your new strategy.
 
 5. **Reset and continue**:
    - Set `has_replanned = true`
@@ -293,12 +328,14 @@ After each sub-agent (Developer, Tester, Reviewer) returns, check its output for
 | `PLAN_TEXT_ERROR` | Plan says `parseTask(string)` but should say `parseTask(Buffer)` based on M-001's plan | This module's plan text only |
 | `UPSTREAM_BUG` | M-001's plan says sync, but its actual code is async (M-001 code doesn't match M-001 plan) | Upstream module's code (bug fix) |
 | `UPSTREAM_INSUFFICIENT` | M-001 correctly implements sync per its plan, but this module needs async — the design didn't anticipate this need | Upstream module's code + possibly its plan (enhancement) |
+| `UPSTREAM_NOT_IMPLEMENTED` | The dependency this module needs has no implementation at all — either M-XXX has not been run yet, or no module owns the surface, even though it's referenced by the design / PRD | Upstream module dispatched (or new module allocated) before this one resumes — see delivery-discipline §N |
 | `INTERFACE_REDESIGN` | The interaction protocol between M-001 and this module is fundamentally unworkable — data flows in the wrong direction, types are structurally incompatible | Cross-module design change — likely needs human input |
 
 For all FUNDAMENTAL issues:
 - Do NOT continue grinding through retries — this will not be fixed by local code changes
 - Commit any work done so far
 - Return PLAN_REVISION_NEEDED with the issue type and enough detail for the Orchestrator to act
+- **NEVER substitute a stub, mock-past, or `// TODO: M-XXX` comment for the missing capability and then return APPROVE.** Per delivery-discipline §N, an in-scope missing dependency is a unit of work, not a reason to abandon this module. The Module Agent's job is to escalate (PLAN_REVISION_NEEDED with `UPSTREAM_NOT_IMPLEMENTED`), not to fake completion.
 
 ## Persist Return Data
 

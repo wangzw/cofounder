@@ -1,0 +1,51 @@
+skill_version: 1.2.0
+
+# Abstract model tiers — never pin a specific version in prompts or SKILL.md.
+# `model_tier_defaults` declares the default tier for each role; the orchestrator
+# resolves the tier through `model_mapping` when dispatching the Claude Code Agent
+# tool. A single dispatch may be overridden via `--tier <role>=<tier>`.
+#
+# Why abstract tiers: autoforge's inner loop (Developer → Tester → Reviewer) runs
+# dozens of times per module; a mis-tiered default multiplies across every module.
+# Aliases also avoid rot as model versions evolve.
+model_tier_defaults:
+  orchestrator:        balanced
+  planner:             heavy
+  bootstrap:           balanced
+  module_agent:        balanced
+  developer:           balanced   # Variants 1, 2, 3, 5
+  developer_replan:    heavy      # Variant 4 — new strategy after stall
+  tester:              balanced
+  reviewer:            balanced   # escalates to heavy on repeated REJECT (see SKILL.md)
+  integration_tester:  balanced
+  acceptance_tester:   balanced   # ambiguity-classification pass escalates to heavy
+
+# Tier → Agent-tool `model` alias. Aliases track the current tier member; do not
+# pin a concrete version (e.g. `claude-opus-4-5`) here unless you have a
+# reproducibility reason. Keep block-style YAML for tooling compatibility.
+model_mapping:
+  heavy:    opus
+  balanced: sonnet
+  light:    haiku
+
+# Escalation triggers — encoded so prompts and SKILL.md can reference one source.
+escalation:
+  developer_replan:
+    trigger: "Module Agent stalls for >= stall_threshold non-progress rounds"
+    from: balanced
+    to: heavy
+    revert_after: "one Replan attempt; subsequent retries return to balanced"
+  reviewer_repeated_reject:
+    trigger: "Reviewer returns REJECT with the same findings pattern across rounds"
+    from: balanced
+    to: heavy
+    revert_after: "review APPROVE"
+  acceptance_ambiguity:
+    trigger: "Acceptance Tester classifies a failure as PRD ambiguity"
+    from: balanced
+    to: heavy
+    revert_after: "ambiguity resolved (PRD updated or AC re-scoped)"
+
+# Cost note (informational; autoforge has no metric aggregator):
+# heavy is roughly 5x balanced on input and ~15x on cache_read. Use heavy only
+# for the targeted escalations above, not as a baseline.

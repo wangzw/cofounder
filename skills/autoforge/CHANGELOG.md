@@ -3,6 +3,110 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] — 2026-05-07
+
+Hardens delivery quality in response to the retro
+`/Users/wangzw/Documents/mind/raw/guide/2026-04-27-autoforge-prd-delivery-shortfall.md`,
+which catalogued the recurring failure pattern: features reported as done
+without being wired in, soft-pass tests, layer-language reports that hide
+user-visible regressions, and silent debt that escaped review. This
+release encodes the nine countermeasures from the retro plus three
+follow-up disciplines into a shared, machine-checkable ruleset.
+
+### Added
+
+- **`delivery-discipline.md`** — single shared ruleset every sub-agent
+  reads. Sections A–N covering: forbidden test patterns (§A),
+  forbidden silent write-paths (§B), required wiring signals (§C),
+  out-of-scope = issue not comment (§D), naming as contract (§E),
+  bidirectional traceability closure (§F), cross-domain contract
+  same-source (§G), full local CI as the completion gate (§H), reflex
+  to flip soft-pass (§I), user-visible report language (§J), long-run
+  re-anchor (§K), strict scrutiny of every deferral (§L), E2E assert
+  outcomes / cover failure paths (§M), and missing-dependency =
+  implement-it-don't-abandon (§N). Quick Self-Check questions 1–14.
+- **`common/config.yml`** — abstract model tiers (`heavy` / `balanced`
+  / `light`), per-role defaults, and named escalation triggers. SKILL.md
+  Model Tier Policy rewritten to reference this file.
+- **`scripts/`** — deterministic structural checkers that replace LLM
+  inspection wherever a script can do the job:
+  - `lib/autoforge_lint.py` — shared `Finding` model, regex constants,
+    3-state (PASS / FOUND / ERROR) emit contract matching prd-analysis.
+  - `check-module-plan.sh` — CR-AF01–04, CR-AF17–19 (required sections,
+    wiring rows, AC mapping rows, deferral has issue link, deferral
+    reason isn't a complexity excuse, deferral item is concrete,
+    deferral doesn't contradict an AC the module also claims).
+  - `check-acceptance-report.sh` — CR-AF05–06 (required sections,
+    verdict set; required sections include the new Negative-Path
+    Coverage section).
+  - `check-traceability.sh` — CR-AF07–10, CR-AF21 (schema valid, no
+    unmapped AC, no orphan tests, NOT_COVERED has issue, journey has
+    a non-happy scenario or a `coverage_gap_issue` issue link).
+  - `check-discipline-scan.sh` — CR-AF12–14, CR-AF20, CR-AF22
+    (soft-pass test patterns, silent debt without issue, skip without
+    issue, "no error == success" patterns, dependency-abandonment
+    markers like `// stub for M-XXX` / `// waiting on M-XXX`).
+  - `check-plan-readme.sh` — CR-AF15–16 (required sections,
+    Module-Status rows match plan files in `plans/`).
+  - `run-checkers.sh` — aggregator that walks artifacts in a plan-dir,
+    invokes the right checker per artifact, and merges JSON output
+    matching the prd-analysis run-checkers contract.
+- **`tests/`** — checker test harness mirroring prd-analysis:
+  `lib/test_helpers.sh`, `run-all.sh`, per-checker `test-check-*.sh`.
+
+### Changed
+
+- **Directory layout** — flat skill root reorganized into ordered
+  subdirectories matching prd-analysis: `planning/` (planner-prompt,
+  plan-readme-template, module-plan-template), `module/`
+  (agent / developer / tester / reviewer prompts), `integration/`,
+  `acceptance/`. Top-level kept: SKILL.md, CHANGELOG.md,
+  delivery-discipline.md.
+- **`module/agent-prompt.md`** — Setup loads `discipline_path`; Step 2c
+  runs the discipline scan; Step 5 final discipline gate runs all
+  applicable checkers via `run-checkers.sh` before APPROVE. Plan Issue
+  Handling table adds `UPSTREAM_NOT_IMPLEMENTED` with explicit "do not
+  stub / mock-past / TODO the missing capability" guard.
+- **`module/{developer,tester,reviewer}-prompt.md`** — read
+  `delivery-discipline.md` at session start; enforce the relevant
+  anti-patterns inline (Tester: §A flips, §M.1 outcome assertion,
+  §M.2 negative scenarios; Reviewer: §B silent write-paths, §C wiring,
+  §L deferral scrutiny, §N abandonment markers).
+- **`integration/tester-prompt.md`** — full local CI is the gate (§H);
+  cross-domain contract same-source check (§G); discipline scan over
+  the cross-module diff; failures expressed in journey language (§J).
+- **`acceptance/tester-prompt.md`** — rewritten Steps 0–6 for
+  per-journey touchpoint traversal; mandatory `traceability.json` with
+  the schema declared inline (now includes `scenarios[].kind` per §M.2
+  and `coverage_gap_issue`); closure check runs `check-traceability.sh`
+  and `check-acceptance-report.sh` before declaring PASS.
+- **`acceptance/report-template.md`** — added Outstanding Debt, Orphan
+  Tests, Unmapped AC, Naming-vs-Content Mismatches, Negative-Path
+  Coverage tables; user-visible Verdict line.
+- **`planning/module-plan-template.md`** — added Wiring & Registration,
+  Out-of-Scope / Deferred Work, expanded AC Mapping with journey
+  touchpoint and strict-assertion columns.
+- **`planning/planner-prompt.md`** — new "Delivery Discipline" preamble
+  binding plan output to §C / §E / §F / §L / §M.2 / §N. Plans are
+  rejected by `check-module-plan.sh` before reaching the Developer if
+  any rule is violated.
+- **`SKILL.md`** — Model Tier Policy rewritten in prd-analysis style
+  (abstract `heavy`/`balanced`/`light` tiers, references
+  `common/config.yml`); Step 2 plan-revision routing adds
+  `UPSTREAM_NOT_IMPLEMENTED` autonomous handling (allocate owner,
+  pull-forward, restart requester) so the orchestrator never abandons
+  a module for an in-scope missing dep without escalation.
+
+### Notes
+
+- prd-analysis's checker contract is followed exactly (exit 0 PASS,
+  exit 1 FOUND + JSON document on stdout, exit 2 ERROR on stderr).
+  Adding new checks is a matter of dropping a new `check-*.sh` under
+  `scripts/` and registering it in `run-checkers.sh`.
+- Where an LLM check could be replaced by a script check, the script
+  is now authoritative; sub-agent prompts consume the JSON findings
+  rather than re-implementing the rule.
+
 ## [1.1.0] — 2026-05-07
 
 Adds **`--evolve` mode** so autoforge can absorb in-place mutations made by

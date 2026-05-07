@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.1.0
+version: 1.2.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
@@ -38,27 +38,29 @@ Detect the mode first. Read the routing files for that mode only — do not load
 | **Status** | `--status <plan-dir>` | No additional files (read-only query) |
 | **Cleanup** | `--cleanup <plan-dir>` | No additional files |
 
-## Model Tier Policy
+## Model Tiers
 
-Every `Agent(...)` dispatch in this skill MUST set the `model` field to a tier **alias** — never pin a specific version. Aliases (`opus` / `sonnet` / `haiku`) track the current tier member and avoid rot as models evolve. The top tier is materially more expensive per token; use it only where its reasoning budget is actually needed.
+Abstract: `heavy` / `balanced` / `light`. Mapping in `common/config.yml` (`model_tier_defaults` + `model_mapping`).
 
-**Default tiers by role:**
+### Per-dispatch model override (MANDATORY for cost control)
 
-| Role | Tier | Why |
-|------|------|-----|
-| Planner | `opus` | Architecture decisions, cross-module consistency, most reasoning-heavy role in the pipeline |
-| Bootstrap | `sonnet` | Mechanical project scaffolding from a tech-stack spec |
-| Module Agent (2nd-level orchestrator) | `sonnet` | Flow control + state updates; escalate only on Replan/Diagnosis mode (see below) |
-| Developer (initial + retry-from-tester/reviewer) | `sonnet` | Implementing code from a detailed plan |
-| Developer (Replan Mode — Variant 4) | `opus` | New-strategy design after the current approach stalled |
-| Tester | `sonnet` | Test authoring from spec acceptance criteria is mechanical |
-| Reviewer | `sonnet` | Spec-compliance checking — escalate to `opus` only after repeated REJECT with the same findings pattern |
-| Integration Tester | `sonnet` | Phase-level test authoring + execution |
-| Acceptance Tester | `sonnet` | E2E tests + traceability matrix; escalate to `opus` only for ambiguity classification during the fix cycle |
+When the orchestrator dispatches a sub-agent via the Claude Code Agent tool, it **MUST** pass the `model` parameter to override the default (parent-session inheritance). Without this override, all sub-agents run on the parent session's model — typically `opus` — which costs 5–25× the configured tier rate. Per the `model_tier_defaults` section of `common/config.yml`:
 
-**Escalation rule:** when Replan Mode / Diagnosis Mode triggers (Module Agent has stalled for ≥3 non-progress rounds), the next Developer spawn uses `model: opus` instead of `sonnet`. After one Opus-backed Replan attempt, revert to `sonnet` for routine retries. For the Acceptance Tester: after classifying a failure as ambiguous (PRD ambiguity type), escalate the next acceptance fix cycle's ambiguity-classification pass to `opus`; revert to `sonnet` once the ambiguity is resolved.
+| Role | Default tier | Agent-tool `model` value | Why |
+|------|------|------|------|
+| Planner | `heavy` | `"opus"` | Architecture decisions, cross-module consistency, most reasoning-heavy role in the pipeline |
+| Bootstrap | `balanced` | `"sonnet"` | Mechanical project scaffolding from a tech-stack spec |
+| Module Agent (2nd-level orchestrator) | `balanced` | `"sonnet"` | Flow control + state updates; escalates only on Replan/Diagnosis |
+| Developer (initial + retry) | `balanced` | `"sonnet"` | Implementing code from a detailed plan |
+| Developer (Replan Mode — Variant 4) | `heavy` | `"opus"` | New-strategy design after the current approach stalled |
+| Tester | `balanced` | `"sonnet"` | Test authoring from spec acceptance criteria is mechanical |
+| Reviewer | `balanced` | `"sonnet"` | Spec-compliance checking; escalate to `heavy` after repeated REJECT pattern |
+| Integration Tester | `balanced` | `"sonnet"` | Phase-level test authoring + execution |
+| Acceptance Tester | `balanced` | `"sonnet"` | E2E tests + traceability matrix; escalate to `heavy` for ambiguity classification |
 
-**Why not top-tier everywhere:** top tier is ~5× Sonnet on input and ~15× on cache_read. Autoforge's inner loop (Developer → Tester → Reviewer) runs dozens of times per module across many modules — a mis-tiered default multiplies across the whole run. Sonnet is the right default; Opus is a targeted escalation, not a baseline.
+**Escalation rule** (declared in `common/config.yml#escalation`): when Replan / Diagnosis triggers (Module Agent stalled ≥3 non-progress rounds), the next Developer spawn uses `heavy`. After one heavy-backed Replan attempt, revert. For the Acceptance Tester: after classifying a failure as PRD-ambiguity, the next ambiguity-classification pass uses `heavy`; revert once resolved.
+
+**Why not heavy everywhere:** the heavy tier is ~5× balanced on input and ~15× on cache_read. Autoforge's inner loop (Developer → Tester → Reviewer) runs dozens of times per module across many modules — a mis-tiered default multiplies across the whole run. Balanced is the right default; heavy is a targeted escalation, not a baseline.
 
 ## Process Overview
 
@@ -119,7 +121,7 @@ flowchart TD
 
 ## Step 1 — Phased Planning (parallel within phases)
 
-> **Load now:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`
+> **Load now:** `planning/planner-prompt.md`, `planning/plan-readme-template.md`, `planning/module-plan-template.md`
 
 Plan modules **phase by phase**. Phases run sequentially — so every plan in Phase N-1 is complete before any Phase N Planner starts — but within a phase, Planners run **in parallel**. Same-phase modules are independent by the DAG construction (no dep between them), so parallelism is safe for interface consistency.
 
@@ -189,7 +191,7 @@ For each phase (following the conventions-bootstrap exception in the first round
 # Round 1 — bootstrap (only the very first Planner in Phase 1)
 Agent({
   description: "Planner for M-001 (conventions bootstrap)",
-  prompt: <fill in planner-prompt.md; is_first_module=true, dependency_closure_plan_paths=[]>,
+  prompt: <fill in planning/planner-prompt.md; is_first_module=true, dependency_closure_plan_paths=[]>,
   model: "opus",
   mode: "auto"
 })
@@ -202,7 +204,7 @@ Agent({ description: "Planner for M-008", model: "opus", mode: "auto",
         prompt: <is_first_module=false, dependency_closure_plan_paths=[closure(M-008)]> })
 ```
 
-See `planner-prompt.md` for the complete Planner prompt template.
+See `planning/planner-prompt.md` for the complete Planner prompt template.
 
 **Planner input:**
 
@@ -219,7 +221,7 @@ See `planner-prompt.md` for the complete Planner prompt template.
 | Conventions | `plans/conventions.md` | First Planner creates; subsequent Planners read. Extensions are written to per-module `conventions-additions/M-{id}.md` files and merged by the Orchestrator between phases. |
 
 **Planner output:**
-- `docs/raw/plans/{plan-dir}/plans/plan-M-{id}-{slug}.md` (using `module-plan-template.md`)
+- `docs/raw/plans/{plan-dir}/plans/plan-M-{id}-{slug}.md` (using `planning/module-plan-template.md`)
 - [First module only] `docs/raw/plans/{plan-dir}/plans/conventions.md`
 - [Subsequent modules, if needed] `docs/raw/plans/{plan-dir}/plans/conventions-additions/M-{id}.md`
 
@@ -234,7 +236,7 @@ Run between phases — before spawning the next phase's Planners — so later ph
 
 ### After All Phases of Planning Complete
 
-1. **Generate plan README** — write `docs/raw/plans/{plan-dir}/README.md` using `plan-readme-template.md`: dependency graph (mermaid), phase breakdown, module list with status
+1. **Generate plan README** — write `docs/raw/plans/{plan-dir}/README.md` using `planning/plan-readme-template.md`: dependency graph (mermaid), phase breakdown, module list with status
 2. **Commit plans** — single commit of all plan files on the feature branch: `docs(plan): add implementation plans for {project}`
 3. **Present to human** — provide a structured review summary so the user doesn't need to read every plan in full:
    - Per module: step count, key decisions, integration points
@@ -245,7 +247,14 @@ Run between phases — before spawning the next phase's Planners — so later ph
      - **Trigger** — the issue that caused re-planning (ISSUE_TYPE, evidence, affected module)
      - **Impact scope** — which plans were unchanged vs. revised; which already-implemented modules need code changes
    - If `--plan-only` mode, stop here.
-4. **Human review gate** — user approves, requests edits, or rejects. If edits requested, modify plans and re-commit.
+3.5. **Structural plan check (mandatory before human review)** — run
+
+```
+bash skills/autoforge/scripts/run-checkers.sh {plan_dir}
+```
+
+The aggregator invokes `check-plan-readme.sh` against the plan README, `check-module-plan.sh` against every `plans/plan-M-*.md`, and merges the JSON output. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
+4. **Human review gate** — user approves, requests edits, or rejects. If edits requested, modify plans, re-run step 3.5, and re-commit.
 
 **Step 1 → Step 1.5 gate:** Human approves all plans.
 
@@ -283,8 +292,8 @@ This step only applies when creating a new project from scratch. It initializes 
 
 ## Step 2 — Phase Execution
 
-> **Load now:** `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`
-> **Load at phase integration test:** `integration-tester-prompt.md`
+> **Load now:** `module/agent-prompt.md`, `module/developer-prompt.md`, `module/tester-prompt.md`, `module/reviewer-prompt.md`
+> **Load at phase integration test:** `integration/tester-prompt.md`
 
 Execute phases sequentially. Within each phase, execute modules in parallel.
 
@@ -317,7 +326,7 @@ Agent({
   mode: "auto",
   prompt: "You are a Module Agent implementing M-{id}: {module-name}.
     Your working directory is: {module_worktree}
-    [Paste full contents of module-agent-prompt.md with parameters filled in]
+    [Paste full contents of module/agent-prompt.md with parameters filled in]
 
     Parameters:
     - module_design_path: {path}
@@ -333,13 +342,13 @@ Agent({
     - draft_source_path: {extracted draft path, or empty if Promotion action = Rewrite / None}
     - stall_threshold: 3
     - hard_ceiling: 20
-    - developer_prompt_path: {absolute path to skills/autoforge/module-developer-prompt.md}
-    - tester_prompt_path: {absolute path to skills/autoforge/module-tester-prompt.md}
-    - reviewer_prompt_path: {absolute path to skills/autoforge/module-reviewer-prompt.md}"
+    - developer_prompt_path: {absolute path to skills/autoforge/module/developer-prompt.md}
+    - tester_prompt_path: {absolute path to skills/autoforge/module/tester-prompt.md}
+    - reviewer_prompt_path: {absolute path to skills/autoforge/module/reviewer-prompt.md}"
 })
 ```
 
-Module Agents within the same phase are spawned in parallel. See `module-agent-prompt.md` for the complete instructions.
+Module Agents within the same phase are spawned in parallel. See `module/agent-prompt.md` for the complete instructions.
 
 ### Module Agent Internal Flow
 
@@ -401,7 +410,7 @@ The Module Agent continues iterating as long as **measurable progress** is being
 
 **Replan Mode** is the critical differentiator: when the current approach isn't working, the agent doesn't ask for help — it steps back, re-reads the design spec, identifies what's fundamentally wrong, and devises an alternative implementation strategy. Only after exhausting reasonable alternatives does it involve the human, and only when the choice involves genuine trade-offs.
 
-See `module-agent-prompt.md` for the complete Replan Mode, Diagnosis Mode, and decision request logic.
+See `module/agent-prompt.md` for the complete Replan Mode, Diagnosis Mode, and decision request logic.
 
 ### Developer Role
 
@@ -499,6 +508,21 @@ Review Dimensions:
    - Commit revised plans: `docs(plan): re-plan from phase {n} — {reason}`
    - **Human review gate** — present the re-plan review summary (see Step 1, item 3) with emphasis on what changed and why. The user should be able to understand the re-plan without re-reading unchanged plans.
    - After approval: resume execution from the appropriate phase, using `--execute` mode logic to determine which modules need re-execution
+
+   **c. UPSTREAM_NOT_IMPLEMENTED (autonomous, no human gate by default)** — the dependency this module needs has no implementation yet, even though it is in scope of the design / PRD. **Per delivery-discipline §N, the orchestrator's job is to make the missing capability exist this round, not to abandon the requesting module.** Do NOT bubble this up to the user as a DECISION_REQUEST unless steps below also fail.
+   - **Identify the owner module** of the missing capability:
+     - If the design names a module that owns this surface, that module is the owner.
+     - If no module owns it, dispatch a `heavy`-tier Planner to allocate the surface to the most appropriate module (or split a new module M-NEW), commit the revised plan with `docs(plan): allocate {capability} to M-{id} for {requester}`, and treat that module as the owner for the rest of this step.
+   - **Schedule the owner module before the requester resumes:**
+     - If the owner module is in an earlier phase that already completed: re-open it in `--execute` mode (recreate worktree, dispatch Module Agent with the augmented plan that adds the missing surface), wait for APPROVE.
+     - If the owner module is in the same phase: defer the requester's resumption until the owner completes; the owner is run with full Module Agent pipeline (Developer → Tester → Reviewer → discipline gate).
+     - If the owner module would have been later: pull it forward into the current phase by adding it to the active phase's module set; the DAG is recomputed for downstream phases.
+   - **Once the owner returns APPROVE**: restart the requester Module Agent with the same plan (the `module-state-M-{requester-id}.json` was preserved on PLAN_REVISION_NEEDED). The requester's Developer reads the now-implemented upstream and proceeds.
+   - **Forbidden orchestrator responses to UPSTREAM_NOT_IMPLEMENTED:**
+     - Returning APPROVE for the requester with a stub of the missing capability.
+     - Marking the requester's relevant ACs `NOT_COVERED` and proceeding — these are in-scope, not deferrable (delivery-discipline §L).
+     - Pausing the requester indefinitely while continuing to merge other modules; the dependency MUST be resolved within this phase.
+   - Only escalate to DECISION_REQUEST after the Planner has tried at least one allocation and the owner module hits its own DECISION_REQUEST (genuine ambiguity), OR the missing capability is genuinely outside the design scope (in which case it is `UPSTREAM_INSUFFICIENT` and routes to b above).
 3. **Handle decision requests** — if any module returned DECISION_REQUEST:
    - Orchestrator presents the module's diagnosis and proposed options to the user (the Orchestrator runs in the main conversation and can communicate with the user directly)
    - Human picks an option (or provides their own instruction)
@@ -516,7 +540,7 @@ Review Dimensions:
    ```
    Agent({
      description: "Integration Tester for phase {n}",
-     prompt: <fill in integration-tester-prompt.md with parameters below>,
+     prompt: <fill in integration/tester-prompt.md with parameters below>,
      model: "sonnet",
      mode: "auto"
    })
@@ -536,8 +560,9 @@ Review Dimensions:
    | `conventions_path` | `docs/raw/plans/{plan-dir}/plans/conventions.md` |
    | `project_coding_standards` | Unified project conventions (same as passed to Module Agents) |
    | `is_rerun` | `false` on first run; `true` when re-running after fix cycle |
+   | `discipline_path` | Absolute path to `skills/autoforge/delivery-discipline.md` (the shared delivery-discipline ruleset; same value passed to every sub-agent) |
 
-   See `integration-tester-prompt.md` for the complete prompt template.
+   See `integration/tester-prompt.md` for the complete prompt template.
 
    **Integration test fix cycle:** If integration tests fail, spawn a **Developer** agent in the primary worktree:
 
@@ -577,7 +602,7 @@ Review Dimensions:
 
 ## Step 3 — PRD Acceptance Validation
 
-> **Load now:** `acceptance-tester-prompt.md`, `acceptance-report-template.md`
+> **Load now:** `acceptance/tester-prompt.md`, `acceptance/report-template.md`
 
 After all phases complete, validate against the original PRD.
 
@@ -588,7 +613,7 @@ Spawn the Acceptance Tester agent in the primary worktree:
 ```
 Agent({
   description: "Acceptance Tester",
-  prompt: <fill in acceptance-tester-prompt.md with parameters below>,
+  prompt: <fill in acceptance/tester-prompt.md with parameters below>,
   model: "sonnet",
   mode: "auto"
 })
@@ -607,8 +632,17 @@ Agent({
 | `acceptance_threshold` | From plan README Design Input table (default: 80) |
 | `is_rerun` | `false` on first run; `true` when re-running after fix cycle |
 | `previous_report_path` | `docs/raw/plans/{plan-dir}/reports/acceptance.md` — only when `is_rerun = true` |
+| `discipline_path` | Absolute path to `skills/autoforge/delivery-discipline.md` (the shared delivery-discipline ruleset; same value passed to every sub-agent) |
 
-See `acceptance-tester-prompt.md` for the complete prompt template. The Acceptance Tester reads all PRD feature specs and journey specs, writes E2E tests, builds a requirements traceability matrix, and determines the verdict (PASS / PARTIAL / FAIL) based on the acceptance threshold.
+See `acceptance/tester-prompt.md` for the complete prompt template. The Acceptance Tester reads all PRD feature specs and journey specs, writes E2E tests, builds a requirements traceability matrix, and determines the verdict (PASS / PARTIAL / FAIL) based on the acceptance threshold.
+
+**Structural acceptance gate (mandatory before declaring PASS).** After the Acceptance Tester writes its report and `traceability.json`, the Orchestrator runs:
+
+```
+bash skills/autoforge/scripts/run-checkers.sh {plan_dir} --source-root {worktree_root}/main
+```
+
+This invokes `check-acceptance-report.sh`, `check-traceability.sh`, and `check-discipline-scan.sh` over the merged source tree. **Any `error`/`critical` finding (especially CR-AF09 orphan tests, CR-AF10 unmapped AC, CR-AF21 happy-path-only journeys, CR-AF20 "no error == success" assertions, CR-AF22 dependency-abandonment markers) blocks PASS** — treat these as acceptance failures and route through the fix cycle below. Warnings are listed in the report but do not block. This replaces the prior LLM-grep heuristics and matches the contract in delivery-discipline §F / §H / §M / §N.
 
 ### Acceptance Fix Cycle
 
@@ -708,8 +742,8 @@ If rebase has conflicts, pause and present to human for resolution.
 
 ## --execute Mode
 
-> **Load on entry:** `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `integration-tester-prompt.md`, `acceptance-tester-prompt.md`, `acceptance-report-template.md`
-> **Load only if re-plan triggered:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`
+> **Load on entry:** `module/agent-prompt.md`, `module/developer-prompt.md`, `module/tester-prompt.md`, `module/reviewer-prompt.md`, `integration/tester-prompt.md`, `acceptance/tester-prompt.md`, `acceptance/report-template.md`
+> **Load only if re-plan triggered:** `planning/planner-prompt.md`, `planning/plan-readme-template.md`, `planning/module-plan-template.md`
 
 When invoked with `--execute docs/raw/plans/{plan-dir}/`:
 
@@ -756,7 +790,7 @@ This mode is useful for:
 
 ## --evolve Mode
 
-> **Load on entry:** `planner-prompt.md`, `plan-readme-template.md`, `module-plan-template.md`, `module-agent-prompt.md`, `module-developer-prompt.md`, `module-tester-prompt.md`, `module-reviewer-prompt.md`, `integration-tester-prompt.md`, `acceptance-tester-prompt.md`, `acceptance-report-template.md`
+> **Load on entry:** `planning/planner-prompt.md`, `planning/plan-readme-template.md`, `planning/module-plan-template.md`, `module/agent-prompt.md`, `module/developer-prompt.md`, `module/tester-prompt.md`, `module/reviewer-prompt.md`, `integration/tester-prompt.md`, `acceptance/tester-prompt.md`, `acceptance/report-template.md`
 
 When invoked with `--evolve docs/raw/design/<design-dir>/ [--from <plan-dir>] [--plan-only] [--fresh]`:
 
@@ -936,7 +970,7 @@ Standard Step 2 flow with two adjustments:
 When the Orchestrator spawns a Module Agent with `is_evolution: true`, the agent's behaviour changes in three places:
 
 - **Setup** also reads the prior implementation from the parent commit (`git show {parent-commit}:src/...` for files the module owns per the prior plan), and assembles a brief "what's already there" summary.
-- **First Developer spawn** uses **Variant 5 — Evolve from Existing Code** (see `module-developer-prompt.md`), not Variant 1. The Developer reads the revised plan + existing module source, identifies the deltas, applies them, and commits with `feat(M-{id}): evolve to delivery-{N} — {summary}`. Variants 2/3/4 (retry-from-Tester, retry-from-Reviewer, Replan) are reused unchanged after the first round.
+- **First Developer spawn** uses **Variant 5 — Evolve from Existing Code** (see `module/developer-prompt.md`), not Variant 1. The Developer reads the revised plan + existing module source, identifies the deltas, applies them, and commits with `feat(M-{id}): evolve to delivery-{N} — {summary}`. Variants 2/3/4 (retry-from-Tester, retry-from-Reviewer, Replan) are reused unchanged after the first round.
 - **Tester** is invoked with `is_rerun: true` (previous tests exist on the parent commit; review them against the revised plan, update or extend, then run the full suite). For `added` modules, `is_rerun: false` (no prior tests).
 
 Reviewer behaviour is unchanged — it always reviews the current code against the current plan.
@@ -1299,16 +1333,17 @@ The plan directory name uses the **original** `{design-dir-name}-{hash4}` from t
 
 ## Templates
 
-- `plan-readme-template.md` — plan directory README with dependency graph, phase list, status tables
-- `planner-prompt.md` — Planner agent instructions (sequential planning with context accumulation)
-- `module-plan-template.md` — per-module implementation plan with atomic steps
-- `module-agent-prompt.md` — Module Agent instructions (second-level orchestrator)
-- `module-developer-prompt.md` — Developer sub-agent prompt variants (initial, retry-from-tester, retry-from-reviewer, replan, evolve-from-existing-code)
-- `module-tester-prompt.md` — Tester sub-agent prompt
-- `module-reviewer-prompt.md` — Reviewer sub-agent prompt
-- `integration-tester-prompt.md` — Phase-level integration tester instructions
-- `acceptance-tester-prompt.md` — PRD acceptance tester instructions
-- `acceptance-report-template.md` — PRD acceptance report with traceability matrix
+- `delivery-discipline.md` — shared delivery-discipline ruleset (forbidden test patterns, write-path signal rules, wiring/registration, debt → issue, naming = contract, traceability closure, full local CI gate, flip-on-sight reflex, user-visible reporting, long-run re-anchor). Every sub-agent reads it before doing anything; every gate enforces it.
+- `planning/plan-readme-template.md` — plan directory README with dependency graph, phase list, status tables
+- `planning/planner-prompt.md` — Planner agent instructions (sequential planning with context accumulation)
+- `planning/module-plan-template.md` — per-module implementation plan with atomic steps
+- `module/agent-prompt.md` — Module Agent instructions (second-level orchestrator)
+- `module/developer-prompt.md` — Developer sub-agent prompt variants (initial, retry-from-tester, retry-from-reviewer, replan, evolve-from-existing-code)
+- `module/tester-prompt.md` — Tester sub-agent prompt
+- `module/reviewer-prompt.md` — Reviewer sub-agent prompt
+- `integration/tester-prompt.md` — Phase-level integration tester instructions
+- `acceptance/tester-prompt.md` — PRD acceptance tester instructions
+- `acceptance/report-template.md` — PRD acceptance report with traceability matrix
 
 ## Next Steps Hint
 

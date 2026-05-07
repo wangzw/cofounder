@@ -112,10 +112,46 @@ Interfaces this module exposes or consumes that other modules depend on:
 
 Direction: `Exposes ->` means this module exposes an interface consumed by the listed module. `Consumes <-` means this module consumes an interface exposed by the listed module.
 
+## Wiring & Registration
+
+> Required section (delivery-discipline §B, §C). A module is **not done**
+> until every persistence/transport/middleware piece it ships is wired
+> into the running application. List every wire-up step — code that
+> "exists" but is unregistered is the no-op-write-path failure mode.
+
+| # | What to wire | Where | Verify signal |
+|---|--------------|-------|---------------|
+| 1 | Schema model `User` | `db/schema.go` AutoMigrate list | startup logs show table creation; integration test asserts row insert via the public API |
+| 2 | HTTP route `POST /api/x` | `router.go` mount table | request returns non-404; test asserts behavior, not just status |
+| 3 | Middleware `authz` | `app.use(...)` chain | test asserts a forbidden caller receives 403 — not just that authz file exists |
+| 4 | Env flag / config key | deployment config (`docker-compose.yml` / `helm/values.yaml` / `.env.example`) | test that exercises the flag's "on" branch via integration |
+
+**Write-path signal rule:** every write the module performs must be
+observable to a caller — return the persisted entity / RowsAffected /
+event published — so a test can assert "the write happened", not "the
+function did not raise". Plans whose final step is a void-returning
+write without a check are a discipline violation.
+
+## Out-of-Scope / Deferred Work
+
+> Required section (delivery-discipline §D). Anything intentionally
+> deferred — partial AC, mock-only path, environment-conditional branch,
+> follow-up refactor — is tracked here with a GitHub issue link. Plans
+> that bury deferrals as `// TODO` comments in code are a discipline
+> violation.
+
+| # | Item | Reason | Issue |
+|---|------|--------|-------|
+| 1 | {what is deferred} | {why} | `owner/repo#NNN` |
+
 ## Acceptance Criteria Mapping
 
-Trace from design spec acceptance criteria to implementation steps:
+> Required (delivery-discipline §E, §F). Every AC the module owns must
+> have a row. Each test step must use the AC reference in its name
+> (`test_F001_AC3_*`) **and** assert the AC's exact behavior — not just
+> "the call succeeded". The test column lists the strict assertion the
+> step will make, not just the test name.
 
-| Criterion (from design) | Implemented in Step | Test in Step |
-|------------------------|---------------------|-------------|
-| {criterion description} | Step 3 | Step 4: {test name} |
+| Criterion (from design) | Journey Touchpoints | Implemented in Step | Test in Step | Strict Assertion |
+|-------------------------|---------------------|---------------------|--------------|-------------------|
+| {criterion description} | J-001 step 4 | Step 3 | Step 4: `test_F001_AC3_returns_403_when_caller_lacks_role` | `expect(response.status).toBe(403)` AND `expect(body.error).toBe("forbidden")` |

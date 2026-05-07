@@ -34,6 +34,19 @@ You will receive these parameters from the Orchestrator:
 - `removed_modules`: list of module IDs being removed in this delivery — your plan **must not** reference any of them as a dependency or import target
 - `evolution_class`: `revised-direct | revised-downstream | added` for this module. `revised-direct` = its own design file changed semantically; `revised-downstream` = its design is unchanged but a dependency's interface changed; `added` = brand-new module in this delivery
 
+## Delivery Discipline
+
+Before producing any plan, read `skills/autoforge/delivery-discipline.md` (passed as `discipline_path` if available, otherwise read from the autoforge skill root). Your plan MUST reflect every applicable rule:
+
+- **§C — Wiring & Registration**: every model, route, middleware, env-flag, schema migration, and event handler the module ships gets a row in the plan's `## Wiring & Registration` table with a verifiable signal column (e.g., `curl /x` returns 200, `SELECT … FROM pg_tables` lists `users`, integration test green). A plan with no wiring rows is invalid for any module that exposes a behavior at runtime.
+- **§E — Naming Is a Contract**: every test step references the AC id (`F-NNN/ACK`) it asserts. The Tester reads this; if a test claims to verify F-001/AC3 it must actually assert what F-001/AC3 promises.
+- **§F — Bidirectional Traceability**: the plan's `## Acceptance Criteria Mapping` table lists every AC the module owns with: AC id, journey touchpoint (`J-NNN step K`), implementation step number, test step number, and the **strict assertion** the test will make (e.g., `status==201 AND response.id matches /[a-f0-9]{36}/ AND DB row exists`). Soft-form assertions (`status in {200,201,204}`, "no error thrown") are forbidden — see §A and §M.1.
+- **§L — Strict Scrutiny of Every Deferral**: the plan's `## Out-of-Scope / Deferred Work` section lists only items that are genuinely outside this module's design surface. Each row needs a concrete item name (≥ 12 chars, not "polish UX"), a *causal* reason (an upstream PR not merged, a third-party API contract missing, an explicit PRD scoping decision — never "too complex" / "no time" / "later iteration"), and an `owner/repo#NNN` issue link. **Do not use the deferral table to mark difficult-to-implement work as out-of-scope.**
+- **§M.2 — Negative-Path Coverage**: for every AC that maps to a journey touchpoint, the plan's test steps include both the happy path and at least one negative scenario (precondition violation / boundary value / concurrency case) the AC implies. The Tester will be evaluated against this list.
+- **§N — Missing Dependency = Implement It**: if you discover during planning that the design references a capability no module owns, do NOT silently route around it. Flag it in your `KEY_DECISIONS` output as `MISSING_OWNER: <capability> — needs allocation`. The Orchestrator will allocate it before this module is dispatched.
+
+Plans that fail any of these will be rejected by the structural checker (`scripts/check-module-plan.sh`) before they reach the Developer.
+
 ## Execution
 
 ### 1. Read All Inputs
@@ -171,7 +184,7 @@ The Orchestrator merges all `conventions-additions/*.md` into `conventions.md` a
 
 ### 3. Write the Implementation Plan
 
-Output: `{plan_dir}/plan-M-{module_id}-{module_slug}.md` following the structure in `module-plan-template.md`.
+Output: `{plan_dir}/plan-M-{module_id}-{module_slug}.md` following the structure in `planning/module-plan-template.md`.
 
 Populate the Context table fields:
 - **Promotion Action**: from the module design spec's UI Architecture `Promotion action` field (`Promote` / `Extend` / `Rewrite`). Set to `None` for backend or shared-library modules with no UI Architecture

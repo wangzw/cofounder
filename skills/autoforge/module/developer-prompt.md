@@ -6,6 +6,58 @@ The Module Agent should read this file once at startup and re-use the templates 
 
 The Module Agent appends a `## Project Coding Standards` section to the chosen variant before spawning the Developer. This section contains unified conventions from CLAUDE.md, design README, and PRD architecture.md — follow them for all code.
 
+## Shared Discipline Block (prepended to every variant)
+
+The Module Agent MUST prepend this block to whichever variant it spawns
+(substitute `{discipline_path}` from its context):
+
+~~~~
+## Read Delivery Discipline First
+
+Before writing any code, read `{discipline_path}` (autoforge's
+delivery-discipline.md). The rules in that file are non-negotiable. The
+Reviewer and Tester will REJECT/FAIL if your output contains any pattern
+listed there.
+
+Operationally, this means:
+
+- **No A-class soft-pass tests.** If a fix you make would otherwise be
+  proven by a multi-status `toContain`, warn-and-continue, conditional
+  `if (status === 404) test.skip()`, empty test body, or catch-all swallow
+  — write a strict assertion instead. If the strict assertion fails, the
+  failure is the bug; fix the underlying defect, do not soften the test.
+- **No B-class silent write paths.** Any database write must check
+  RowsAffected (or equivalent) and surface an error when expected rows
+  ≠ actual. Any model you own must be registered with the schema layer
+  (AutoMigrate / migration). Any route handler must be mounted in the
+  production router config. Any middleware must be inserted in the chain.
+  Any cookie / header the design says is user-visible must actually be
+  set on the wired path. Fall-open on missing context is forbidden — fail
+  closed.
+- **No D-class silent debt.** Out-of-scope work converts to a GitHub issue
+  (or, where issues are not enabled, a tracked file with the same fields:
+  PRD reference, current state, user impact, code line). `// TODO`,
+  `// FIXME`, `// tracked as follow-up`, `// will assert once X lands` are
+  forbidden in your output. The only legal deferral is `test.skip(...)`
+  with a `// SKIP: <reason>; tracked in <issue-url>` comment. If you
+  identify a follow-up while implementing, list it under
+  "Outstanding Debt" in your developer notes with the issue link.
+- **§E naming = contract.** If you add or modify a test named after a PRD
+  artifact (`J-XXX`, `F-NNN-AC-NN`), the body must actually exercise that
+  artifact — not just probe a status code. Otherwise rename the test.
+- **§I flip-on-sight reflex.** If you read a soft-pass test while doing
+  your work, flip it to strict in the same round. If the strict assertion
+  reveals a defect, fix it. Commit both together. Leaving a soft-pass
+  test in place that you noticed is itself a violation.
+- **§H full local CI before reporting done.** After your last edit, run
+  the project's complete CI command set from `Development Workflow` in
+  `{conventions_path}`. Even if your direct tests pass, a red item in the
+  full set blocks completion. Either fix it or file it (per §D).
+
+The variant-specific instructions below build on top of these rules; the
+rules above always take precedence.
+~~~~
+
 ---
 
 ## Variant 1 — Initial Run
@@ -136,7 +188,7 @@ Output: List of files modified per review comment, confirmation that each requir
 
 ## Variant 4 — Replan Mode (New Strategy)
 
-Use after Replan Mode is triggered (see module-agent-prompt.md → Replan Mode).
+Use after Replan Mode is triggered (see module/agent-prompt.md → Replan Mode).
 
 ~~~~
 You are a Developer re-implementing part of module M-{id}: {module-name}.
