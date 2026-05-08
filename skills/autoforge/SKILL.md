@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.2.0
+version: 1.3.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
@@ -815,20 +815,40 @@ If a particular evolution is so heavy that in-place mutation would be misleading
 
 ### Step E0 — Locate Prior Delivery and Plan
 
-1. **Find the prior plan directory** — look for `docs/raw/plans/{design-dir-name}-*/` directories whose `README.md` `Source Design` field matches `<design-dir>`. Pick the one with the highest `Autoforge Delivery` field. If `--from <plan-dir>` is supplied, use it explicitly. Refuse if none matches: "no prior autoforge delivery for this design — run `/autoforge <design-dir>` from scratch first".
+1. **Find the prior plan directory** — look for `docs/raw/plans/{design-dir-name}-*/` directories whose `README.md` `Source Design` field matches `<design-dir>`. Pick the one with the highest `Autoforge Delivery` field; treat an absent field as `0` (a legacy plan dir created before --evolve was introduced — the migration in Step E0.5 below will backfill it). If `--from <plan-dir>` is supplied, use it explicitly. Refuse if none matches: "no prior autoforge delivery for this design — run `/autoforge <design-dir>` from scratch first".
 
 2. **Read the plan README** — extract the Design Input table fields:
    - `Source Design` (verify equals `<design-dir>`)
    - `Source PRD`
-   - `Feature Branch Family` (e.g. `autoforge/{design-dir-name}-{hash4}`)
+   - `Feature Branch Family` (e.g. `autoforge/{design-dir-name}-{hash4}`) — falls back to the older `Feature Branch` field on legacy READMEs
    - `Worktree Root`
-   - `Current Design Delivery` (e.g. `delivery-2-tooling`) — the **baseline design tag**
-   - `Autoforge Delivery` (integer; this is delivery `N-1`; the new delivery is `N`)
+   - `Current Design Delivery` (e.g. `delivery-2-tooling`) — the **baseline design tag**; may be absent on legacy READMEs (handled in Step E0.5)
+   - `Autoforge Delivery` (integer; this is delivery `N-1`; the new delivery is `N`); may be absent on legacy READMEs (handled in Step E0.5)
    - `Acceptance Threshold`
 
-3. **Resolve the design's target delivery tag** — list `delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
+   If any of `Feature Branch Family`, `Current Design Delivery`, `Autoforge Delivery`, or the `## Evolution History` section are absent, this is a legacy plan dir — proceed to Step E0.5 to backfill before continuing. Otherwise skip E0.5.
 
-4. **Refuse on dirty / mid-flight states** (same gate as Step 0):
+3. **Step E0.5 — Backfill legacy plan README (only when needed).** Triggered by E0.2 when the plan README pre-dates --evolve. The goal is to put the README into the schema described in `planning/plan-readme-template.md` so the rest of E0–E6 can run unchanged. Do **not** touch module status tables (other than reconciling orphan rows in sub-step 4), dependency graphs, or any data outside the listed fields.
+
+   1. **Infer values:**
+      - `Feature Branch Family` ← existing `Feature Branch` value
+      - `Autoforge Delivery` ← `1` (the existing implementation is the first delivery)
+      - `Current Design Delivery` ← run `git tag --list 'delivery-*' --merged HEAD --sort=creatordate` in the design's repo. Recommended default = the **earliest** delivery tag reachable from the design's HEAD (the design state the implementation was originally written against — subsequent design tags are evolutions to migrate toward). If no `delivery-*` tag exists, refuse: "design has no `delivery-*` tag yet — run `system-design --evolve` first to establish a baseline".
+   2. **Confirm with user (mandatory):** present the inferred baseline alongside *all* candidate `delivery-*` tags (with their commit short-hashes and dates) via `AskUserQuestion` so the user can override. The plan's `Date` field is unreliable on its own — the legacy plan may have been written against a design that was tagged retroactively. The user's selection becomes `Current Design Delivery`.
+   3. **Backfill the README** (Design Input + Evolution History only):
+      - Insert `Feature Branch Family`, `Current Design Delivery`, `Autoforge Delivery`, and `Autoforge Delivery Tag` rows into the Design Input table per the template (keep `Feature Branch` as well — leave existing rows untouched). `Autoforge Delivery Tag` ← `—` (no tag was created at delivery-1's converged commit).
+      - Add a `## Evolution History` section before `## Phase Status`, populated with one row for delivery-1: Baseline `—`, Target = the chosen `Current Design Delivery`, Autoforge Tag `—`, Modules `— / {total-from-Module-Index} / — / —`, Verdict = the existing Acceptance row's verdict (e.g. `Pass (90.4%)`), Summary `Legacy delivery (pre-evolve)`.
+   4. **Reconcile orphan plan files (CR-AF16).** Run `bash skills/autoforge/scripts/run-checkers.sh {plan_dir}` and inspect any `CR-AF16` findings of the form *"plan exists for M-{id} but no row in Module Status"*. These are plan files added outside the autoforge run (typically post-acceptance hotfixes — look for a `Source Issue` / `Source ADR` / `Hotfix on top of Phase N` marker in the file's Context table). For each:
+      - **If the plan file looks like merged hotfix work** (has a `Source Issue`/`Source ADR` field, references existing modules as deps, and the file is reachable from `main` per `git log --all -- <plan-path>`): append a row to `## Module Status` with `Plan=Done · Dev=Done · Test=Done · Review=Approved · Merged=Yes` and the Notes column citing the source issue/ADR (e.g. `manual hotfix · issue #21`). Also append a corresponding row to `## Module Plans` so the index stays complete; mark the Phase column as `Hotfix` (not a numbered phase, since these landed outside the planned phase order).
+      - **If the plan file is unrecognised** (no source-issue marker, never made it to `main`, or the user can't classify it): present the file path and the first 30 lines to the user via `AskUserQuestion` and ask whether to (a) add as completed hotfix, (b) drop the file (`git rm`), or (c) abort the migration so the user can resolve manually.
+      - These reconciliation edits go into the same migration commit — no separate commit per orphan.
+   5. **Detect ID collisions with the design's added modules.** For each module classified `added` in the upcoming Step E1 (those with new `modules/M-{id}-{slug}.md` files in the target design tag): if the same `M-{id}` already has a plan file under `plans/` (whether from the original autoforge run or from sub-step 4's hotfix reconciliation), this is a **hard refusal** — the design's evolution introduces an ID that the implementation has already burned for unrelated work. Report the collision (`design adds M-{id}-<design-slug>; plan dir already owns M-{id}-<plan-slug>`) and stop. The user must either renumber the design's new module (re-run `system-design --evolve` to allocate a different ID) or rename the existing plan file before retrying.
+   6. **Commit on the branch the plan dir currently lives on (typically `main`):** `docs(plan): backfill evolve-mode fields for legacy delivery-1`. The commit covers backfilled fields + Evolution History + any orphan-row reconciliations from sub-step 4.
+   7. **Resume Step E0** at sub-step 4 below; the now-backfilled README has all fields E1–E6 require, and `run-checkers.sh` returns clean.
+
+4. **Resolve the design's target delivery tag** — list `delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
+
+5. **Refuse on dirty / mid-flight states** (same gate as Step 0):
    | Condition | Action |
    |-----------|--------|
    | Working tree has uncommitted changes | Refuse; ask user to commit/stash |
@@ -871,19 +891,21 @@ new_feature_branch  = autoforge/{design-dir-name}-{hash4}-d{N}
 new_worktree_root   = {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}-d{N}
 ```
 
-Branch from the most recent ancestor that contains the prior delivery's code:
+Branch from the most recent ancestor that contains the prior delivery's code. Pick whichever case is true for this plan dir — they are mutually exclusive:
 
 ```bash
-# Common case — prior delivery (N-1) merged to main:
+# Case A — prior delivery's code is on main (the common case after --merge,
+#          AND the only case for legacy delivery-1 plans backfilled in Step E0.5
+#          where no autoforge-delivery-1 tag exists):
 git branch {new_feature_branch} main
 
-# Edge case — prior delivery not yet merged (rare; --evolve usually follows merge):
+# Case B — prior delivery has not been merged yet (rare; --evolve usually follows merge):
 git branch {new_feature_branch} autoforge-delivery-{N-1}-<prev-slug>
 
 git worktree add {new_worktree_root}/main {new_feature_branch}
 ```
 
-The new branch and worktree replace the original ones for this delivery; original worktrees were already cleaned up at the end of delivery N-1 (`Step 4 — Merge to Main`).
+A missing `autoforge-delivery-{N-1}-<slug>` tag is **not** a refusal trigger. For legacy plan dirs (N-1 = 1) Case A always applies: the original feature branch has been merged and deleted, the converged commit lives on `main`, and the migration row in `Evolution History` already records `Autoforge Tag = —`. The new branch and worktree replace the original ones for this delivery; original worktrees (if any) were cleaned up at the end of delivery N-1 (`Step 4 — Merge to Main`).
 
 ### Step E3 — Apply Removals (Pre-Replan)
 

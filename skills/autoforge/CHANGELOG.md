@@ -3,6 +3,40 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0] — 2026-05-08
+
+### Added
+
+- **`SKILL.md` Step E0.5 — legacy plan migration.** `--evolve` previously
+  required the prior plan README to already carry the post-1.2.0 schema
+  (`Feature Branch Family`, `Current Design Delivery`, `Autoforge
+  Delivery`, `Evolution History`). Plan dirs created by earlier autoforge
+  versions had none of these and the skill bailed out at Step E0.2 with no
+  recovery path. Step E0.5 now detects the legacy shape, infers the
+  missing values (`Autoforge Delivery=1`, `Feature Branch Family` from the
+  older `Feature Branch` field, recommended baseline = earliest
+  `delivery-*` design tag reachable from HEAD), confirms the baseline
+  with the user via `AskUserQuestion` (the plan's `Date` field is
+  unreliable when design tags were created retroactively), backfills the
+  Design Input table + adds an `## Evolution History` section with a
+  delivery-1 row, and commits as `docs(plan): backfill evolve-mode fields
+  for legacy delivery-1`. After the commit, E0 resumes at sub-step 4.
+- **`SKILL.md` Step E2 — explicit legacy fork case.** Clarifies that a
+  missing `autoforge-delivery-{N-1}-<slug>` tag is *not* a refusal
+  trigger: legacy delivery-1 plans always take Case A (branch from
+  `main`) since the original feature branch was merged and deleted
+  before per-delivery tagging existed. The Evolution History row added
+  by Step E0.5 records `Autoforge Tag = —` for that delivery.
+
+### Why
+
+Encountered while testing `--evolve` against the castworks plan dir
+`docs/raw/plans/2026-04-11-castworks-1b8c/` (created in April, completed
+to 90.4 % acceptance, then design evolved through `delivery-2` /
+`delivery-3` tags). Without the migration, the only path forward was
+hand-editing the plan README, which is exactly the kind of friction the
+in-place evolve flow was meant to avoid.
+
 ## [1.2.0] — 2026-05-07
 
 Hardens delivery quality in response to the retro
