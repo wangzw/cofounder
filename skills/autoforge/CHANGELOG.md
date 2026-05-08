@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **`SKILL.md` Step E1 sub-step 5 — zero-impact target handling.** When
+  every `revised (direct)` module downgrades to `kept` after the
+  semantic-vs-cosmetic check (URL normalization, table fill-ins, prose
+  rewording only) AND nothing was added or removed, autoforge previously
+  marched into Step E2 and created a no-op evolution branch. Now it
+  stops, presents three options (switch target tag / tag-bump-only
+  delivery / abort), and waits for user input. The Refusal Conditions
+  Summary now lists this as a soft-stop rather than a hard refusal.
+  Surfaced while running --evolve against the castworks plan: user
+  picked target `delivery-3-frontend-draft-reference-retrofit` but the
+  substantive Provider/Model work lives at HEAD's tag; the diff to
+  delivery-3 was 100 % cosmetic and would have produced a meaningless
+  evolution branch.
 - **`SKILL.md` Step E0.5 — legacy plan migration.** `--evolve` previously
   required the prior plan README to already carry the post-1.2.0 schema
   (`Feature Branch Family`, `Current Design Delivery`, `Autoforge

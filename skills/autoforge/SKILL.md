@@ -879,7 +879,15 @@ system-design's evolution emits four file-level lists (`delete | modify | add | 
 
 4. **Refresh conventions baseline** — re-read the design README's `Implementation Conventions` and `Key Technical Decisions`, plus the PRD's `architecture.md` developer convention sections. Diff against the current `plans/conventions.md`. Emit any added/changed convention text as `plans/conventions-additions/_evolve-{N}.md`, to be merged after re-planning (Step E4.1).
 
-5. **Present impact summary to user** — table per module (class + reason), cross-module interface deltas, conventions diff, removed-module fallout (orphaned consumers from `kept` modules — these are surfaced as "downgrade-blocking" and force the consumer into `revised`). The user may explicitly downgrade an `auto-revised (downstream)` module to `kept` (with rationale captured in `versions/<N>.md`) or upgrade a `kept` to `revised`. Approval gate before proceeding.
+5. **Detect zero-impact target.** If after sub-steps 2–4 the impact set is empty (`semantic-revised = 0`, `added = 0`, `removed = 0`, with all `revised (direct)` modules downgraded to `kept` because every change was cosmetic, AND `conventions-additions/_evolve-{N}.md` is empty or absent), the chosen target tag introduces no semantic work. This is *not* the same as `target == baseline` — the diff is non-empty but consists entirely of doc-quality refreshes (URL formatting, table fill-ins, prose rewording). Stop and surface this explicitly to the user via `AskUserQuestion`:
+
+   - **Option A — Switch target tag.** List every other `delivery-*` tag reachable from the design's HEAD that is more recent than the chosen target, plus HEAD itself if untagged. Common cause: the user picked a label like `delivery-3-foo` that is chronologically older than `delivery-2-bar`, because tag names don't always sort with commit graph order. Re-run sub-steps 1–4 with the chosen tag.
+   - **Option B — Tag-bump-only delivery.** Treat the cosmetic refresh as a real (but module-execution-free) delivery: skip Steps E2–E5 entirely, write `versions/{N}.md` describing the doc-only refresh, append the Evolution History row with `Modules: — / — / — / 44`, and create the `autoforge-delivery-{N}-{slug}` annotated tag on the *current* feature branch tip (no new branch, since no source code changed). Run acceptance only as a regression check (Step E6 sub-step 1 with `is_rerun: true`). Useful when the user wants delivery-tag continuity without re-executing modules.
+   - **Option C — Abort the evolve run.** Leave the migration commit (Step E0.5) in place as a useful schema upgrade and stop. The user can re-run `--evolve` later when delivery state is clearer.
+
+   Do NOT silently proceed to E2 with an empty impact set — the user gets no value from a no-op branch + worktree creation, and `versions/{N}.md` becomes meaningless.
+
+6. **Present impact summary to user** — non-empty case only. Table per module (class + reason), cross-module interface deltas, conventions diff, removed-module fallout (orphaned consumers from `kept` modules — these are surfaced as "downgrade-blocking" and force the consumer into `revised`). The user may explicitly downgrade an `auto-revised (downstream)` module to `kept` (with rationale captured in `versions/<N>.md`) or upgrade a `kept` to `revised`. Approval gate before proceeding.
 
 ### Step E2 — Create Evolution Branch
 
@@ -1004,6 +1012,7 @@ Reviewer behaviour is unchanged — it always reviews the current code against t
 | No prior plan directory matches the design | Run from scratch first (no `--evolve` baseline) |
 | Prior plan directory is mid-execution | Resume the in-flight run with `--execute` first |
 | Target design delivery tag equals the prior plan's recorded baseline | Nothing to evolve |
+| Step E1 impact set is empty (all `revised (direct)` downgraded to `kept` after semantic check) | Not a hard refusal — Step E1 sub-step 5 routes to user decision (switch target / tag-bump-only / abort). Never silently proceed to E2 in this state. |
 | Working tree is dirty | Same gate as default Step 0 |
 | `--evolve --fresh` selected | Documented escape hatch — proceeds via Default Mode against a new plan directory |
 
