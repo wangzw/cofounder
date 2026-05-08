@@ -34,6 +34,7 @@ exposes.
 | SP6 | Conditional skip on missing route/data: `if (res.status === 404) test.skip()` | The 404 IS the bug; skipping hides it | Remove the conditional skip; if the route is genuinely out-of-scope, mark the test `test.skip` with an issue link |
 | SP7 | Mock-only verification of behaviour the PRD says is observable to the user | Tests the mock, not the system | At least one test per AC that exercises the real wired path (DB writes through, route registered, cookie set) |
 | SP8 | Asserting on `console.warn` / log output as a substitute for asserting on user-visible state | Confirms the warning logged, not that the feature works | Assert on the user-observable state change |
+| SP9 | Orchestrator hand-writes `acceptance.md` / `traceability.json` based on its own view of test results, instead of spawning a fresh-context Acceptance Tester subagent | Writer = verdict — the same agent that decided which signals to gather decides whether they're sufficient. This is the d1 / d2 retro failure mode. | Spawn the Acceptance Tester subagent (autoforge SKILL.md Step 3 / E6). The subagent's report carries the sentinel `<!-- generated-by: acceptance-tester-subagent; version: N -->` as its first line. `check-acceptance-report.sh` (CR-AF24) and `run-checkers.sh --gate=delivery-tag` enforce the sentinel; pasting it onto a hand-written file is itself an SP3 placeholder and a separate violation. |
 
 **`test.skip` is the only legal way to defer a test.** Each `test.skip` MUST:
 

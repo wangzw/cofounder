@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.3.0
+version: 1.5.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
@@ -608,6 +608,22 @@ After all phases complete, validate against the original PRD.
 
 ### Acceptance Tester Role
 
+> **Mandatory subagent boundary (delivery-1 / delivery-2 retro).** The
+> Orchestrator is **structurally forbidden** from hand-writing
+> `reports/acceptance.md` or `reports/traceability.json`. Both files
+> MUST be produced by a fresh Acceptance Tester subagent spawned in
+> this step. The subagent's report carries a sentinel
+> `<!-- generated-by: acceptance-tester-subagent; version: N -->` as
+> its first non-blank line; `check-acceptance-report.sh` (CR-AF24)
+> refuses any acceptance.md missing the sentinel, and the
+> `--gate=delivery-tag` mode of `run-checkers.sh` refuses to authorize
+> tag creation in that case.
+>
+> If you ever feel the temptation as Orchestrator to "just write a
+> short acceptance report myself", that is exactly the soft-pass
+> failure mode that produced the d1 / d2 incidents. Spawn the
+> subagent. No exceptions.
+
 Spawn the Acceptance Tester agent in the primary worktree:
 
 ```
@@ -717,6 +733,22 @@ When the acceptance fix cycle stabilizes at PARTIAL (no further progress but som
 
 Executed when acceptance verdict is PASS, or when the user explicitly chooses to merge with a PARTIAL verdict (see Acceptance Fix Cycle — PARTIAL Verdict Handling, option a).
 
+0. **Pre-merge delivery gate (MANDATORY).** Before any rebase or merge,
+   run the same gate the evolution-mode Step E6 mandates:
+
+   ```bash
+   bash skills/autoforge/scripts/run-checkers.sh \
+     docs/raw/plans/{plan-dir}/ \
+     --source-root {worktree_root}/main \
+     --gate=delivery-tag
+   ```
+
+   The exit code is the authorization signal. Exit 0 → proceed. Exit
+   1 → DO NOT merge; route blocking findings through the Acceptance
+   Fix Cycle. This is identical to Step E6's gate and applies to
+   delivery-1 (default mode) as well — the d1 / d2 retros showed both
+   modes were vulnerable to the same self-attestation soft-pass.
+
 1. **Rebase feature branch** onto latest main (in the primary worktree, which is on the feature branch):
    ```
    cd {worktree_root}/main
@@ -794,7 +826,7 @@ This mode is useful for:
 
 When invoked with `--evolve docs/raw/design/<design-dir>/ [--from <plan-dir>] [--plan-only] [--fresh]`:
 
-The design directory has been evolved in place by `system-design --evolve` and now carries a new `delivery-<N>-<slug>` annotated tag (see system-design `SKILL.md` Phase Contract: design history is preserved via tags + `.review/versions/<N>.md` + the design `CHANGELOG.md`). autoforge follows the same convention on the implementation side: **the existing plan directory is mutated in place** — `--evolve` does NOT create a new plan directory. Plan history is preserved via:
+The design directory has been evolved in place by `system-design --evolve` and now carries a new `system-design-delivery-<N>-<slug>` annotated tag (see system-design `SKILL.md` Phase Contract: design history is preserved via tags + `.review/versions/<N>.md` + the design `CHANGELOG.md`). autoforge follows the same convention on the implementation side: **the existing plan directory is mutated in place** — `--evolve` does NOT create a new plan directory. Plan history is preserved via:
 
 - Annotated git tag `autoforge-delivery-<N>-<slug>` at each delivery's converged commit on the feature branch
 - Per-delivery summary file `docs/raw/plans/{plan-dir}/versions/<N>.md`
@@ -822,7 +854,7 @@ If a particular evolution is so heavy that in-place mutation would be misleading
    - `Source PRD`
    - `Feature Branch Family` (e.g. `autoforge/{design-dir-name}-{hash4}`) — falls back to the older `Feature Branch` field on legacy READMEs
    - `Worktree Root`
-   - `Current Design Delivery` (e.g. `delivery-2-tooling`) — the **baseline design tag**; may be absent on legacy READMEs (handled in Step E0.5)
+   - `Current Design Delivery` (e.g. `system-design-delivery-2-tooling`) — the **baseline design tag**; may be absent on legacy READMEs (handled in Step E0.5)
    - `Autoforge Delivery` (integer; this is delivery `N-1`; the new delivery is `N`); may be absent on legacy READMEs (handled in Step E0.5)
    - `Acceptance Threshold`
 
@@ -833,8 +865,8 @@ If a particular evolution is so heavy that in-place mutation would be misleading
    1. **Infer values:**
       - `Feature Branch Family` ← existing `Feature Branch` value
       - `Autoforge Delivery` ← `1` (the existing implementation is the first delivery)
-      - `Current Design Delivery` ← run `git tag --list 'delivery-*' --merged HEAD --sort=creatordate` in the design's repo. Recommended default = the **earliest** delivery tag reachable from the design's HEAD (the design state the implementation was originally written against — subsequent design tags are evolutions to migrate toward). If no `delivery-*` tag exists, refuse: "design has no `delivery-*` tag yet — run `system-design --evolve` first to establish a baseline".
-   2. **Confirm with user (mandatory):** present the inferred baseline alongside *all* candidate `delivery-*` tags (with their commit short-hashes and dates) via `AskUserQuestion` so the user can override. The plan's `Date` field is unreliable on its own — the legacy plan may have been written against a design that was tagged retroactively. The user's selection becomes `Current Design Delivery`.
+      - `Current Design Delivery` ← run `git tag --list 'system-design-delivery-*' --merged HEAD --sort=creatordate` in the design's repo. Recommended default = the **earliest** delivery tag reachable from the design's HEAD (the design state the implementation was originally written against — subsequent design tags are evolutions to migrate toward). If no `system-design-delivery-*` tag exists, refuse: "design has no `system-design-delivery-*` tag yet — run `system-design --evolve` first to establish a baseline".
+   2. **Confirm with user (mandatory):** present the inferred baseline alongside *all* candidate `system-design-delivery-*` tags (with their commit short-hashes and dates) via `AskUserQuestion` so the user can override. The plan's `Date` field is unreliable on its own — the legacy plan may have been written against a design that was tagged retroactively. The user's selection becomes `Current Design Delivery`.
    3. **Backfill the README** (Design Input + Evolution History only):
       - Insert `Feature Branch Family`, `Current Design Delivery`, `Autoforge Delivery`, and `Autoforge Delivery Tag` rows into the Design Input table per the template (keep `Feature Branch` as well — leave existing rows untouched). `Autoforge Delivery Tag` ← `—` (no tag was created at delivery-1's converged commit).
       - Add a `## Evolution History` section before `## Phase Status`, populated with one row for delivery-1: Baseline `—`, Target = the chosen `Current Design Delivery`, Autoforge Tag `—`, Modules `— / {total-from-Module-Index} / — / —`, Verdict = the existing Acceptance row's verdict (e.g. `Pass (90.4%)`), Summary `Legacy delivery (pre-evolve)`.
@@ -847,7 +879,7 @@ If a particular evolution is so heavy that in-place mutation would be misleading
 
    The ID-collision check between the design's `added` modules and the plan dir's existing `M-{id}` plans is **not** part of E0.5 — it runs in Step E1 sub-step 2.5 below, where `added` is first identified. E0.5 itself only handles README schema and orphan rows.
 
-4. **Resolve the design's target delivery tag** — list `delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
+4. **Resolve the design's target delivery tag** — list `system-design-delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'system-design-delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
 
 5. **Refuse on dirty / mid-flight states** (same gate as Step 0):
    | Condition | Action |
@@ -899,7 +931,7 @@ system-design's evolution emits four file-level lists (`delete | modify | add | 
 
 5. **Detect zero-impact target.** If after sub-steps 2–4 the impact set is empty (`semantic-revised = 0`, `added = 0`, `removed = 0`, with all `revised (direct)` modules downgraded to `kept` because every change was cosmetic, AND `conventions-additions/_evolve-{N}.md` is empty or absent), the chosen target tag introduces no semantic work. This is *not* the same as `target == baseline` — the diff is non-empty but consists entirely of doc-quality refreshes (URL formatting, table fill-ins, prose rewording). Stop and surface this explicitly to the user via `AskUserQuestion`:
 
-   - **Option A — Switch target tag.** List every other `delivery-*` tag reachable from the design's HEAD that is more recent than the chosen target, plus HEAD itself if untagged. Common cause: the user picked a label like `delivery-3-foo` that is chronologically older than `delivery-2-bar`, because tag names don't always sort with commit graph order. Re-run sub-steps 1–4 with the chosen tag.
+   - **Option A — Switch target tag.** List every other `system-design-delivery-*` tag reachable from the design's HEAD that is more recent than the chosen target, plus HEAD itself if untagged. Common cause: the user picked a label like `system-design-delivery-3-foo` that is chronologically older than `system-design-delivery-2-bar`, because tag names don't always sort with commit graph order. Re-run sub-steps 1–4 with the chosen tag.
    - **Option B — Tag-bump-only delivery.** Treat the cosmetic refresh as a real (but module-execution-free) delivery: skip Steps E2–E5 entirely, write `versions/{N}.md` describing the doc-only refresh, append the Evolution History row with `Modules: — / — / — / 44`, and create the `autoforge-delivery-{N}-{slug}` annotated tag on the *current* feature branch tip (no new branch, since no source code changed). Run acceptance only as a regression check (Step E6 sub-step 1 with `is_rerun: true`). Useful when the user wants delivery-tag continuity without re-executing modules.
    - **Option C — Abort the evolve run.** Leave the migration commit (Step E0.5) in place as a useful schema upgrade and stop. The user can re-run `--evolve` later when delivery state is clearer.
 
@@ -1003,15 +1035,45 @@ Standard Step 2 flow with two adjustments:
 
 3. **Update CHANGELOG.md** — `docs/raw/plans/{plan-dir}/CHANGELOG.md` gets a new section header `## delivery-{N} — {YYYY-MM-DD} — {target-tag}` with bullet summary referencing `versions/{N}.md`.
 
-4. **Commit-delivery** — single commit on the feature branch: `docs(plan): finalize autoforge delivery-{N}` and create annotated tag:
+4. **Pre-tag delivery gate (MANDATORY).** Before creating the annotated tag, run:
+
+   ```bash
+   bash skills/autoforge/scripts/run-checkers.sh \
+     docs/raw/plans/{plan-dir}/ \
+     --source-root {worktree_root}/main \
+     --gate=delivery-tag
+   ```
+
+   The gate enforces, beyond the normal checker set:
+   - `reports/acceptance.md` exists and carries the
+     acceptance-tester-subagent sentinel (CR-AF24 / CR-AF27).
+   - `reports/traceability.json` exists (CR-AF28).
+   - The `## E2E Test Run` section in `acceptance.md` records a real
+     command + exit code, OR a written `n/a — …` justification
+     (CR-AF23).
+   - Every frontend feature ID owned by a design module with
+     `## UI Architecture` has at least one matching e2e spec file
+     (CR-AF26).
+   - Traceability closure is clean (no orphan tests, unmapped AC,
+     PASS-without-test, NOT_COVERED-without-issue, naming-content
+     mismatches, happy-only journeys).
+
+   **The gate's exit code is the authorization signal.** Exit 0 →
+   proceed to the tag command. Exit 1 → DO NOT create the tag; treat
+   each blocking finding as a failed acceptance criterion and route
+   through the Acceptance Fix Cycle. The d1 / d2 retros showed that
+   self-attestation produced soft-pass deliveries; this gate is the
+   structural counter-pressure.
+
+5. **Commit-delivery** — single commit on the feature branch: `docs(plan): finalize autoforge delivery-{N}` and create annotated tag:
 
    ```bash
    git tag -a autoforge-delivery-{N}-<slug> -m "autoforge delivery {N}: {target-design-tag}"
    ```
 
-   `<slug>` matches the design's `delivery-{N}-<slug>` slug for 1:1 traceability.
+   `<slug>` matches the design's `system-design-delivery-{N}-<slug>` slug for 1:1 traceability.
 
-5. **Step 4 (Merge to main)** — runs as in the default flow, but on `{new_feature_branch}` instead of the original.
+6. **Step 4 (Merge to main)** — runs as in the default flow, but on `{new_feature_branch}` instead of the original.
 
 ### Evolution Mode in Module Agent
 
@@ -1109,7 +1171,7 @@ Module branches (created by Orchestrator before spawning Module Agent):
 Annotated tags (created on converged delivery commit):
   autoforge-delivery-{N}-{slug}
   Example: autoforge-delivery-2-cancel-flow
-  The slug matches the design's delivery-{N}-{slug} for 1:1 traceability.
+  The slug matches the design's system-design-delivery-{N}-{slug} for 1:1 traceability.
 ```
 
 - `{design-dir-name}` = design directory name, directly traceable to `docs/raw/design/{name}/`

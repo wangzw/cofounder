@@ -1,3 +1,18 @@
+<!-- generated-by: acceptance-tester-subagent; version: 1 -->
+<!--
+  This sentinel above MUST be the FIRST line of every acceptance.md report.
+  It is asserted by check-acceptance-report.sh (CR-AF24) and by
+  run-checkers.sh --gate=delivery-tag.
+
+  The sentinel exists because the autoforge Orchestrator is structurally
+  forbidden from hand-writing this file: writer = verdict is the failure
+  mode that produced the soft-pass acceptance reports in delivery-1 and
+  delivery-2. Only an Acceptance Tester subagent (spawned in a fresh
+  context, with traceability.json + full local CI as the input) may produce
+  this file. Removing the sentinel — or hand-editing the file as the
+  Orchestrator — invalidates every claim below.
+-->
+
 # Acceptance Report: {project-name}
 
 > Validation of implemented code against PRD requirements.
@@ -66,6 +81,50 @@
 | J-001 {name} | 3 | 3 | 0 | 0 | 100% |
 | J-002 {name} | 5 | 4 | 1 | 0 | 80% |
 | **Total** | **{n}** | **{n}** | **{n}** | **{n}** | **{pct}%** |
+
+## E2E Test Run
+
+<!-- Required (delivery-discipline §H + autoforge skill Step E6).
+Cannot be omitted. The Acceptance Tester MUST actually invoke the
+project's E2E command and embed the verbatim invocation, summary, and
+exit code below. `check-e2e-coverage.sh` (CR-AF23) parses these blocks
+and refuses the delivery-tag gate if they are absent or claim success
+without a command record.
+
+If the project legitimately has no E2E surface (pure CLI, library, etc.),
+state that explicitly and skip the spec table — but the section header
+above is still required and the Command field below must say
+`n/a — project has no E2E layer (justification: …)`. -->
+
+| Field | Value |
+|-------|-------|
+| Command | ``$ npm run test:e2e`` (or actual project equivalent) |
+| Working Dir | `frontend/` (or wherever the e2e suite lives) |
+| Exit Code | `0` |
+| Specs Discovered | `{n}` |
+| Specs Passed | `{n}` |
+| Specs Failed | `{n}` |
+| Specs Skipped | `{n}` (each skip MUST have a tracked issue link) |
+| Duration | `{seconds}s` |
+
+```text
+{paste the last ~30 lines of the e2e command output verbatim — must
+include the test framework's summary line such as `xx passed (yyy.ms)` /
+`Tests: xx passed, yy failed`. Trimming the middle is fine; the summary
+line is mandatory.}
+```
+
+### F-ID Coverage
+
+<!-- One row per delivery-N feature ID with a frontend / E2E surface. The
+spec column lists at least one e2e spec file whose name encodes the
+F-ID. `check-e2e-coverage.sh` (CR-AF26) verifies the file actually
+exists. -->
+
+| F-ID | Spec File | Status |
+|------|-----------|--------|
+| F-049 | `e2e/F-049-provider-resolver-chain.spec.ts` | PASS |
+| F-050 | `e2e/F-050-admin-llm-providers.spec.ts` | PASS |
 
 ## Negative-Path Coverage
 

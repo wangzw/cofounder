@@ -3,6 +3,148 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.0] — 2026-05-08
+
+### Added — structural counter-pressure to the d1 / d2 soft-pass failure mode
+
+The delivery-1 and delivery-2 retros showed the same failure: the
+Orchestrator wrote `acceptance.md` itself based on weaker signals
+(unit + integration tests, no e2e, no traceability) and stamped a
+`autoforge-delivery-N-*` tag on a self-attested PASS. Adding more
+rules to prompts could not prevent this — *writer = verdict* must be
+made structurally impossible. This release closes the loop with four
+mutually-reinforcing checks (A–D) so a third occurrence is mechanically
+unreachable.
+
+- **A — Acceptance Tester sentinel** (`CR-AF24`).
+  Every `reports/acceptance.md` MUST start with the line
+  `<!-- generated-by: acceptance-tester-subagent; version: 1 -->` (or
+  later versions). Only a freshly-spawned Acceptance Tester subagent
+  may write this file. `check-acceptance-report.sh` (`scripts/`) now
+  asserts the sentinel; `acceptance/report-template.md` and
+  `acceptance/tester-prompt.md` document and require it. The d1 / d2
+  acceptance reports lack the sentinel and would now be rejected on
+  sight.
+
+- **B — `check-e2e-coverage.sh`** (`CR-AF23`, `CR-AF26`). New checker.
+  - `CR-AF23` (critical): the `## E2E Test Run` section must record a
+    real command, exit code, and verbatim output block — or an
+    explicit `n/a — <justification>` Command line. Empty placeholders
+    or missing sections are critical.
+  - `CR-AF26` (error): every feature ID owned by a design module
+    carrying a `## UI Architecture` section must have at least one e2e
+    spec file under `frontend/e2e/` / `e2e/` / `tests/e2e/` whose
+    filename encodes the F-ID. Tested against d2: cleanly identified
+    F-050 as the single missing spec; backend-only F-IDs are not
+    flagged (uses the design's `UI Architecture` declaration as the
+    source of truth, not a noisy keyword regex).
+  Wired into `run-checkers.sh` dispatch.
+
+- **C — `check-traceability.sh` hardening** (`CR-AF15`).
+  Each PASS/FAIL entry's `tests[]` (and each journey scenario's
+  `test`) MUST be a non-empty string. When `--source-root` is supplied,
+  the path must resolve to a real file. Catches the soft-pass pattern
+  "PASS with `tests: [\"\"]`" and "PASS pointing at a renamed file".
+  Existing schema / closure / negative-coverage checks (CR-AF07–10,
+  CR-AF21) preserved.
+
+- **D — `run-checkers.sh --gate=delivery-tag`** (`CR-AF27`, `CR-AF28`).
+  New gate mode that fronts the standard dispatch. In gate mode:
+  - `reports/acceptance.md` is REQUIRED to exist (synthetic CR-AF27 if
+    missing).
+  - `reports/traceability.json` is REQUIRED to exist (CR-AF28).
+  - Any error or critical finding (across all checkers) blocks the
+    gate; warnings are advisory.
+  - Exit 0 = `DELIVERY-TAG GATE PASSED` banner; exit 1 =
+    `DELIVERY-TAG GATE FAILED — refusing to authorize tag creation`.
+  `SKILL.md` Step E6 sub-step 4 and Step 4 sub-step 0 now require this
+  gate to pass before `git tag -a autoforge-delivery-*` and before
+  fast-forward-merging the feature branch.
+
+### Changed
+
+- `acceptance/report-template.md` adds a new mandatory `## E2E Test Run`
+  section with Command / Working Dir / Exit Code / Specs counts /
+  Duration rows + a fenced output block, plus an `### F-ID Coverage`
+  sub-table mapping every frontend F-ID to its spec file.
+- `acceptance/tester-prompt.md` Step 3 now explicitly enumerates the
+  project's E2E suite as part of the full local CI command set, with
+  guidance on discovering the e2e command from `package.json`. Step 5
+  enforces the sentinel.
+- `SKILL.md` Step 3 (Acceptance Tester Role) carries an "MANDATORY
+  subagent boundary" callout naming the d1 / d2 retros and forbidding
+  the Orchestrator from hand-writing acceptance.md / traceability.json.
+- `check-acceptance-report.sh` adds `## E2E Test Run` to the required
+  sections list and emits `CR-AF25` if the section is present but
+  missing Command / Exit Code rows.
+- `delivery-discipline.md` §A gains a new `SP9` entry — Orchestrator
+  hand-writing `acceptance.md` / `traceability.json` (the d1 / d2
+  retro failure mode) is now an explicit forbidden pattern in the
+  shared ruleset every sub-agent reads, alongside the existing soft-
+  pass test patterns.
+- `check-e2e-coverage.sh` rejects `n/a` justifications that contain
+  delivery-discipline §L's forbidden complexity-excuse phrases ("too
+  complex", "no time", "later", "TBD/TODO", "tracked as follow-up", …)
+  even when the post-`n/a` text length passes. Acceptable
+  justifications must name a concrete observable cause ("project is a
+  Go library, no UI surface").
+- `check-traceability.sh` CR-AF15 now uses `os.path.isfile` (not
+  `os.path.exists`); a directory at the test path means the test was
+  renamed/deleted and the path is stale, which is exactly the soft-
+  pass shape the check is meant to catch.
+
+### Tests
+
+- New `tests/test-gate-mode.sh` — 23 fixture-based regression tests
+  covering every CR-AF the gate enforces (AF15, AF23, AF24, AF25,
+  AF26, AF27, AF28), including the standard-mode no-fire condition
+  for CR-AF23 mid-phase. Locks the gate against future regression.
+
+### Validation
+
+The new gate, run retroactively against `docs/raw/plans/2026-04-11-castworks-1b8c/`
+(d2's plan dir), produces:
+
+```
+DELIVERY-TAG GATE FAILED — 21 blocking finding(s) (worst severity: critical);
+refusing to authorize tag creation
+```
+
+— including CR-AF24 (missing sentinel), CR-AF23 (missing E2E Test Run
+block), CR-AF26 (F-050 missing spec), CR-AF28 (missing
+traceability.json). In other words: the gate would have caught d2's
+soft-pass and refused to authorize the tag.
+
+## [1.4.0] — 2026-05-08
+
+### Changed
+
+- **BREAKING — design-tag namespace rename.** Updated every reference
+  that reads `system-design`'s annotated delivery tags to use the new
+  `system-design-delivery-*` namespace (was bare `delivery-*`).
+  - **Why.** `prd-analysis` and `system-design` previously *both*
+    created `delivery-<N>-<slug>` tags, so this skill's
+    `git tag --list 'delivery-*' --merged HEAD` queries (Step E0.5
+    sub-step 1, Step E1 sub-step 1, Step E1 sub-step 5 Option A)
+    could match PRD-side tags in repos containing both. The
+    `--sort=creatordate` "earliest match" baseline default was the
+    most dangerous case — autoforge could pick a PRD tag as the design
+    baseline. Each skill now owns its own `<skill>-delivery-*`
+    namespace; this skill's own tags (`autoforge-delivery-<N>-<slug>`)
+    were already isolated and remain unchanged.
+  - **Scope of change.** `SKILL.md` (Phase Contract narrative,
+    `Current Design Delivery` example, `git tag --list` queries and
+    refuse messages, Option A example tags, slug-traceability lines),
+    `planning/plan-readme-template.md` (`Current Design Delivery` row
+    and Evolution History example rows), `planning/planner-prompt.md`
+    (`baseline_design_tag` / `target_design_tag` examples).
+  - **Migration.** A one-shot repo-level
+    `scripts/migrate-delivery-tags.sh` renames pre-existing
+    `delivery-<N>-<slug>` tags to the new namespaced form. Existing
+    plan READMEs that record the old tag name in
+    `Current Design Delivery` / Evolution History rows should be
+    updated by hand or via `--evolve`'s next migration pass.
+
 ## [1.3.0] — 2026-05-08
 
 ### Added

@@ -12,26 +12,48 @@
 #   CR-AF11  fail-status-blocks-pass (any FAIL entry must be reported,
 #            not silently absent — covered by closure: every AC must
 #            appear in criteria[] or in unmapped_criteria[])
+#   CR-AF15  tests-list-must-have-concrete-paths (PASS / FAIL entries
+#            must reference at least one non-empty test path string —
+#            stops "PASS with empty tests" or "PASS with [\"\"]" soft-pass)
 #   CR-AF21  journey-negative-coverage (each journey must record at least
 #            one scenario whose `kind` is not `happy`, or document the
 #            gap with a tracked issue — delivery-discipline §M.2)
 #
-# Usage: check-traceability.sh <traceability-json>
+# Usage: check-traceability.sh <traceability-json> [--source-root <dir>]
+#
+# When --source-root is supplied, CR-AF15 additionally checks that each
+# referenced test path resolves to an existing file under <source-root>.
+# Without it, only the "non-empty string" check fires.
 
 set -euo pipefail
 
 TFILE="${1:-}"
 if [ -z "$TFILE" ] || [ ! -f "$TFILE" ]; then
   echo "ERROR: traceability file not found: ${TFILE:-<empty>}" >&2
-  echo "Usage: check-traceability.sh <traceability-json>" >&2
+  echo "Usage: check-traceability.sh <traceability-json> [--source-root <dir>]" >&2
   exit 2
 fi
+shift
+
+SOURCE_ROOT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --source-root) SOURCE_ROOT="$2"; shift 2 ;;
+    *) echo "ERROR: unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python3 - "$TFILE" "$SCRIPT_DIR/lib" <<'PYEOF'
+export AF_TFILE="$TFILE"
+export AF_SOURCE_ROOT="$SOURCE_ROOT"
+export AF_LIB_DIR="$SCRIPT_DIR/lib"
+
+python3 - <<'PYEOF'
 import json, os, sys
-tfile = sys.argv[1]
-sys.path.insert(0, sys.argv[2])
+tfile = os.environ["AF_TFILE"]
+source_root = os.environ.get("AF_SOURCE_ROOT") or ""
+sys.path.insert(0, os.environ["AF_LIB_DIR"])
 from autoforge_lint import (
     Finding, emit, fail_with_script_error, AC_REF_RE, JOURNEY_ID_RE,
     ISSUE_REF_RE,
@@ -103,6 +125,47 @@ for i, c in enumerate(data.get("criteria", []) or []):
                 description=f"criteria[{i}] ({cid}): {status} entry has no tests[]",
                 suggested_fix="list at least one test path that exercises this AC",
             ))
+        elif isinstance(tests, list):
+            # CR-AF15 — every test path must be a non-empty string; if a
+            # source-root is supplied, the path must resolve to a real file.
+            for ti, tp in enumerate(tests):
+                if not isinstance(tp, str) or not tp.strip():
+                    findings.append(Finding(
+                        criterion_id="CR-AF15", file=rel, severity="error",
+                        description=(
+                            f"criteria[{i}] ({cid}).tests[{ti}] is not a "
+                            f"non-empty string ({tp!r})"
+                        ),
+                        suggested_fix=(
+                            "replace with the actual test file path or "
+                            "test case identifier (e.g. "
+                            "`tests/acceptance/test_F001_AC3.py` or "
+                            "`e2e/F-001-login.spec.ts::happy_path`)"
+                        ),
+                    ))
+                    continue
+                if source_root:
+                    # Strip ::testname suffix and any trailing whitespace.
+                    raw_path = tp.split("::", 1)[0].strip()
+                    full = os.path.join(source_root, raw_path)
+                    # Use isfile, not exists: a directory at the test path
+                    # means the path is wrong (renamed test, deleted file
+                    # but stale parent dir, etc.).
+                    if not os.path.isfile(full):
+                        findings.append(Finding(
+                            criterion_id="CR-AF15", file=rel, severity="error",
+                            description=(
+                                f"criteria[{i}] ({cid}).tests[{ti}] references "
+                                f"a path that is not an existing file under "
+                                f"source-root: {tp!r}"
+                            ),
+                            suggested_fix=(
+                                "fix the path to point at a real test file "
+                                "(typo, wrong subdir, or the test was never "
+                                "actually written — the AC is then "
+                                "NOT_COVERED, not PASS)"
+                            ),
+                        ))
     # CR-AF10 — NOT_COVERED needs issue link
     if status == "NOT_COVERED":
         issue = str(c.get("issue", "")).strip()
@@ -197,6 +260,43 @@ for i, j in enumerate(data.get("journeys", []) or []):
                     ))
                 else:
                     kinds.append(kind)
+                # CR-AF15 — scenario.test must be a non-empty path; if
+                # source-root is supplied, file must exist.
+                stat = s.get("status")
+                if stat in ("PASS", "FAIL"):
+                    test_path = s.get("test")
+                    if not isinstance(test_path, str) or not test_path.strip():
+                        findings.append(Finding(
+                            criterion_id="CR-AF15", file=rel, severity="error",
+                            description=(
+                                f"journeys[{i}] ({jid}).scenarios[{k}] ({kind}, "
+                                f"{stat}) has empty/missing `test` path "
+                                f"({test_path!r})"
+                            ),
+                            suggested_fix=(
+                                "set `test` to the spec file that asserts this "
+                                "scenario (e.g. `e2e/J-001-checkout-error.spec.ts`); "
+                                "PASS without a test path is a soft-pass per "
+                                "delivery-discipline §A SP4"
+                            ),
+                        ))
+                    elif source_root:
+                        raw_path = test_path.split("::", 1)[0].strip()
+                        # Use isfile, not exists: a directory at the spec
+                        # path means the spec was renamed/deleted.
+                        if not os.path.isfile(os.path.join(source_root, raw_path)):
+                            findings.append(Finding(
+                                criterion_id="CR-AF15", file=rel, severity="error",
+                                description=(
+                                    f"journeys[{i}] ({jid}).scenarios[{k}].test "
+                                    f"references non-existent file: {test_path!r}"
+                                ),
+                                suggested_fix=(
+                                    "fix the path to point at a real spec file, "
+                                    "or downgrade the scenario to NOT_COVERED "
+                                    "with an issue link"
+                                ),
+                            ))
             non_happy = [k for k in kinds if k != "happy"]
             if not non_happy:
                 if not coverage_gap_issue or not ISSUE_REF_RE.match(coverage_gap_issue):

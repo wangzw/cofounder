@@ -116,7 +116,20 @@ Development Workflow (discipline §H), not just acceptance tests:
 - Unit tests (all modules)
 - Module-level integration tests
 - Phase-level integration tests
-- Your new E2E acceptance tests
+- **The project's E2E suite** — not just unit / vitest. Discover the
+  e2e command from `package.json` scripts (look for `test:e2e`,
+  `e2e`, `playwright`, `cypress`, or any script whose name starts
+  with `e2e`). If you find none, search for `playwright.config.*`
+  / `cypress.config.*` / `e2e/` directories and run the framework's
+  standard CLI directly. **Capture the verbatim invocation, the
+  exit code, and the summary line** of the output — they are
+  mandatory inputs to the `## E2E Test Run` section of acceptance.md
+  (Step 5). If the project genuinely has no e2e surface, you must
+  justify that in the report (`Command: n/a — …`). "Skipped because
+  it would take too long" is **not** a valid justification — that
+  is the exact failure mode the delivery-2 retro caught.
+- Your new E2E acceptance tests on top of the project suite (one per
+  AC / journey scenario, named after the PRD reference per §E).
 - Any other check the project requires (license, generated-code freshness, schema drift, smoke against ephemeral env, etc.)
 
 All of the above must be green for a PASS verdict. Regression failures —
@@ -192,6 +205,20 @@ Calculate:
 
 Create `{report_dir}/acceptance.md` using the `acceptance/report-template.md` structure.
 
+**Mandatory sentinel.** The very first non-blank line of `acceptance.md`
+MUST be:
+
+```
+<!-- generated-by: acceptance-tester-subagent; version: 1 -->
+```
+
+This sentinel is asserted by `check-acceptance-report.sh` (CR-AF24) and
+by `run-checkers.sh --gate=delivery-tag`. It exists because the
+delivery-1 / delivery-2 retros showed the Orchestrator silently writing
+the acceptance verdict itself when the Acceptance Tester subagent was
+skipped — a "writer = verdict" soft-pass pattern. The sentinel makes
+that bypass mechanically impossible.
+
 Key sections:
 - Summary table with overall verdict (in journey-language per discipline §J)
 - Per-feature acceptance criteria results
@@ -199,6 +226,14 @@ Key sections:
 - Journey E2E scenario results — touchpoints traversed / total
 - Requirements traceability matrix
 - E2E traceability matrix
+- **E2E Test Run** — the actual command you ran, working dir, exit code,
+  spec counts, and the verbatim summary line of the framework's output.
+  This block is mandatory (CR-AF25); if the project genuinely has no
+  E2E layer, the Command field must read `n/a — project has no E2E
+  layer (justification: …)` and you must justify it in writing.
+- F-ID Coverage table — one row per feature ID with a frontend / E2E
+  surface, listing the spec file that asserts it (CR-AF26 verifies the
+  file actually exists).
 - Failed items with responsible module (from Feature-Module mapping) and fix suggestions
 - Not covered items with reasons **and tracked issue links**
 - Outstanding Debt section: every NOT_COVERED entry, plus every limitation surfaced by this run (mock-only paths, disabled features, soft-passes that were flipped, contracts not yet enforced) — each with PRD reference, current state, user impact, and issue link.

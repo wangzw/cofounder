@@ -29,8 +29,8 @@ You will receive these parameters from the Orchestrator:
 - `evolution_delivery_n`: integer — the autoforge delivery number being planned (N≥2)
 - `previous_plan_path`: path to this module's plan file as it existed at the prior delivery's commit (read via `git show {parent_commit}:{path}` and staged into a temp file). Empty if the module is **added** in this delivery
 - `design_delta_summary_path`: path to `<plan_dir>/.evolve-{N}/impact.md` containing the autoforge-computed module classification, the system-design `versions/<N>.md` summary, and the cosmetic-vs-semantic interface diff
-- `baseline_design_tag`: previous design tag (e.g. `delivery-1-{slug}`)
-- `target_design_tag`: current design tag (e.g. `delivery-2-{slug}`)
+- `baseline_design_tag`: previous design tag (e.g. `system-design-delivery-1-{slug}`)
+- `target_design_tag`: current design tag (e.g. `system-design-delivery-2-{slug}`)
 - `removed_modules`: list of module IDs being removed in this delivery — your plan **must not** reference any of them as a dependency or import target
 - `evolution_class`: `revised-direct | revised-downstream | added` for this module. `revised-direct` = its own design file changed semantically; `revised-downstream` = its design is unchanged but a dependency's interface changed; `added` = brand-new module in this delivery
 
