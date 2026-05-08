@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **`SKILL.md` Step E1 sub-step 2.5 — ID collision check on `added`
+  modules.** Initially placed inside Step E0.5's legacy-migration flow,
+  the check more naturally belongs in E1 where `added` is first
+  classified. Moved it out so the check runs on every `--evolve` (not
+  just legacy migrations) and the legacy migration commit stays
+  scope-limited to README schema + orphan rows. Hard-refusal: prints
+  both colliding paths + the existing plan's status, then suggests
+  renumbering on the design side (recommended) or the plan side.
 - **`SKILL.md` Step E1 sub-step 5 — zero-impact target handling.** When
   every `revised (direct)` module downgrades to `kept` after the
   semantic-vs-cosmetic check (URL normalization, table fill-ins, prose

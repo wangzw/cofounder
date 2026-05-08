@@ -842,9 +842,10 @@ If a particular evolution is so heavy that in-place mutation would be misleading
       - **If the plan file looks like merged hotfix work** (has a `Source Issue`/`Source ADR` field, references existing modules as deps, and the file is reachable from `main` per `git log --all -- <plan-path>`): append a row to `## Module Status` with `Plan=Done · Dev=Done · Test=Done · Review=Approved · Merged=Yes` and the Notes column citing the source issue/ADR (e.g. `manual hotfix · issue #21`). Also append a corresponding row to `## Module Plans` so the index stays complete; mark the Phase column as `Hotfix` (not a numbered phase, since these landed outside the planned phase order).
       - **If the plan file is unrecognised** (no source-issue marker, never made it to `main`, or the user can't classify it): present the file path and the first 30 lines to the user via `AskUserQuestion` and ask whether to (a) add as completed hotfix, (b) drop the file (`git rm`), or (c) abort the migration so the user can resolve manually.
       - These reconciliation edits go into the same migration commit — no separate commit per orphan.
-   5. **Detect ID collisions with the design's added modules.** For each module classified `added` in the upcoming Step E1 (those with new `modules/M-{id}-{slug}.md` files in the target design tag): if the same `M-{id}` already has a plan file under `plans/` (whether from the original autoforge run or from sub-step 4's hotfix reconciliation), this is a **hard refusal** — the design's evolution introduces an ID that the implementation has already burned for unrelated work. Report the collision (`design adds M-{id}-<design-slug>; plan dir already owns M-{id}-<plan-slug>`) and stop. The user must either renumber the design's new module (re-run `system-design --evolve` to allocate a different ID) or rename the existing plan file before retrying.
-   6. **Commit on the branch the plan dir currently lives on (typically `main`):** `docs(plan): backfill evolve-mode fields for legacy delivery-1`. The commit covers backfilled fields + Evolution History + any orphan-row reconciliations from sub-step 4.
-   7. **Resume Step E0** at sub-step 4 below; the now-backfilled README has all fields E1–E6 require, and `run-checkers.sh` returns clean.
+   5. **Commit on the branch the plan dir currently lives on (typically `main`):** `docs(plan): backfill evolve-mode fields for legacy delivery-1`. The commit covers backfilled fields + Evolution History + any orphan-row reconciliations from sub-step 4.
+   6. **Resume Step E0** at sub-step 4 below; the now-backfilled README has all fields E1–E6 require, and `run-checkers.sh` returns clean.
+
+   The ID-collision check between the design's `added` modules and the plan dir's existing `M-{id}` plans is **not** part of E0.5 — it runs in Step E1 sub-step 2.5 below, where `added` is first identified. E0.5 itself only handles README schema and orphan rows.
 
 4. **Resolve the design's target delivery tag** — list `delivery-*` annotated tags reachable from the design dir's HEAD commit (`git tag --list 'delivery-*' --merged HEAD --sort=-creatordate`); the most recent one is the **target design tag**. Refuse if it equals the baseline (nothing to evolve).
 
@@ -874,6 +875,23 @@ system-design's evolution emits four file-level lists (`delete | modify | add | 
    | **revised (direct)** | `modules/M-xxx-*.md` modified, OR a consumed `api/*.md` modified, OR a Module Interaction Protocol section in the design README that names this module modified, OR a Tech Stack change forces this module to switch frameworks/libraries | Re-plan in place, re-execute in evolution mode |
    | **revised (downstream)** | M is in `closure(N)` for some `revised (direct)` or `added` N whose **public interface or data model** changed semantically | Same as direct revised |
    | **kept** | None of the above | Plan unchanged; module code inherited from the parent feature-branch commit; participates in phase integration test + acceptance |
+
+2.5. **ID-collision check on `added` modules.** For each module classified `added` (a `modules/M-{id}-{slug}.md` file present at the target tag and absent at the baseline tag): if the plan dir already has a `plans/plan-M-{id}-*.md` file (regardless of whether it came from the original autoforge run or from the legacy E0.5 hotfix reconciliation), the design has reused an ID that the implementation already burned for unrelated work.
+
+   This is a **hard refusal**. Print:
+
+   ```
+   Refused: M-{id} ID collision.
+     Design (target tag) adds:    modules/M-{id}-<design-slug>.md
+     Plan dir already owns:        plans/plan-M-{id}-<plan-slug>.md
+                                   (status: {Module Status row}, owner: {Notes column})
+   ```
+
+   Provide the user with two remediation paths and exit:
+   - **Renumber on the design side** — re-run `system-design --evolve` against the original target, asking the planner to allocate a free ID (e.g. M-{first-free}). Re-tag, then retry `--evolve`.
+   - **Renumber on the plan side** — only if the existing M-{id} plan file is genuinely retired (not depended on by other modules). Rename `plans/plan-M-{id}-<plan-slug>.md` → `plans/plan-M-{first-free}-<plan-slug>.md`, update Module Status / Module Plans rows + dependency graph + any cross-references, commit, then retry `--evolve`.
+
+   Do NOT auto-renumber — it requires user judgement on which side legitimately owns the ID. The collision check is independent of the legacy/non-legacy state of the plan dir; it runs on every `--evolve` run.
 
 3. **Compute the downstream closure** — for each `revised (direct)` and `added` module, dispatch a small `sonnet` subagent to compare the module spec's `## Public Interfaces` and `## Data Models` sections between the baseline and target design tags and decide whether the change is *semantic* (signature, type, semantics, error contract) or *cosmetic* (typo, doc rewording). Mark every module N in the DAG with `M ∈ closure(N)` as `revised (downstream)` only when at least one upstream change is semantic. This avoids churning every transitive consumer when an upstream module only updated its prose.
 
