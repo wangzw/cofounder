@@ -103,8 +103,8 @@ file-read tools):
 - **Resolution order**: resolve R-001 (target slug / skill name) first, then R-003 (input
   modality — PRD path, draft, or interactive), then R-002 (artifact structure / output dir),
   then R-004 (has APIs?), then R-005 and R-006 in order.
-- **Auto-confirm R-001**: the slug is always `"system-design"` for the cofounder plugin. If the
-  cwd contains `skills/system-design` or the user invoked `/cofounder:system-design`, confirm
+- **Auto-confirm R-001**: the slug is always `"system-design"` for this skill. If the
+  cwd contains `skills/system-design` or the user invoked `/system-design`, confirm
   R-001 silently without asking.
 - **Skeleton replay** (after R-001/R-002 confirmed): present a one-paragraph summary anchoring
   R-002/R-004/R-005 to concrete expectations — e.g., "Your design will produce a README index,
@@ -116,7 +116,7 @@ file-read tools):
   asking. If the user's input already answers a requirement, mark it `confirmed` immediately —
   do not ask redundant questions.
 - **Stay in scope**: FORBIDDEN to discuss implementation tasks, timelines, or code execution
-  during this phase. Redirect to `/cofounder:autoforge` for execution planning.
+  during this phase. Redirect to `/autoforge` for execution planning.
 - **Exit conditions**:
   - All R-001..R-006 are `confirmed` or `deferred` (or `not-applicable` for R-006 on first
     run) → write `clarification.yml`, return ACK.
@@ -175,7 +175,7 @@ normalized_requirements:
     value: "system-design"
     status: confirmed
     guidance: |
-      Auto-confirm if cwd contains skills/system-design or invocation was /cofounder:system-design.
+      Auto-confirm if cwd contains skills/system-design or invocation was /system-design.
       Never ask the user to confirm this — it is structural.
   R-002:  # Artifact structure and output directory
     value: "<output dir path, e.g. docs/raw/design/YYYY-MM-DD-{slug}/>"
@@ -231,7 +231,7 @@ marker in the skeleton will be left un-substituted, silently polluting the scaff
 
 ### GOOD — Well-formed clarification dialogue (satisfies CR-CL01 and CR-CL02)
 
-**Context**: User invokes `/cofounder:system-design docs/raw/prd/2026-04-28-teamflow/`
+**Context**: User invokes `/system-design docs/raw/prd/2026-04-28-teamflow/`
 
 **Consultant auto-confirms R-001 and R-003** (PRD path is already provided).
 

@@ -255,17 +255,17 @@ so the skill behaves correctly under `claude -p ... --auto`.
    - `<prd-dir>/CHANGELOG.md` — prepend a delivery entry
    - (conditional) `<prd-dir>/README.md` — append a Revisions row
 3. Run `scripts/commit-delivery.sh <prd-dir> <delivery-id> <slug>` to create
-   the annotated git tag `delivery-<N>-<slug>`.
+   the annotated git tag `prd-analysis-delivery-<N>-<slug>`.
 4. **In `--auto` mode only**: run
    `scripts/compact-delivery.sh <prd-dir>` to retire the just-converged
    delivery's intermediate rounds. No `--force` is required because
-   Step 3 just created the `delivery-<N>-<slug>` tag, so the deleted
+   Step 3 just created the `prd-analysis-delivery-<N>-<slug>` tag, so the deleted
    rounds remain recoverable from git history. The script is a no-op
    (exit 0) if the delivery has only one round; any non-zero exit is
    treated as a script error and aborts the orchestrator with exit 2 —
    the converged commit and tag are kept. In interactive mode this
    step is skipped; the user is instead pointed at
-   `/cofounder:prd-analysis --compact <prd-dir>` in the next-steps
+   `/prd-analysis --compact <prd-dir>` in the next-steps
    hint.
 5. Orchestrator exits cleanly.
 

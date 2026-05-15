@@ -26,9 +26,9 @@
 #
 # Recovery:
 #   - Original round-N content is preserved by git history when the user
-#     has run commit-delivery.sh (delivery-<N>-<slug> tag). When no such
-#     tag is found we print a warning before destructive work; --force
-#     suppresses the warning.
+#     has run commit-delivery.sh (prd-analysis-delivery-<N>-<slug> tag).
+#     When no such tag is found we print a warning before destructive work;
+#     --force suppresses the warning.
 #
 # Usage:
 #   compact-delivery.sh <prd-dir> [--dry-run] [--force]
@@ -199,13 +199,13 @@ if not intermediate:
 if not force:
     try:
         proc = subprocess.run(
-            ["git", "-C", prd_root, "tag", "--list", f"delivery-{current_delivery}-*"],
+            ["git", "-C", prd_root, "tag", "--list", f"prd-analysis-delivery-{current_delivery}-*"],
             capture_output=True, text=True, check=False,
         )
         tags = (proc.stdout or "").strip()
         if not tags:
             sys.stderr.write(
-                f"warn: no git tag matches 'delivery-{current_delivery}-*' — the "
+                f"warn: no git tag matches 'prd-analysis-delivery-{current_delivery}-*' — the "
                 "intermediate rounds about to be deleted are NOT preserved in git "
                 "history. Pass --force to proceed anyway, or run "
                 "scripts/commit-delivery.sh first.\n"

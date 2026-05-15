@@ -1,7 +1,7 @@
 # compact mode — retire intermediate review rounds of the current delivery
 
 > Loaded by SKILL.md when the user invokes
-> `/cofounder:system-design --compact <design-dir>`. This file is the only
+> `/system-design --compact <design-dir>`. This file is the only
 > orchestration document loaded in compact mode.
 
 ## When to use
@@ -9,7 +9,7 @@
 After many review/revise rounds (often 10+), the current delivery's design
 bundle has converged (`verdict: converged`) but `.review/round-*/` is
 heavy with intermediate per-round scaffolding. Before handing the design
-off to the next pipeline stage (e.g. `/cofounder:autoforge`), the
+off to the next pipeline stage (e.g. `/autoforge`), the
 user runs `--compact` to:
 
 1. Aggregate the intermediate rounds of the **current delivery** into a
@@ -66,7 +66,7 @@ If the gate refuses, surface the script's stdout to the user and stop.
 scripts/compact-delivery.sh <design-dir> --dry-run --force
 ```
 
-`--force` here lets the dry-run run even when no `delivery-<N>-<slug>`
+`--force` here lets the dry-run run even when no `system-design-delivery-<N>-<slug>`
 git tag exists yet (the actual destructive step in Step 5 re-evaluates
 this). Output lists exactly which file would be written and which
 directories would be removed.
@@ -76,7 +76,7 @@ Show the output to the user verbatim.
 ### Step 4 — HITL approval (mandatory, except in `--auto` flow)
 
 Present the dry-run summary and ask the user to approve. Compaction is
-destructive; if a `delivery-<N>-<slug>` git tag is missing, the warning
+destructive; if a `system-design-delivery-<N>-<slug>` git tag is missing, the warning
 in Step 3 indicates the deleted rounds will not be recoverable from git
 history.
 
@@ -90,7 +90,7 @@ Acceptable answers:
 
 **`--auto` flow.** When this orchestration is invoked from the review
 mode's auto-converged delivery sequence (review/index.md Step 9.4),
-Steps 3 and 4 are skipped: the `delivery-<N>-<slug>` tag was just
+Steps 3 and 4 are skipped: the `system-design-delivery-<N>-<slug>` tag was just
 created in Step 9.3 so the destructive guard is already satisfied, and
 HITL approval is replaced by the global `--auto` contract from
 SKILL.md. Step 5 runs `scripts/compact-delivery.sh <design-dir>` directly
@@ -133,7 +133,7 @@ The orchestrator MUST NOT auto-commit without confirmation.
 Compact complete: delivery-<N> intermediate rounds retired.
 
 Next steps:
-  Interactive — /cofounder:autoforge <design-dir>
+  Interactive — /autoforge <design-dir>
   Automated  — claude -p "implement based on <design-dir>" --auto
 ```
 

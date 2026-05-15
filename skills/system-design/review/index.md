@@ -256,17 +256,17 @@ so the skill behaves correctly under `claude -p ... --auto`.
    - `<design-dir>/CHANGELOG.md` — prepend a delivery entry
    - (conditional) `<design-dir>/README.md` — append a Revisions row
 3. Run `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` to create
-   the annotated git tag `delivery-<N>-<slug>`.
+   the annotated git tag `system-design-delivery-<N>-<slug>`.
 4. **In `--auto` mode only**: run
    `scripts/compact-delivery.sh <design-dir>` to retire the just-converged
    delivery's intermediate rounds. No `--force` is required because
-   Step 3 just created the `delivery-<N>-<slug>` tag, so the deleted
+   Step 3 just created the `system-design-delivery-<N>-<slug>` tag, so the deleted
    rounds remain recoverable from git history. The script is a no-op
    (exit 0) if the delivery has only one round; any non-zero exit is
    treated as a script error and aborts the orchestrator with exit 2 —
    the converged commit and tag are kept. In interactive mode this
    step is skipped; the user is instead pointed at
-   `/cofounder:system-design --compact <design-dir>` in the next-steps
+   `/system-design --compact <design-dir>` in the next-steps
    hint.
 5. Orchestrator exits cleanly.
 

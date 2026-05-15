@@ -6,7 +6,7 @@ phase boundaries.
 
 This README is for developers who want to **use**, **modify**, or
 **audit** the skill. End-users typically just invoke
-`/cofounder:prd-analysis` from Claude Code; the entry-point doc for that
+`/prd-analysis` from Claude Code; the entry-point doc for that
 flow is `SKILL.md`.
 
 ---
@@ -36,13 +36,13 @@ records every dispatch, every issue, and every state transition.
 
 | Command | Mode |
 |---------|------|
-| `/cofounder:prd-analysis` | Interactive from-scratch generation |
-| `/cofounder:prd-analysis path/to/notes.md` | Document-driven generation |
-| `/cofounder:prd-analysis --review <prd-dir>` | Read phase: cross-reviewer + judge |
-| `/cofounder:prd-analysis --revise <prd-dir>` | Write phase: per-issue fix loop |
-| `/cofounder:prd-analysis --evolve <prd-dir> [notes.md]` | Iterate to a new version |
-| `/cofounder:prd-analysis --compact <prd-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
-| `/cofounder:prd-analysis --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
+| `/prd-analysis` | Interactive from-scratch generation |
+| `/prd-analysis path/to/notes.md` | Document-driven generation |
+| `/prd-analysis --review <prd-dir>` | Read phase: cross-reviewer + judge |
+| `/prd-analysis --revise <prd-dir>` | Write phase: per-issue fix loop |
+| `/prd-analysis --evolve <prd-dir> [notes.md]` | Iterate to a new version |
+| `/prd-analysis --compact <prd-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
+| `/prd-analysis --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
 
@@ -159,7 +159,7 @@ and one test runner. **29 scripts / 29 test runners / 470 tests** (run
 
 | Script | Role |
 |--------|------|
-| `commit-delivery.sh` | On-converge: stages, commits, creates annotated `delivery-<N>-<slug>` tag. |
+| `commit-delivery.sh` | On-converge: stages, commits, creates annotated `prd-analysis-delivery-<N>-<slug>` tag. |
 | `compact-delivery.sh` | `--compact` mode: aggregates current delivery's intermediate rounds into `compacted-history.md`, then deletes those `round-N/` + `traces/round-N/` trees. Gated on `verdict: converged`. |
 | `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
 | `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |

@@ -43,7 +43,7 @@ setup_git_repo
 stage_pending_change 1
 run_command "$CHECK" "$FIXTURE" "1" "initial release"
 [ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected 0 got $LAST_EXIT"
-( cd "$FIXTURE" && git tag --list | grep -q "^delivery-1" )
+( cd "$FIXTURE" && git tag --list | grep -q "^prd-analysis-delivery-1" )
 [ $? = 0 ] && _record_pass || _record_fail "tag not created"
 teardown_fixture
 
@@ -51,7 +51,7 @@ test_case "tag includes delivery id in slug"
 setup_git_repo
 stage_pending_change 5
 run_command "$CHECK" "$FIXTURE" "5" "fix the thing"
-( cd "$FIXTURE" && git tag --list ) | grep -q "^delivery-5" && _record_pass || _record_fail "tag delivery-5 not found"
+( cd "$FIXTURE" && git tag --list ) | grep -q "^prd-analysis-delivery-5" && _record_pass || _record_fail "tag prd-analysis-delivery-5 not found"
 teardown_fixture
 
 test_case "exit 1 on tag collision (same delivery id + summary)"
@@ -69,7 +69,15 @@ setup_git_repo
 stage_pending_change 2
 run_command "$CHECK" "$FIXTURE" "2" "delivery-2: cleanup"
 tag=$(cd "$FIXTURE" && git tag --list | head -1)
-echo "$tag" | grep -qE "^delivery-2-cleanup" && _record_pass || _record_fail "expected tag prefix 'delivery-2-cleanup', got '$tag'"
+echo "$tag" | grep -qE "^prd-analysis-delivery-2-cleanup" && _record_pass || _record_fail "expected tag prefix 'prd-analysis-delivery-2-cleanup', got '$tag'"
+teardown_fixture
+
+test_case "strips redundant '<skill>-delivery-N' prefix from summary"
+setup_git_repo
+stage_pending_change 3
+run_command "$CHECK" "$FIXTURE" "3" "prd-analysis-delivery-3: cleanup"
+tag=$(cd "$FIXTURE" && git tag --list | head -1)
+echo "$tag" | grep -qE "^prd-analysis-delivery-3-cleanup$" && _record_pass || _record_fail "expected tag 'prd-analysis-delivery-3-cleanup', got '$tag'"
 teardown_fixture
 
 # Regression: parallel work in the surrounding repo MUST NOT leak into the

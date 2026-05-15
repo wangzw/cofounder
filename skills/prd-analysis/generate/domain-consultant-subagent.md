@@ -80,7 +80,7 @@ file-read tools):
   immediately — do not ask redundant questions.
 - **Stay in scope**: FORBIDDEN to discuss system design, implementation details, or code
   architecture during this phase. Redirect any out-of-scope questions to the appropriate
-  downstream skill (`/cofounder:system-design`, `/cofounder:autoforge`).
+  downstream skill (`/system-design`, `/autoforge`).
 - **Exit conditions**:
   - All R-001..R-007 are `confirmed` or `deferred` → write `clarification.yml`, return ACK.
   - User types `/proceed` → treat all remaining unresolved as `deferred`, write, return ACK.

@@ -160,7 +160,7 @@ Verdict routing (per `review/index.md` Step 8):
 
 | Verdict | Next |
 |---------|------|
-| `converged` | Delivery: `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` creates annotated tag `delivery-<N>-<slug>`; skill exits cleanly |
+| `converged` | Delivery: `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` creates annotated tag `system-design-delivery-<N>-<slug>`; skill exits cleanly |
 | `progressing` | Load `revise/index.md`; increment round; loop back to review |
 | `oscillating` / `diverging` / `stalled` | HITL gate; surface to user |
 

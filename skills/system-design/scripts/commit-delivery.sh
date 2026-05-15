@@ -28,10 +28,12 @@ fi
 TARGET="${TARGET%/}"
 
 # Compute slug from change-summary (§8.3)
-# Since the final tag is always `delivery-<N>-<slug>`, strip a leading redundant
-# `delivery <N>:` / `delivery-<N>:` / `Delivery <N>:` prefix from the summary
-# before slug computation. Prevents tags like `delivery-2-delivery-2-...`
-# when summarizer's change_summary repeats the delivery prefix. (F9 fix)
+# Since the final tag is always `system-design-delivery-<N>-<slug>`, strip a
+# leading redundant `delivery <N>:` / `delivery-<N>:` / `Delivery <N>:` /
+# `system-design-delivery-<N>:` (or any `<skill>-delivery-<N>:`) prefix from
+# the summary before slug computation. Prevents tags like
+# `system-design-delivery-2-system-design-delivery-2-...` when summarizer's
+# change_summary repeats the delivery prefix. (F9 fix)
 SLUG=$(python3 - "$CHANGE_SUMMARY" "$DELIVERY_ID" <<'PYEOF'
 import sys, re
 from datetime import datetime, timezone
@@ -39,11 +41,12 @@ from datetime import datetime, timezone
 summary      = sys.argv[1]
 delivery_id  = sys.argv[2]
 
-# Strip leading redundant "delivery-N" / "delivery N" / "Delivery N:" forms.
-# Matches (case-insensitive): optional "Delivery", separator, the delivery id,
-# optional trailing punct, whitespace. Only strips if it matches THIS delivery_id
-# (not some other number — that might be meaningful).
-pattern = rf'^\s*delivery[\s\-_:]+{re.escape(delivery_id)}\b[:\s\-–—]*'
+# Strip leading redundant "delivery-N" / "delivery N" / "Delivery N:" /
+# "<skill>-delivery-N:" forms. Matches (case-insensitive): optional skill prefix
+# (e.g. "prd-analysis-", "system-design-"), then "delivery", separator, the
+# delivery id, optional trailing punct, whitespace. Only strips if it matches
+# THIS delivery_id (not some other number — that might be meaningful).
+pattern = rf'^\s*(?:[a-z0-9_-]+-)?delivery[\s\-_:]+{re.escape(delivery_id)}\b[:\s\-–—]*'
 # Always use the stripped result. If strip yields empty (i.e. the summary was
 # ONLY the delivery prefix), let slugify produce empty → fall through to the
 # YYYYMMDD date fallback rather than re-introducing the prefix we just removed.
@@ -63,7 +66,7 @@ print(slugified)
 PYEOF
 )
 
-TAG="delivery-${DELIVERY_ID}-${SLUG}"
+TAG="system-design-delivery-${DELIVERY_ID}-${SLUG}"
 
 # Check if tag already exists — collision = state bug
 if git -C "$TARGET" rev-parse "$TAG" >/dev/null 2>&1; then

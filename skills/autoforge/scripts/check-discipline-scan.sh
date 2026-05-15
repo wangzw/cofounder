@@ -217,7 +217,7 @@ for dirpath, dirnames, filenames in os.walk(root):
         # Skip the discipline doc itself — it documents the patterns it bans.
         if rel.endswith("delivery-discipline.md"):
             continue
-        # Skip Claude plugin skill prompts: a markdown file in or under
+        # Skip Claude Code skill prompts: a markdown file in or under
         # a directory that contains SKILL.md is a skill prompt that
         # legitimately quotes forbidden patterns as teaching examples.
         if is_skill_doc(full):

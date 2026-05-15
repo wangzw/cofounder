@@ -1,5 +1,32 @@
 # CHANGELOG
 
+## [1.1.0] — 2026-05-08
+
+**BREAKING — git tag rename.** The annotated tag created on converged
+delivery is now `system-design-delivery-<N>-<slug>` (was `delivery-<N>-<slug>`).
+
+- **Why.** The old `delivery-*` namespace was shared with `prd-analysis`,
+  causing cosmetic mixing in `git tag -l 'delivery-*'` and a functional
+  hazard for downstream `autoforge --evolve`, which resolves the
+  baseline design tag via `git tag --list 'delivery-*' --merged HEAD`
+  and would have been ambiguous in repos containing PRD tags. Each
+  skill now owns its own `<skill>-delivery-*` namespace; autoforge has
+  been updated in lockstep to query `system-design-delivery-*`.
+- **Scope of change.** `scripts/commit-delivery.sh` (`TAG=` line and
+  redundant-prefix strip pattern), `scripts/compact-delivery.sh`
+  (`tag --list` query and warning text), `tests/test-commit-delivery.sh`,
+  and all docs that reference the tag form (`SKILL.md`, `README.md`,
+  `compact/index.md`, `review/index.md`,
+  `generate/from-scratch.md`, `generate/new-version.md`).
+- **Migration.** A one-shot script renames pre-existing `delivery-<N>-<slug>`
+  tags created by this skill to the new form. See repo-level
+  `scripts/migrate-delivery-tags.sh` (run once per affected repo);
+  it is idempotent and safe to re-run.
+- **Strip-pattern extension.** `commit-delivery.sh`'s redundant-prefix
+  strip now also recognises `<skill>-delivery-N:` forms, so summarizers
+  that adopt the new convention won't produce double-prefixed tags.
+- **Tests.** Added a regression case for the `<skill>-delivery-N:` strip path.
+
 ## [1.0.0] — 2026-05-07
 
 First stable release. Convergence after rounds 5–10 of iterative

@@ -1,43 +1,43 @@
 ---
 name: system-design
 version: 1.0.0
-description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, or review existing designs. Triggers: /cofounder:system-design, 'system design', 'module design', 'technical design', 'design review'."
+description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, or review existing designs. Triggers: /system-design, 'system design', 'module design', 'technical design', 'design review'."
 ---
 
 # system-design — AI-Coding-Ready Technical Design Documents
 
 ## Artifact
 
-system-design generates technical design documents as a **multi-file directory** — a pyramid-indexed bundle of README, per-module specs, and optional API contracts. It operates as a **multi-role generative pipeline** (planner → parallel writer fan-out → structural-lint → cross/adversarial review → revise → judge convergence), not a single-pass orchestrator. Each module spec is a self-contained file that a coding agent can read independently. This maps to guide §7.1 (Document variant): the primary artifact is a structured Markdown document set consumed by `/cofounder:autoforge` and human reviewers alike.
+system-design generates technical design documents as a **multi-file directory** — a pyramid-indexed bundle of README, per-module specs, and optional API contracts. It operates as a **multi-role generative pipeline** (planner → parallel writer fan-out → structural-lint → cross/adversarial review → revise → judge convergence), not a single-pass orchestrator. Each module spec is a self-contained file that a coding agent can read independently. This maps to guide §7.1 (Document variant): the primary artifact is a structured Markdown document set consumed by `/autoforge` and human reviewers alike.
 
 ## Pipeline Position
 
 ```
-/cofounder:prd-analysis  →  /cofounder:system-design  →  /cofounder:autoforge
+/prd-analysis  →  /system-design  →  /autoforge
 ```
 
 - **Consumes**: PRD output at `docs/raw/prd/YYYY-MM-DD-{slug}/`
 - **Produces**: design output at `docs/raw/design/YYYY-MM-DD-{slug}/`
-- **Feeds**: `/cofounder:autoforge` reads `README.md` (Feature-Module matrix) + `modules/M-NNN-{slug}.md` (implementation specs)
+- **Feeds**: `/autoforge` reads `README.md` (Feature-Module matrix) + `modules/M-NNN-{slug}.md` (implementation specs)
 
 ## Input Modes
 
 ```
-/cofounder:system-design                                    # interactive (no PRD path)
-/cofounder:system-design path/to/prd/                       # PRD-based
-/cofounder:system-design path/to/draft.md                   # document-based
-/cofounder:system-design --output docs/raw/design/my-product
-/cofounder:system-design --review docs/raw/design/xxx/      # read-only review (single round)
-/cofounder:system-design --review docs/raw/design/xxx/ --auto  # auto-loop review↔revise until convergence
-/cofounder:system-design --revise docs/raw/design/xxx/      # change management
-/cofounder:system-design --revise docs/raw/design/xxx/ --auto  # same loop, entered from the revise side
-/cofounder:system-design --evolve docs/raw/design/xxx/      # generate new version from an evolved PRD
-/cofounder:system-design --evolve docs/raw/design/xxx/ notes.md  # supply explicit change notes
-/cofounder:system-design --compact docs/raw/design/xxx/     # retire intermediate review rounds before next stage
+/system-design                                    # interactive (no PRD path)
+/system-design path/to/prd/                       # PRD-based
+/system-design path/to/draft.md                   # document-based
+/system-design --output docs/raw/design/my-product
+/system-design --review docs/raw/design/xxx/      # read-only review (single round)
+/system-design --review docs/raw/design/xxx/ --auto  # auto-loop review↔revise until convergence
+/system-design --revise docs/raw/design/xxx/      # change management
+/system-design --revise docs/raw/design/xxx/ --auto  # same loop, entered from the revise side
+/system-design --evolve docs/raw/design/xxx/      # generate new version from an evolved PRD
+/system-design --evolve docs/raw/design/xxx/ notes.md  # supply explicit change notes
+/system-design --compact docs/raw/design/xxx/     # retire intermediate review rounds before next stage
 ```
 
-**Note on evolved PRDs:** When a PRD has been evolved (`/cofounder:prd-analysis --evolve`),
-either pass the new PRD path to a fresh design (`/cofounder:system-design <new-prd-path>`),
+**Note on evolved PRDs:** When a PRD has been evolved (`/prd-analysis --evolve`),
+either pass the new PRD path to a fresh design (`/system-design <new-prd-path>`),
 use `--evolve <design-dir>` to generate a delta-aware new version of an existing design,
 or use `--revise <design-dir>` to thread specific PRD changes through the change-management
 state machine.
@@ -46,11 +46,11 @@ state machine.
 
 | Mode | Args | Loaded Files | Semantics |
 |------|------|-------------|-----------|
-| generate (from scratch) | `/cofounder:system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
-| generate (new version) | `/cofounder:system-design --evolve <design-dir>` | `generate/new-version.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
-| review | `/cofounder:system-design --review <design-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
-| revise | `/cofounder:system-design --revise <design-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
-| compact | `/cofounder:system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
+| generate (from scratch) | `/system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
+| generate (new version) | `/system-design --evolve <design-dir>` | `generate/new-version.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
+| review | `/system-design --review <design-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
+| revise | `/system-design --revise <design-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
+| compact | `/system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
 | `--diagnose` | `[--round N \| --delivery N \| --since <iso>]` | Only `scripts/metrics-aggregate.sh` (pure script; no sub-agent prompt loaded, no artifact leaves read) | Aggregate harness JSONL + dispatch-log; output `.review/metrics/<scope>.metrics.yml` |
 
 Do NOT load files not listed for the current mode — unused files waste context.
@@ -200,7 +200,7 @@ docs/raw/design/YYYY-MM-DD-{product-name}/
 
 1. **Self-contained file** — each module/API spec is independently consumable by a coding agent. Copy relevant data models, interface definitions, and conventions inline; never link to a sibling file the agent must also read.
 2. **Two-phase quality gate** — structural-lint (deterministic, grep-runnable: placeholder JSON, missing per-endpoint blocks, unfilled Boundary Enforcement columns, dangling endpoint references, PRD-architecture/analytics coverage gaps) runs BEFORE semantic LLM review. Mechanical findings never reach the semantic reviewer.
-3. **Feature-Module mapping matrix** — the bridge between PRD features and implementation modules (README.md). Symbols: `✦` = module modifies data for the feature, `△` = module provides read-only support. The matrix is the key input for `/cofounder:autoforge`.
+3. **Feature-Module mapping matrix** — the bridge between PRD features and implementation modules (README.md). Symbols: `✦` = module modifies data for the feature, `△` = module provides read-only support. The matrix is the key input for `/autoforge`.
 4. **Copy, don't reference** — relevant data models, conventions, and interface definitions are copied inline into each module file. A coding agent reading one module file should need no other file.
 5. **Mode routing** — detect mode from flags; load only the relevant routing file. Templates are loaded per-writer dispatch, not globally.
 6. **Dependency layering** — forward-only layer order; reverse-layer imports are blockers (not warnings), requiring: (a) consumer-side interface extraction into a lower layer, (b) callee relocation, or (c) documented cross-cutting exemption.
@@ -221,7 +221,7 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 
 - Orchestrator is **pure dispatch + bookkeeping only**. Forbidden: reading artifact leaves, summarizing content, computing convergence verdicts, rewriting artifacts, analyzing issue priority.
 - Hard dependencies: `git ≥ 2.0`, `bash ≥ 4.0`, `python3 ≥ 3.8`. NEVER add `pyyaml` / `jq` / `slugify` / any third-party package.
-- Target artifact in-place mutated. History through git tags (`delivery-<N>-<slug>` annotated tags) + `.review/versions/<N>.md` + target `CHANGELOG.md`.
+- Target artifact in-place mutated. History through git tags (`system-design-delivery-<N>-<slug>` annotated tags) + `.review/versions/<N>.md` + target `CHANGELOG.md`.
 - `.review/` lives at target root. Pyramid-indexed: `round-<N>/` + `metrics/` + `versions/`.
 - Round numbers are cross-delivery monotonic. Delivery-1 round-1..k, delivery-2 starts at round-k+1.
 - Metrics aggregated ONLY by `scripts/metrics-aggregate.sh` via `--diagnose` mode, never by a sub-agent.
@@ -411,7 +411,7 @@ After committing, print the following guidance to the user:
 System design complete: {output path}
 
 Next steps:
-  /cofounder:autoforge {output path}
+  /autoforge {output path}
 ```
 
 ## Configuration & Subagent Files

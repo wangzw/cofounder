@@ -41,7 +41,7 @@ The `<design-dir>/README.md` MUST exist and contain a structured index of the bu
 - when `api/` exists, a section that enumerates every `API-NNN` API file
 - a one-line product / system identification near the top
 
-Missing index entries break downstream consumption — `/cofounder:autoforge` and reviewers
+Missing index entries break downstream consumption — `/autoforge` and reviewers
 both walk the README to discover modules.
 
 ```yaml

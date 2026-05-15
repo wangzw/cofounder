@@ -6,7 +6,7 @@ phase boundaries.
 
 This README is for developers who want to **use**, **modify**, or
 **audit** the skill. End-users typically just invoke
-`/cofounder:system-design` from Claude Code; the entry-point doc for
+`/system-design` from Claude Code; the entry-point doc for
 that flow is `SKILL.md`.
 
 ---
@@ -40,13 +40,13 @@ marks read-only support.
 
 | Command | Mode |
 |---------|------|
-| `/cofounder:system-design` | Generate from latest PRD |
-| `/cofounder:system-design <prd-dir>` | Generate from a specific PRD bundle |
-| `/cofounder:system-design --review <design-dir>` | Read phase: cross-reviewer + judge |
-| `/cofounder:system-design --revise <design-dir>` | Write phase: per-issue fix loop |
-| `/cofounder:system-design --evolve <design-dir> [<prd-dir>]` | Iterate to a new version |
-| `/cofounder:system-design --compact <design-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
-| `/cofounder:system-design --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
+| `/system-design` | Generate from latest PRD |
+| `/system-design <prd-dir>` | Generate from a specific PRD bundle |
+| `/system-design --review <design-dir>` | Read phase: cross-reviewer + judge |
+| `/system-design --revise <design-dir>` | Write phase: per-issue fix loop |
+| `/system-design --evolve <design-dir> [<prd-dir>]` | Iterate to a new version |
+| `/system-design --compact <design-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
+| `/system-design --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
 
@@ -172,7 +172,7 @@ and one test runner. **~34 scripts / 23 test runners / 442 tests** (run
 
 | Script | Role |
 |--------|------|
-| `commit-delivery.sh` | On-converge: stages, commits, creates annotated `delivery-<N>-<slug>` tag. |
+| `commit-delivery.sh` | On-converge: stages, commits, creates annotated `system-design-delivery-<N>-<slug>` tag. |
 | `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
 | `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |

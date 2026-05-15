@@ -120,7 +120,7 @@ Verdict routing per `review/index.md` Step 8:
 
 | Verdict | Next |
 |---------|------|
-| `converged` | Delivery: `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` creates tag `delivery-<N+1>-<slug>` |
+| `converged` | Delivery: `scripts/commit-delivery.sh <design-dir> <delivery-id> <slug>` creates tag `system-design-delivery-<N+1>-<slug>` |
 | `progressing` | Load `revise/index.md`; loop |
 | `oscillating` / `diverging` / `stalled` | HITL gate |
 
@@ -129,8 +129,8 @@ Verdict routing per `review/index.md` Step 8:
 ## Round Numbering Example
 
 ```
-Delivery 1:  round-1 (plan), round-2, round-3 (converged) → tag delivery-1-foo
-Delivery 2:  round-4 (plan), round-5 (converged)          → tag delivery-2-foo
+Delivery 1:  round-1 (plan), round-2, round-3 (converged) → tag system-design-delivery-1-foo
+Delivery 2:  round-4 (plan), round-5 (converged)          → tag system-design-delivery-2-foo
 ```
 
 Delivery 2's planner reads `versions/3.md` (the delivery 1 converged

@@ -4,24 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CoFounder is a Claude Code **plugin** that guides solo founders and small teams through the full business lifecycle: idea -> requirements -> design -> implementation -> launch. Skills live in `skills/` (plugin format) and are loaded via the plugin system.
+CoFounder is a Claude Code **skill bundle** that guides solo founders and small teams through the full business lifecycle: idea -> requirements -> design -> implementation -> launch. Skills live in `skills/` and are loaded by symlinking each skill directory into `~/.claude/skills/`.
 
 **Install locally for development:**
 ```bash
-claude --plugin-dir /path/to/cofounder
+mkdir -p ~/.claude/skills
+ln -sfn "$(pwd)/skills/"*/ ~/.claude/skills/
 ```
 
-Skills are invoked with the `cofounder:` namespace prefix: `/cofounder:prd-analysis`, `/cofounder:system-design`, etc.
+Skills are invoked by their slug, no namespace prefix: `/prd-analysis`, `/system-design`, etc.
 
 ## Pipeline
 
 ```
-Idea → /cofounder:prd-analysis → /cofounder:system-design → /cofounder:autoforge → /cofounder:go-to-market → Market-Ready Business
-                                                                      ↑
-                                              /cofounder:dev-conventions (standalone, run anytime)
+Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → Market-Ready Business
+                                              ↑
+                              /dev-conventions (standalone, run anytime)
 ```
 
-Skills are chainable: `/cofounder:system-design` reads PRD output, `/cofounder:autoforge` reads system design output, `/cofounder:go-to-market` can chain from PRD. `/cofounder:dev-conventions` is standalone — run it at any point to generate repo scaffolding (issue/PR templates, CI lint workflows, git hooks, CONTRIBUTING.md). It is independent of the main pipeline and can be used before or after `/cofounder:autoforge`.
+Skills are chainable: `/system-design` reads PRD output, `/autoforge` reads system design output, `/go-to-market` can chain from PRD. `/dev-conventions` is standalone — run it at any point to generate repo scaffolding (issue/PR templates, CI lint workflows, git hooks, CONTRIBUTING.md). It is independent of the main pipeline and can be used before or after `/autoforge`.
 
 ## Skill Architecture
 
@@ -85,7 +86,7 @@ When modifying an existing skill, start by reading its `SKILL.md` to understand 
 ## Review Gates
 
 Skills include human review checkpoints before finalizing output:
-- `/cofounder:prd-analysis`: ~50 dimension review checklist in `review-checklist.md` (many dimensions have multiple sub-checks)
-- `/cofounder:system-design`: structured design review phase
-- `/cofounder:autoforge`: approval gates after planning (before execution), progress checks during execution
-- `/cofounder:go-to-market`: per-stage approve/revise/skip/go-back logic with cascade updates
+- `/prd-analysis`: ~50 dimension review checklist in `review-checklist.md` (many dimensions have multiple sub-checks)
+- `/system-design`: structured design review phase
+- `/autoforge`: approval gates after planning (before execution), progress checks during execution
+- `/go-to-market`: per-stage approve/revise/skip/go-back logic with cascade updates
