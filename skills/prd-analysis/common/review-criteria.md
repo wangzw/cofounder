@@ -1344,3 +1344,42 @@ Missing AI agent configuration causes coding agents to operate with incomplete c
   priority: 3
   incremental_skip: full_scan
 ```
+
+---
+
+## CR-PP-MM01 mermaid-label-syntax
+
+Every ```mermaid``` block in a PRD leaf (README, journeys/, features/, architecture/)
+MUST render correctly in standards-compliant Mermaid (Obsidian, GitHub, Mermaid v10+).
+Three sub-rules — derived from observed renderer failures in production deliveries —
+are enforced together:
+
+1. **No `\n` literal in labels.** Mermaid does NOT honor C-style escape sequences;
+   `\n` is rendered as the two-character string `"\n"`. Line breaks in node, edge,
+   and state labels MUST use `<br/>`. Quoted labels are the most robust form:
+   `NodeId["Line1<br/>Line2"]`.
+2. **Path labels starting with `/` MUST be quoted.** Unquoted `NodeId[/var/run/docker.sock]`
+   collides with Mermaid's parallelogram shape syntax `[/text/]` and corrupts parsing.
+   Always write `NodeId["/var/run/docker.sock"]`. The valid parallelogram form
+   `[/text/]` (text both opens and closes with `/`) is accepted as intentional.
+3. **`stateDiagram-v2` transition descriptions MUST NOT contain `:` inside parens.**
+   Mermaid v10+ parsers treat the inner `:` inside `( ... )` as a second state-description
+   boundary and reject the line. Convert `(key: value)` to `(key=value)` or drop the
+   parentheses (`— key value`). URL path-parameter syntax such as `/sessions/:id`
+   appearing on the same line is excluded — only the `(...:...)` form inside the
+   transition description is the violation.
+
+The script is auto-discovered by `run-checkers.sh` and therefore participates in the
+formal hard gate at `verify-phase-entry.sh read`. Findings carry concrete line numbers
+and the exact suggested rewrite so revisers can fix them without context churn.
+
+```yaml
+- id: CR-PP-MM01
+  name: "mermaid-label-syntax"
+  version: 1.0.0
+  checker_type: script
+  script_path: scripts/check-mermaid.sh
+  severity: error
+  conflicts_with: []
+  priority: 2
+```

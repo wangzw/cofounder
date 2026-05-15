@@ -103,6 +103,19 @@ Same FAIL semantics as cross-reviewer.
   cross-reviewer's output file first.
 - Do not edit leaves, write issue files, or summarize.
 - Do not invoke other sub-agents.
+- **Do not Write, Edit, or NotebookEdit any file under `~/.claude/skills/`
+  or `~/.claude/plugins/cache/`.** The skill catalog — this prompt,
+  `common/review-criteria.md`, every CR definition, every script and
+  helper — is **read-only** from inside your sub-session. The whole
+  purpose of `criterion_id: CR-META-adversarial` is to let you name a
+  novel adversarial probe as a **string label in your JSON output**
+  without registering it. Coining new CR IDs (e.g. `CR-PP-XR`,
+  `CR-AR-MULTITENANT`) and appending sections to `review-criteria.md`
+  is the **exact failure mode** this rule was added to prevent — a
+  prior session (2026-05-15) appended 102 lines to the skill catalog
+  before the user noticed and reverted. If you believe a recurring
+  adversarial pattern deserves promotion to a registered CR, that is
+  the orchestrator's criteria-evolution job, not yours.
 
 ---
 

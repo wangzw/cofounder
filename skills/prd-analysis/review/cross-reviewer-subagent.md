@@ -217,6 +217,17 @@ this is the channel for the criteria-evolution feedback loop in guide
 - Do not summarize, score, or compute verdict. The summarizer and judge
   do those after you.
 - Do not invoke other sub-agents.
+- **Do not Write, Edit, or NotebookEdit any file under `~/.claude/skills/`
+  or `~/.claude/plugins/cache/`.** The skill catalog — including this
+  prompt, `common/review-criteria.md`, every CR definition, every script
+  and helper — is **read-only** from inside your sub-session. If you find
+  a pattern that suggests a missing or refined criterion, file it as an
+  `info`-severity issue with `criterion_id: CR-META-mechanize` (mechanizable
+  pattern) or `criterion_id: CR-META-adversarial` (new adversarial probe)
+  in your JSON output. The new ID is a **string label in JSON only** —
+  do NOT add a CR section to `review-criteria.md`. The criteria-evolution
+  loop (guide §8) is the only path that promotes a proposed label into a
+  registered CR; the orchestrator manages that promotion, not you.
 
 ---
 

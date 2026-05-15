@@ -336,6 +336,20 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 - Rewriting artifacts
 - Analyzing issue priority
 - Writing business archives (issues / self-reviews / plan.md / verdict.yml / index.md / CHANGELOG)
+- **Dispatching one sub-agent that combines multiple work units the skill defines as separate.**
+  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry), per-leaf
+  reviser dispatch (one reviser per leaf with `state: new` issues, never one reviser for >1
+  leaf), and per-cluster reviewer dispatch (clusters sized per `common/parallel-dispatch.md`
+  Rule 3) are **contracts** — the orchestrator MAY NOT coalesce them into a single "mega"
+  dispatch. The temptation to "just write one big sub-agent that handles all 38 issues"
+  (observed in delivery 4 of a 2026-05-15 session, where it also triggered an unrelated
+  skill-catalog mutation) is forbidden because it (a) defeats the per-leaf isolation contract
+  in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing limits in Rule 3,
+  (c) eliminates the parallel cache-read amortization that makes large bundles affordable, and
+  (d) gives the coalesced sub-agent the surface area to mutate things it would never touch
+  in a per-leaf scope. If you find yourself authoring a single Task prompt that lists >1 leaf
+  for a writer or reviser role, STOP — split into per-leaf dispatches and emit them as a
+  parallel batch per Rule 1.
 
 ## `--diagnose` Mode
 

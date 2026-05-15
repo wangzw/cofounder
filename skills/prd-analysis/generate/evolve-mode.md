@@ -2,9 +2,9 @@
 
 **Scope.** This file documents the **domain-content conventions** that apply when generating
 an incremental PRD for a new software iteration on top of a delivered baseline: how to flatten
-the version chain, how to ask delta-aware questions per phase, what evolve-specific metadata
-and inline change markers look like, the two-layer review checklist, and the commit /
-post-commit cascade format.
+the version chain, how to ask delta-aware questions per phase, what evolve-specific file-level
+metadata looks like, the two-layer review checklist, and the commit / post-commit cascade
+format.
 
 **Orchestration lives elsewhere.** The dispatch sequence (git precheck → phase-entry verify →
 prepare-input → glossary probe → planner sub-agent → HITL plan-approval → writer fan-out →
@@ -193,14 +193,15 @@ Generate files using the standard templates, with the following evolve-specific 
    `Status = Added`, `Baseline = N/A`.
 3. **Modified features** — use `common/templates/feature-template.md` for a full rewrite. Add evolve metadata
    header with `Status = Modified`, `Baseline = {link to predecessor's version}`, and a concise
-   Change summary. Add inline change markers (`[ADDED]`, `[MODIFIED]`, `[REMOVED]`) at relevant
-   points in the body.
+   Change summary. **Do NOT** sprinkle inline `[ADDED]` / `[MODIFIED]` / `[REMOVED]` markers
+   through the body — file-level frontmatter plus `git diff` against the baseline tag is the
+   authoritative delta record (see Change Annotation Convention below).
 4. **Deprecated features** — create a tombstone file per the format in
    `common/templates/evolve-readme-template.md`.
 5. **New/modified journeys** — same rules as features: full rewrite using `common/templates/journey-template.md`
-   plus evolve metadata header and inline markers.
+   plus evolve metadata header. No inline body markers.
 6. **New/modified architecture topics** — same rules: full rewrite using `common/templates/architecture-template.md`
-   topic structure, plus evolve metadata header and inline markers.
+   topic structure, plus evolve metadata header. No inline body markers.
 7. **`architecture/` index** — incremental index listing all topics. Changed topics link to
    local files; unchanged topics link to baseline.
 8. **Frontend draft** — REQUIRED for every new/modified user-facing feature; modify the code at the baseline's Frontend Implementation Path in place. Update each affected feature file's `#### Frontend Draft Reference` (`Draft path:` + `Confirmed (experience): YYYY-MM-DD`). When Phase 5 is explicitly deferred for a feature, write `Confirmed (experience): null` plus a sibling `Drift:` line stating why. Do not create a `prototypes/` directory under the evolved PRD. Enforced at convergence time by **CR-PP-FD01**.
@@ -270,7 +271,7 @@ to what actually changed in this evolve cycle.
 
 | Dimension | Check |
 |-----------|-------|
-| Change annotation completeness | Every modified/added file has a metadata header (Status, Baseline, Change summary); every file's internal change points have inline tags; Change summary is consistent with inline tags; every deprecated feature has a tombstone |
+| Change annotation completeness | Every modified/added file has a metadata header (Status, Baseline, Change summary); the Change summary names the concrete sections / requirements that changed; every deprecated feature has a tombstone; NO leaf body contains inline `[ADDED]` / `[MODIFIED]` / `[REMOVED]` / `[UNCHANGED]` markers (forbidden in evolve mode — see Change Annotation Convention) |
 | Reference validity | README `Baseline.Predecessor` path points to valid old PRD directory; all `→ baseline` links in Journey/Feature/Architecture indexes resolve to existing files; Baseline field links in changed files resolve correctly; tombstone Original links are valid |
 | Incremental consistency | Feature/Journey IDs have no conflicts with baseline (new IDs > baseline max ID); changed features referencing changed architecture conventions point to this PRD's version (not old PRD); deprecated features removed from Feature Index/Roadmap/Cross-Journey Patterns; deprecated journeys' mapped features are either also deprecated or remapped; README Change Summary matches actual files |
 | Flatten integrity | Combined (flattened) view passes existing review checklist; new features' journey mappings exist in the flattened journey set; new features' dependencies exist in the flattened feature set; no references to deprecated items appear in surviving files |
@@ -322,8 +323,12 @@ ID stability is the core guarantee that makes evolve mode safe across multiple i
 
 ## Change Annotation Convention
 
-All content types in evolve mode (features, journeys, architecture topics) use the same
-annotation system.
+All content types in evolve mode (features, journeys, architecture topics) use **file-level
+metadata only**. Inline body markers (`[ADDED]` / `[MODIFIED]` / `[REMOVED]` / `[UNCHANGED]`
+blockquotes scattered through section bodies) are FORBIDDEN — they accumulate across
+deliveries, pollute the reading experience (one delivery 4 PRD reached 690 markers across
+the bundle), and duplicate information already available from `git diff` against the
+baseline-delivery tag.
 
 ### File-Level Metadata Header
 
@@ -336,7 +341,7 @@ is evolve-mode only — initial PRD files and revise-mode files do not use it.
 |-------|-------|
 | Status | **Modified** |
 | Baseline | [{ID} in {predecessor-dir-name}]({relative-path-to-predecessor-file}) |
-| Change summary | {concise list of what changed — maps to inline markers below} |
+| Change summary | {concise list of what changed at the section / requirement level — readable in isolation; the authoritative diff is `git diff <baseline-delivery-tag> -- <this file>`} |
 
 **Added file:**
 
@@ -347,43 +352,37 @@ is evolve-mode only — initial PRD files and revise-mode files do not use it.
 
 **Deprecated file (tombstone):** see tombstone format in `common/templates/evolve-readme-template.md`.
 
-### Inline Change Markers
+### Delta Discovery
 
-Within a fully-rewritten file body, annotate specific change points using blockquotes with tags:
+Readers and downstream consumers (system-design, autoforge) recover the per-section delta from:
 
-```
-> **[ADDED]** {description of what was added}
-```
+1. The file-level **Change summary** field (human-readable narrative — what changed and why).
+2. `git diff <prd-analysis-delivery-N-1-{slug}>..<prd-analysis-delivery-N-{slug}> -- <path>`
+   (authoritative line-level diff against the prior delivery's tag).
+3. The README's per-delivery **Change Summary** section, which enumerates the bundle-wide
+   Added / Modified / Deprecated / Architecture-changes lists.
 
-```
-> **[MODIFIED]** {description of what changed compared to baseline}
-```
+These three sources together carry every delta signal that inline markers used to provide,
+without the markers' two structural problems: (a) staleness — markers from delivery N-1 stay
+in the body forever and confuse readers about what changed *this* delivery, and (b) noise —
+heavily-iterated leaves accumulate so many markers that the underlying content becomes
+unreadable.
 
-```
-> **[REMOVED]** {description of what was removed and why}
-```
+### FORBIDDEN
 
-```
-> **[UNCHANGED]** {optional — only when explicitly calling out that something did NOT change is important for context}
-```
-
-### Available Tags
-
-| Tag | Meaning |
-|-----|---------|
-| `[ADDED]` | New content not present in baseline |
-| `[MODIFIED]` | Content changed from baseline (include description of what changed) |
-| `[REMOVED]` | Content removed from this item (include reason) |
-| `[UNCHANGED]` | Optional — only when emphasizing "this did NOT change" matters for context |
-
-### Annotation Granularity
-
-- **Section level** — if an entire section is new/modified, annotate after the section heading.
-- **Item level** — if only specific items within a section changed, annotate after those items.
-- **Don't annotate every line** — `[UNCHANGED]` is optional; most unchanged content needs no
-  marker.
-- The file-level Change summary MUST be consistent with the inline markers (no omissions or
-  extras).
+- Writing `> **[ADDED]** ...`, `> **[MODIFIED]** ...`, `> **[REMOVED]** ...`, or
+  `> **[UNCHANGED]** ...` blockquotes (or any other shape of the same tag set) inside a leaf
+  file body — features, journeys, or architecture topics. This applies to writers in
+  evolve-mode generation AND revisers in any mode. If a reviser encounters legacy inline
+  markers in a baseline file they are rewriting, they MUST strip them as part of the rewrite —
+  but they MUST strip ONLY the marker line itself. **Never** collapse adjacent blank-line
+  separators or merge the surrounding paragraphs / table rows: a newline-greedy strip (e.g.
+  matching the marker plus `\s*` of trailing whitespace) eats the blank line that separates a
+  heading from the next table, joining them into one corrupted block. Treat the marker line as
+  a self-contained line: delete its content, leave the surrounding newlines intact, and check
+  the file's structure (heading boundaries, table separators) after each marker removal.
+- Mentioning that inline markers are required, optional, or supported anywhere in
+  generated body content. The file-level Change summary is the only narrative record.
 
 ---
 

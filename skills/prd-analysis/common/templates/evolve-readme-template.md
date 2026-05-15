@@ -4,9 +4,11 @@ The incremental README.md is the navigational entry point for an evolved PRD dir
 references a predecessor PRD as baseline, summarizes changes, and provides a complete index that
 mixes local files (changed items) with baseline references (unchanged items).
 
-All change annotations (file-level metadata headers, inline `[MODIFIED]`/`[ADDED]`/`[REMOVED]`/
-`[UNCHANGED]` tags) follow the **Change Annotation Convention** defined in `generate/evolve-mode.md`. Refer
-to that file for the complete format specification, tag syntax, and examples.
+Change annotation is **file-level only** — see `generate/evolve-mode.md` "Change Annotation
+Convention" for the metadata-header format. Inline body markers (`[ADDED]` / `[MODIFIED]` /
+`[REMOVED]` / `[UNCHANGED]` blockquotes inside section bodies) are FORBIDDEN in evolve-mode
+output; the file-level Change summary plus `git diff` against the prior delivery tag carry
+the same information without accumulating across deliveries.
 
 ---
 
@@ -82,22 +84,23 @@ If a category has no entries, omit it entirely. Do not write "None."
 ### Problem & Goals
 
 {If unchanged: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#problem--goals)"}
-{If changed: full rewrite of section + change annotations using inline markers}
+{If changed: full rewrite of the section. The Change Summary above names what changed; the
+section body itself reads as plain content — no inline `[MODIFIED]` / `[ADDED]` markers.}
 
 ### Evidence Base
 
 {If unchanged: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#evidence-base)"}
-{If changed: full rewrite + change annotations}
+{If changed: full rewrite. No inline markers.}
 
 ### Competitive Landscape
 
 {If unchanged: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#competitive-landscape)"}
-{If changed: full rewrite + change annotations}
+{If changed: full rewrite. No inline markers.}
 
 ### Users
 
 {If unchanged: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#users)"}
-{If changed: full rewrite + change annotations}
+{If changed: full rewrite. No inline markers.}
 
 ### User Journeys
 
@@ -115,7 +118,7 @@ never reference-only. Status column uses: `Unchanged`, `**Modified**`, `**Added*
 ### Cross-Journey Patterns
 
 {If unchanged: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#cross-journey-patterns)"}
-{If changed: full rewrite + change annotations. Deprecated features removed from "Addressed by
+{If changed: full rewrite. No inline markers. Deprecated features removed from "Addressed by
 Feature" column.}
 
 ### Feature Index
@@ -178,20 +181,22 @@ If no cascades occurred in this iteration, write: "No cascades in this iteration
 ### Risks
 
 {If no new/changed risks: "No changes — see [baseline](../YYYY-MM-DD-product-name/README.md#risks)"}
-{If risks changed: full rewrite + change annotations. Include all risks (baseline + new), annotate
-changes.}
+{If risks changed: full rewrite. No inline markers. Include all risks (baseline + new); the
+Change Summary section above names which entries are new or revised.}
 
 ### Roadmap
 
-Updated roadmap reflecting this iteration's changes. Include all phases — unchanged features
-listed for context with "(baseline)" note, new/modified features annotated.
+Updated roadmap reflecting this iteration's changes. Include all phases — baseline features
+link to the baseline directory; new features in this iteration link locally. The per-feature
+Status column in the Feature Index above already encodes Added / Modified / Deprecated; the
+roadmap entries do NOT repeat that signal inline.
 
 **Phase 1 — MVP** (P0 features)
-- [F-001: {name}](../YYYY-MM-DD-product-name/features/F-001-{slug}.md) (baseline)
-- [F-012: {name}](features/F-012-{slug}.md) **[ADDED]**
+- [F-001: {name}](../YYYY-MM-DD-product-name/features/F-001-{slug}.md)
+- [F-012: {name}](features/F-012-{slug}.md)
 
 **Phase 2** (P1 features)
-- [F-003: {name}](features/F-003-{slug}.md) **[MODIFIED]**
+- [F-003: {name}](features/F-003-{slug}.md)
 
 ### References
 

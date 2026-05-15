@@ -129,7 +129,34 @@ Every dispatch prompt MUST include:
 4. All inline context the subagent needs (PRD feature text, data-model excerpt, conventions,
    sibling-module Public Interfaces).
 5. Report/ACK format specification (one line per file, no prose summary).
-6. Forbidden list (files outside target set, Grep/Glob, post-edit re-read).
+6. Forbidden list (files outside target set, Grep/Glob, post-edit re-read, **any Write/Edit
+   under `~/.claude/skills/` or `~/.claude/plugins/cache/` — see Rule 7a below**).
+
+### Rule 7a — Skill Catalog is Read-Only (MANDATORY)
+
+**Every dispatch prompt for every sub-agent role (writer, cross-reviewer, adversarial-reviewer,
+reviser, planner, summarizer, judge, domain-consultant) MUST include this prohibition,
+verbatim or paraphrased:**
+
+> You MUST NOT use the Write, Edit, or NotebookEdit tools on any file under
+> `~/.claude/skills/`, `~/.claude/plugins/cache/`, or any other directory containing the
+> running skill bundle. The skill catalog is **read-only** from inside a sub-agent. If your
+> task seems to require adding a new criterion ID, dispatch template, snippet, or example,
+> the new ID is a **string label in your JSON / markdown output ONLY** — do NOT modify the
+> catalog file. The orchestrator's criteria-evolution loop (see `common/review-criteria.md`
+> entries `CR-META-mechanize` and `CR-META-adversarial`) is the only path that promotes a
+> runtime string label into a registered CR; sub-agents propose, the orchestrator does not.
+
+**Why this rule exists.** Production incident on 2026-05-15: an adversarial-reviewer sub-agent
+under high pressure coined three new CR IDs and appended 102 lines to a sibling skill's
+`review-criteria.md`. The user caught and reverted the mutation. Any consuming session can
+quietly mutate the skill from inside a sub-agent dispatch unless this rule is present in the
+dispatch prompt.
+
+**Optional defense-in-depth.** Orchestrators MAY run `git -C ~/.claude/skills/system-design
+diff --quiet && git -C ~/.claude/skills/prd-analysis diff --quiet` after each dispatch; a
+non-zero exit indicates a sub-agent has mutated a skill and the orchestrator MUST abort to
+HITL rather than continue.
 
 ---
 

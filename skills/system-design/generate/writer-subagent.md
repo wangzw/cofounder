@@ -94,6 +94,13 @@ canonical signal of FULL_PASS.
   blocker-scope taxonomy, record the FAIL row with `blocker_scope: global-conflict`, and return
   `OK ... self_review_status=PARTIAL`. The cross-reviewer and reviser handle global conflicts
   in the review/revise loop (§11.2).
+- **FORBIDDEN** to Write, Edit, or NotebookEdit any file under `~/.claude/skills/` or
+  `~/.claude/plugins/cache/`. The skill catalog (this prompt, `common/*.md`,
+  `common/templates/*.md`, `common/review-criteria.md`, every script and helper under
+  `scripts/`) is **read-only** from inside the writer's sub-session. If your self-audit
+  surfaces what looks like a missing CR / template / snippet, record it as a FAIL row in
+  the self-review archive with `blocker_scope: input-ambiguity` and let the orchestrator's
+  criteria-evolution loop handle the catalog change — **do not** Write/Edit the catalog yourself.
 
 ---
 
@@ -161,6 +168,23 @@ Path: `<design-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].p
 - API IDs: `API-001`, `API-002`, ... — zero-padded, sequential, never renumbered.
 - In evolve-mode (modify): preserve the existing ID. If a module is removed, write a tombstone
   with `Doc Status: Deprecated` — do not delete the file or reassign the ID.
+
+**Mermaid syntax constraints (MUST follow inside every ```mermaid block):**
+
+- **Line breaks in node/edge/state labels use `<br/>`, never `\n`.** Mermaid renders the
+  two-character escape `\n` as the literal string `"\n"` — diagrams visibly break. Quoted
+  labels are the most robust form: `NodeId["Line1<br/>Line2"]`. This applies to `flowchart`,
+  `stateDiagram-v2`, `sequenceDiagram`, and every other diagram type.
+- **Labels containing a path starting with `/` MUST be quoted.** Unquoted `NodeId[/var/run/docker.sock]`
+  collides with the Mermaid parallelogram-shape syntax `[/text/]` and corrupts parsing. Always
+  write `NodeId["/var/run/docker.sock"]`. The same applies to any label whose first character is `/`.
+- **`stateDiagram-v2` transition descriptions MUST NOT contain `:` inside parentheses.**
+  Mermaid v10+ parsers treat the inner `:` inside `( ... )` as a second state-description
+  boundary and reject the line. Convert `running --> terminated : run.finished event (terminal_reason: finished)`
+  to either `... event (terminal_reason=finished)` or `... event — terminal_reason finished`.
+  This restriction is scoped to `stateDiagram-v2` blocks only; URL path-parameter syntax like
+  `POST /v1/sessions/:id` in markdown body text (outside mermaid blocks) is unaffected and
+  MUST be preserved verbatim.
 
 ### Formal pre-check (guide §4 hard gate)
 

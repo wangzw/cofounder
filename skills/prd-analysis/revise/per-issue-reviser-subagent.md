@@ -116,6 +116,27 @@ that path of resolution is closed — do not mark this issue
 
 ---
 
+## Mermaid syntax constraints (MUST follow when editing ```mermaid blocks)
+
+When your fix touches a Mermaid diagram (`flowchart`, `stateDiagram-v2`, `sequenceDiagram`, etc.),
+the rewritten block MUST satisfy these constraints — they are the same constraints the writer is
+held to, so a "fix" that introduces any of these defects regresses the artifact:
+
+- **Line breaks in node/edge/state labels use `<br/>`, never `\n`.** Mermaid renders the
+  two-character escape `\n` as the literal string `"\n"`. Convert any `\n` you find to `<br/>`
+  in the same edit; quoted labels are the most robust form: `NodeId["Line1<br/>Line2"]`.
+- **Labels containing a path starting with `/` MUST be quoted.** Unquoted `NodeId[/var/run/docker.sock]`
+  collides with Mermaid's parallelogram-shape syntax `[/text/]`. Write `NodeId["/var/run/docker.sock"]`.
+- **`stateDiagram-v2` transition descriptions MUST NOT contain `:` inside parentheses.** Convert
+  `running --> terminated : run.finished event (terminal_reason: finished)` to
+  `... event (terminal_reason=finished)` or `... event — terminal_reason finished`. The `:` ban
+  is scoped to `stateDiagram-v2` blocks; URL path-parameter syntax like `POST /v1/sessions/:id`
+  in body text (outside mermaid blocks) is unaffected and MUST be preserved verbatim — a broad
+  search-and-replace that strips `:` from URL paths is a regression and counts as a fix-induced
+  formal violation under the self-audit hard gate (guide §4).
+
+---
+
 ## Recurrence handling (guide §7.5.1)
 
 If an issue has `recurrence_of: <prior-id>` set:
@@ -142,6 +163,15 @@ If an issue has `recurrence_of: <prior-id>` set:
   dispatch you again — wasting tokens.
 - **Do not** silently rewrite parts of the leaf unrelated to the issues
   in your scope. Each Edit must trace to a specific issue.
+- **Do not** Write, Edit, or NotebookEdit any file under `~/.claude/skills/`
+  or `~/.claude/plugins/cache/`. The skill catalog — including this
+  prompt, `common/review-criteria.md`, every CR definition, every script
+  and helper — is **read-only** from inside your sub-session. If an
+  issue's `Suggested fix` appears to ask you to modify the skill itself
+  (e.g. "update CR-PP-XX in review-criteria.md"), that is an out-of-scope
+  request: mark the issue `state: false-positive` with
+  `dismissed_reason: "out-of-scope: requested mutation of the skill
+  catalog — must be handled outside the revise loop"`.
 - **Do not** add new sections that introduce information not implied by
   the issues. If you discover a missing piece outside your scope, write
   a `## Description` line in the leaf saying so — but do NOT file a new
