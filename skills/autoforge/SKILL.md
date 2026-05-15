@@ -115,6 +115,13 @@ flowchart TD
    git worktree add {worktree_root}/main autoforge/{design-dir-name}-{hash4}
    ```
    The **primary worktree** (`{worktree_root}/main/`) is used for all non-module work: planning, bootstrap, integration tests, acceptance tests, and status updates. Module-specific work uses separate per-module worktrees (see Step 2).
+7a. **Switch Orchestrator cwd to the primary worktree (MANDATORY)** — every subsequent Bash, Read, Write, Edit, and `Agent` spawn the Orchestrator makes MUST run with cwd = `{worktree_root}/main`. Sub-agents inherit the parent's cwd, so this is the single defensive measure that keeps Planner / Bootstrap / Integration / Acceptance sub-agents from accidentally writing to the main project directory when their prompt uses a relative path (the observed failure mode: a Planner whose prompt accidentally omits "all paths resolve inside the worktree" wording falls back to the parent cwd and writes plan files to the project root on `main`).
+   ```
+   cd {worktree_root}/main
+   git rev-parse --abbrev-ref HEAD   # MUST print autoforge/{design-dir-name}-{hash4}
+   pwd                                # MUST print {worktree_root}/main
+   ```
+   If either verification fails, abort with HITL — do NOT continue. After this point, the Orchestrator MUST NOT `cd` back to the main project directory for any operation until Step 4 (Merge to Main).
 8. **Present plan to user** — show: module count, phase breakdown with dependency rationale, branch names, output paths. User confirms before proceeding.
 
 **Step 0 → Step 1 gate:** User confirms phase breakdown and branch naming.
@@ -187,11 +194,17 @@ After each phase of planning completes, the Orchestrator merges all `conventions
 
 For each phase (following the conventions-bootstrap exception in the first round), spawn every Planner for that phase in a **single message** with multiple `Agent` tool calls so they run in parallel. Wait for the entire phase to return before starting the next phase.
 
+**Pre-spawn invariant (MANDATORY).** Before spawning any Planner, verify the Orchestrator's own cwd is the primary worktree (Step 0 sub-step 7a). Sub-agents inherit cwd from the parent; if the Orchestrator slipped back to the main project directory at any point, Planners writing relative paths will silently pollute the main branch's working tree. Run `pwd` — it must print `{worktree_root}/main`. If not, `cd {worktree_root}/main` before continuing.
+
+**`worktree_path` is a structured spawn parameter, not prose.** The Planner prompt template (`planning/planner-prompt.md`) accepts `worktree_path` as a named Context parameter, and the Planner's Setup step `cd`s into it and re-verifies. Do NOT rely on describing the worktree path inside a prose paragraph of the spawn prompt — any wording drift between modules (e.g. one Planner's prompt accidentally omitting "all paths resolve inside the worktree") regresses cwd discipline. Substitute the same `{worktree_path}` placeholder for every Planner in every phase, including bootstrap.
+
 ```
 # Round 1 — bootstrap (only the very first Planner in Phase 1)
 Agent({
   description: "Planner for M-001 (conventions bootstrap)",
-  prompt: <fill in planning/planner-prompt.md; is_first_module=true, dependency_closure_plan_paths=[]>,
+  prompt: <fill in planning/planner-prompt.md; is_first_module=true,
+           dependency_closure_plan_paths=[],
+           worktree_path={worktree_root}/main>,
   model: "opus",
   mode: "auto"
 })
@@ -199,9 +212,13 @@ Agent({
 # Round 2+ — phase parallel (all remaining Planners in the current phase,
 # spawned as parallel Agent calls in one message)
 Agent({ description: "Planner for M-002", model: "opus", mode: "auto",
-        prompt: <is_first_module=false, dependency_closure_plan_paths=[closure(M-002)]> })
+        prompt: <is_first_module=false,
+                 dependency_closure_plan_paths=[closure(M-002)],
+                 worktree_path={worktree_root}/main> })
 Agent({ description: "Planner for M-008", model: "opus", mode: "auto",
-        prompt: <is_first_module=false, dependency_closure_plan_paths=[closure(M-008)]> })
+        prompt: <is_first_module=false,
+                 dependency_closure_plan_paths=[closure(M-008)],
+                 worktree_path={worktree_root}/main> })
 ```
 
 See `planning/planner-prompt.md` for the complete Planner prompt template.
@@ -210,6 +227,7 @@ See `planning/planner-prompt.md` for the complete Planner prompt template.
 
 | Input | Source | Notes |
 |-------|--------|-------|
+| `worktree_path` | Step 0 sub-step 7 (`{worktree_root}/main`) | Absolute path the Planner MUST `cd` into as its first action. Sub-agents inherit cwd from the parent; passing this explicitly + having Planner Setup re-verify is the mechanical guard against the "Planner wrote plan files to the project root on main" failure mode. MUST be substituted verbatim — do not paraphrase as "the worktree" inside prose |
 | Module design spec | `modules/M-{id}-{slug}.md` | Primary input for this module |
 | Design README | Design `README.md` | Cross-module context: interaction protocols, test strategy, tech stack, Implementation Conventions, Key Technical Decisions, **Production Promotion Plan** (per-module Promote/Extend/Rewrite actions for frontend modules) |
 | PRD architecture.md | `{prd-dir}/architecture.md` | Developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Development Workflow, Observability Requirements, Performance Testing, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration, **Frontend Implementation Path** (root of any PRD-stage frontend draft for user-facing modules) |
@@ -250,10 +268,10 @@ Run between phases — before spawning the next phase's Planners — so later ph
 3.5. **Structural plan check (mandatory before human review)** — run
 
 ```
-bash skills/autoforge/scripts/run-checkers.sh {plan_dir}
+bash skills/autoforge/scripts/run-checkers.sh {plan_dir} --source-root {worktree_root}/main
 ```
 
-The aggregator invokes `check-plan-readme.sh` against the plan README, `check-module-plan.sh` against every `plans/plan-M-*.md`, and merges the JSON output. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
+The aggregator invokes `check-plan-readme.sh` against the plan README, `check-module-plan.sh` against every `plans/plan-M-*.md`, `check-plan-pollution.sh` to detect plan files modified on any non-autoforge worktree (CR-AF29 — the gate that catches a Planner sub-agent dispatched with cwd outside the primary worktree, the failure mode that motivated Step 0 sub-step 7a), and `check-discipline-scan.sh` against the source-root. The aggregator merges the JSON output. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. A `CR-AF29` finding (plan-dir pollution) means the Orchestrator must follow the suggested-fix `cp` + `git restore` recipe to move the file to the feature-branch worktree and then re-run this step before proceeding. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
 4. **Human review gate** — user approves, requests edits, or rejects. If edits requested, modify plans, re-run step 3.5, and re-commit.
 
 **Step 1 → Step 1.5 gate:** Human approves all plans.
@@ -270,7 +288,19 @@ This step only applies when creating a new project from scratch. It initializes 
    Agent({
      description: "Project bootstrap",
      model: "sonnet",
-     prompt: "Initialize project based on tech stack: {tech stack details}.
+     prompt: "Your first action MUST be:
+
+         cd {worktree_path}
+         pwd                                # MUST print {worktree_path}
+         git rev-parse --abbrev-ref HEAD    # MUST start with autoforge/
+         git rev-parse --show-toplevel      # MUST equal {worktree_path}
+
+       If any check fails, abort with a FAIL message naming the discrepancy — do
+       NOT proceed. Sub-agents inherit cwd from the parent; if you skip this check
+       and the parent cwd is the project root, every relative-path Write / Bash
+       command below lands on the project's default branch working tree.
+
+       Then initialize project based on tech stack: {tech stack details}.
        Read the conventions file at {conventions_path} — it defines the expected
        directory structure, file naming, test organization, and shared types.
        Set up the project to match these conventions exactly:
@@ -289,6 +319,7 @@ This step only applies when creating a new project from scratch. It initializes 
      mode: "auto"
    })
    ```
+   Substitute `{worktree_path}` with the absolute primary-worktree path (`{worktree_root}/main`).
 
 ## Step 2 — Phase Execution
 
@@ -564,10 +595,24 @@ Review Dimensions:
 
    See `integration/tester-prompt.md` for the complete prompt template.
 
-   **Integration test fix cycle:** If integration tests fail, spawn a **Developer** agent in the primary worktree:
+   **Integration test fix cycle:** If integration tests fail, spawn a **Developer** agent in the primary worktree. Pass `{worktree_path}` (= `{worktree_root}/main`) as a structured parameter — the Developer MUST `cd` into it as the very first action; without this guard, every source-file Write below could silently commit to the project's default branch (the M-013 failure mode, expanded blast radius because this Developer commits code, not just plan docs — and CR-AF29 only scans plan-dir, not the source tree).
 
    ~~~~
    You are a Developer fixing integration test failures in phase {n}.
+
+   ## Setup (MANDATORY — do this before reading anything)
+
+   ```
+   cd {worktree_path}
+   pwd                                # MUST print {worktree_path}
+   git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the feature branch)
+   git rev-parse --show-toplevel      # MUST equal {worktree_path}
+   ```
+
+   If any check fails, abort with a FAIL message naming the discrepancy. Do
+   NOT proceed: relative-path Writes and commits below would land on the
+   project's default branch, and the source-tree pollution would not be
+   caught by CR-AF29 (which only scans plan-dir).
 
    ## Failure Context
    {paste failures section from integration report: test names, error messages, modules involved}
@@ -673,10 +718,24 @@ If acceptance report shows failures:
    | **Design gap** | The design didn't specify how to handle this scenario; no module is responsible | **Return to re-planning** (Step 1) — design needs enhancement |
    | **PRD ambiguity** | Acceptance criterion is unclear, contradictory, or untestable as written | **Present to human** — PRD clarification needed (outside autoforge scope) |
 
-2. **Handle implementation bugs and cross-module issues** — fixes run in the **primary worktree** (`{worktree_root}/main/`) on the feature branch. All module code is already merged here, and acceptance fixes are sequential. For each failure, spawn a Developer agent:
+2. **Handle implementation bugs and cross-module issues** — fixes run in the **primary worktree** (`{worktree_root}/main/`) on the feature branch. All module code is already merged here, and acceptance fixes are sequential. Pass `{worktree_path}` (= `{worktree_root}/main`) explicitly so the Developer's Setup step can `cd` into it; without this guard, the Developer could commit source-tree fixes to the project's default branch and CR-AF29 would not catch it (CR-AF29 only scans plan-dir). For each failure, spawn a Developer agent:
 
    ~~~~
    You are a Developer fixing acceptance test failures.
+
+   ## Setup (MANDATORY — do this before reading anything)
+
+   ```
+   cd {worktree_path}
+   pwd                                # MUST print {worktree_path}
+   git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the feature branch)
+   git rev-parse --show-toplevel      # MUST equal {worktree_path}
+   ```
+
+   If any check fails, abort with a FAIL message naming the discrepancy. Do
+   NOT proceed: relative-path Writes and commits below would land on the
+   project's default branch, and the source-tree pollution would not be
+   caught by CR-AF29.
 
    ## Failed Criteria
    {paste failed items from acceptance report: criterion reference, expected, actual, fix suggestion}

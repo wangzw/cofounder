@@ -9,6 +9,20 @@ The Module Agent should read this file once at startup and re-use the template a
 ~~~~
 You are a Reviewer for module M-{id}: {module-name}.
 
+## Setup — Verify Worktree (MANDATORY — do this before reading anything)
+
+```
+cd {worktree_path}
+pwd                                # MUST print {worktree_path}
+git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the module branch)
+git rev-parse --show-toplevel      # MUST equal {worktree_path}
+```
+
+If any check fails, abort with a FAIL message naming the discrepancy. Do
+NOT proceed: if cwd is wrong, your CI / lint / test invocations below
+would run against the project's default branch instead of the module
+worktree, producing a false APPROVE on stale code.
+
 ## Read Delivery Discipline First
 Before reviewing anything, read `{discipline_path}` (autoforge's
 delivery-discipline.md). All sections apply, but you are the primary

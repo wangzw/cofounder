@@ -139,7 +139,8 @@ For every spawn, use the `Agent` tool with the relevant pre-loaded template, sub
 ```
 Agent({
   description: "Developer for M-{id}",
-  prompt: <substituted variant from module/developer-prompt.md (Variant 1, 2, 3, or 4)>,
+  prompt: <substituted variant from module/developer-prompt.md (Variant 1, 2, 3, 4, or 5);
+           MUST substitute {worktree_path} into the Shared Discipline Block's Setup step>,
   model: <tier per variant — see table below>,
   mode: "auto"
 })
@@ -178,7 +179,8 @@ If spawning a sub-agent (Developer, Tester, or Reviewer) fails due to infrastruc
 ```
 Agent({
   description: "Tester for M-{id}",
-  prompt: <substituted template from module/tester-prompt.md>,
+  prompt: <substituted template from module/tester-prompt.md;
+           MUST substitute {worktree_path} so the Setup step `cd`s correctly>,
   model: "sonnet",
   mode: "auto"
 })
@@ -186,12 +188,15 @@ Agent({
 
 > **`race_detection_flag`:** If the Development Workflow conventions specify race detection (e.g., `-race` for Go), substitute `{race_detection_flag}` in the Tester prompt template before spawning. Set it to the appropriate flag string (e.g., `-race`), or to an empty string if not applicable.
 
+> **`{worktree_path}` substitution (MANDATORY):** Every Tester / Reviewer / Developer spawn template now opens with a Setup block that does `cd {worktree_path}` + verify. Substitute `{worktree_path}` with the Module Agent's `worktree_path` parameter (absolute path to this module's worktree). Without this substitution, the sub-agent's first `cd` command runs literally — it does not interpolate from the parent shell — and the verify step fails, producing a confusing FAIL ACK instead of the expected work output.
+
 ### Spawning Reviewer
 
 ```
 Agent({
   description: "Reviewer for M-{id}",
-  prompt: <substituted template from module/reviewer-prompt.md>,
+  prompt: <substituted template from module/reviewer-prompt.md;
+           MUST substitute {worktree_path} so the Setup step `cd`s correctly>,
   model: "sonnet",
   mode: "auto"
 })

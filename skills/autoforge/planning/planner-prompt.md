@@ -6,12 +6,13 @@ You are a Planner responsible for converting a module design spec into a concret
 
 You will receive these parameters from the Orchestrator:
 
+- `worktree_path`: **absolute** path to the primary worktree (typically `{project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}/main`). You MUST `cd` into this directory as the very first action you take and re-verify on entry — see Setup below. The `plan_dir`, `conventions_path`, and every other relative path you receive resolves **inside this worktree**. If you skip this step, your relative-path Writes will fall back to the parent session's cwd (which may be the main project directory) and silently pollute the project's default branch.
 - `module_id`: module identifier (e.g., M-001)
 - `module_name`: human-readable module name
 - `module_design_path`: path to the module design spec
 - `design_readme_path`: path to the design README.md
 - `prd_feature_paths`: paths to PRD feature specs referenced by this module
-- `plan_dir`: plan output directory (`docs/raw/plans/{plan-dir}/plans/`)
+- `plan_dir`: plan output directory (`docs/raw/plans/{plan-dir}/plans/`) — relative to `{worktree_path}`
 - `dependency_closure_plan_paths`: plan files for modules in this module's **dependency closure** — the transitive set of upstream modules it consumes (direct `Deps` + their deps). Empty for Phase 1 modules with no dependencies. This is the only set of prior plans you receive; you do not have access to plans outside the closure.
 - `conventions_path`: path to conventions.md (`{plan_dir}/conventions.md`)
 - `module_slug`: Derived from the module design spec filename (e.g., `M-001-task-split.md` -> `task-split`). Used in output filenames.
@@ -48,6 +49,23 @@ Before producing any plan, read `skills/autoforge/delivery-discipline.md` (passe
 Plans that fail any of these will be rejected by the structural checker (`scripts/check-module-plan.sh`) before they reach the Developer.
 
 ## Execution
+
+### 0. Switch into the primary worktree (MANDATORY — do this first)
+
+Before reading any input, opening any file, or writing anything, run:
+
+```
+cd {worktree_path}
+pwd                                # MUST print {worktree_path}
+git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/"
+git rev-parse --show-toplevel      # MUST equal {worktree_path}
+```
+
+If any of the three checks fails — `pwd` doesn't match, the branch is `main` / `master` / `develop` / any other non-`autoforge/*` name, or the toplevel doesn't match — **abort immediately**: do NOT proceed to read inputs or write the plan. Return a short FAIL message naming the discrepancy (e.g. `FAIL: pwd is /Users/.../project-root, expected /Users/.../worktrees/.../main — refusing to write plan to the project's default branch`). The Orchestrator will fix the spawn cwd and re-dispatch.
+
+**Why this step exists.** Sub-agents inherit the parent session's cwd. If the parent Orchestrator slipped back to the project root at any point (or the prompt accidentally described the worktree only in prose without this enforced `cd`), every relative-path Write you make below — `Write docs/raw/plans/.../plan-M-{id}-*.md` — lands on the project's default branch working tree and pollutes `main`. This was the exact failure observed in a production session: 12 Planners with this guard wrote correctly to the worktree, 1 Planner whose prompt prose drifted wrote `plan-M-013-environment.md` to `main`. The enforced `cd` + verification removes that path entirely; you cannot get past this section unless you are in the right place.
+
+Once all three checks pass, proceed to step 1.
 
 ### 1. Read All Inputs
 

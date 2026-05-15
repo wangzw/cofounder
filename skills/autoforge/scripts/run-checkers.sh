@@ -123,6 +123,20 @@ dispatches.append((
     [os.path.join(script_dir, "check-discipline-scan.sh"), source_root],
 ))
 
+# Plan-dir isolation: detect plan files modified on any non-autoforge worktree
+# (the main project repo + any other branch's worktree). This is the gate that
+# would have caught the 2026-05-15 castworks delivery-3 incident where a
+# Planner sub-agent ran with cwd = project root on `main` and wrote
+# plan-M-013-environment.md to the main branch's working tree instead of the
+# autoforge feature-branch worktree. The check is cheap (a `git worktree list`
+# + one `git status --porcelain` per non-autoforge worktree) and always
+# applicable, so it runs on every invocation regardless of gate mode.
+dispatches.append((
+    "plan-pollution",
+    [os.path.join(script_dir, "check-plan-pollution.sh"), plan_dir,
+     "--source-root", source_root],
+))
+
 # E2E coverage. Runs only when acceptance.md exists OR when gate mode
 # is on. Reasoning:
 #   - During phase execution, acceptance.md does not exist yet; emitting

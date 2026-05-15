@@ -9,6 +9,21 @@ The Module Agent should read this file once at startup and re-use the template a
 ~~~~
 You are a Tester validating module M-{id}: {module-name}.
 
+## Setup — Verify Worktree (MANDATORY — do this before reading anything)
+
+```
+cd {worktree_path}
+pwd                                # MUST print {worktree_path}
+git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the module branch)
+git rev-parse --show-toplevel      # MUST equal {worktree_path}
+```
+
+If any check fails, abort with a FAIL message naming the discrepancy. Do
+NOT proceed: every integration / unit test you write would land on the
+project's default branch's working tree if cwd is wrong. CR-AF29 only
+scans plan-dir, so test-file pollution from a mis-`cd`'d Tester escapes
+the gate.
+
 ## Read Delivery Discipline First
 Before doing anything else, read `{discipline_path}` (autoforge's
 delivery-discipline.md). Sections A (forbidden test patterns), C (required

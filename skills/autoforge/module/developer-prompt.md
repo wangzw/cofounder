@@ -9,9 +9,33 @@ The Module Agent appends a `## Project Coding Standards` section to the chosen v
 ## Shared Discipline Block (prepended to every variant)
 
 The Module Agent MUST prepend this block to whichever variant it spawns
-(substitute `{discipline_path}` from its context):
+(substitute `{discipline_path}` and `{worktree_path}` from its context):
 
 ~~~~
+## Setup — Verify Worktree (MANDATORY — do this before reading anything)
+
+Before reading delivery-discipline, the plan, the design spec, or anything
+else, run:
+
+```
+cd {worktree_path}
+pwd                                # MUST print {worktree_path}
+git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the module branch)
+git rev-parse --show-toplevel      # MUST equal {worktree_path}
+```
+
+If any check fails, abort with a FAIL message naming the discrepancy. Do
+NOT proceed: every relative-path Write, Edit, and `git commit` below
+would land on the project's default branch's working tree. The
+Reviewer/Tester catch most defects after the fact, but CR-AF29 (the
+plan-pollution checker) only scans plan-dir, NOT the source tree — so
+source-file pollution from a mis-`cd`'d Developer escapes the gate.
+
+The Module Agent should already have `cd`'d into the worktree before
+spawning you, but this check is the defense-in-depth that catches the
+case where the parent cwd is wrong (the exact 2026-05-15 failure mode
+that motivated SKILL.md Step 0 sub-step 7a).
+
 ## Read Delivery Discipline First
 
 Before writing any code, read `{discipline_path}` (autoforge's
