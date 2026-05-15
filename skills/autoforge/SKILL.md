@@ -268,10 +268,14 @@ Run between phases — before spawning the next phase's Planners — so later ph
 3.5. **Structural plan check (mandatory before human review)** — run
 
 ```
-bash skills/autoforge/scripts/run-checkers.sh {plan_dir} --source-root {worktree_root}/main
+bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+     --source-root {worktree_root}/main \
+     --phase=plan
 ```
 
-The aggregator invokes `check-plan-readme.sh` against the plan README, `check-module-plan.sh` against every `plans/plan-M-*.md`, `check-plan-pollution.sh` to detect plan files modified on any non-autoforge worktree (CR-AF29 — the gate that catches a Planner sub-agent dispatched with cwd outside the primary worktree, the failure mode that motivated Step 0 sub-step 7a), and `check-discipline-scan.sh` against the source-root. The aggregator merges the JSON output. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. A `CR-AF29` finding (plan-dir pollution) means the Orchestrator must follow the suggested-fix `cp` + `git restore` recipe to move the file to the feature-branch worktree and then re-run this step before proceeding. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
+`--phase=plan` is mandatory here. It declares plan-time intent to the aggregator: only `check-plan-readme.sh`, `check-module-plan.sh`, `check-plan-pollution.sh`, and `check-discipline-scan.sh` fire. The acceptance-time checkers (`check-acceptance-report.sh`, `check-traceability.sh`, `check-e2e-coverage.sh`) are explicitly suppressed even if `reports/acceptance.md` and `reports/traceability.json` exist — in `--evolve` mode the plan-dir is mutated in place, so those files are still present from delivery N-1 until E6 archives them. Running E6-time gates against N-1 reports is the "checker mode mismatch" failure mode: at plan time the new design's AC set has changed but the prior `traceability.json` still reflects N-1, so CR-AF10 (unmapped AC), CR-AF09 (orphan tests), and CR-AF26 (frontend F-ID without e2e spec) would all fire on artifacts that this step is not responsible for fixing. The `--phase=plan` flag prevents that.
+
+The aggregator merges the JSON output of the enabled checkers. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. A `CR-AF29` finding (plan-dir pollution) means the Orchestrator must follow the suggested-fix `cp` + `git restore` recipe to move the file to the feature-branch worktree and then re-run this step before proceeding. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
 4. **Human review gate** — user approves, requests edits, or rejects. If edits requested, modify plans, re-run step 3.5, and re-commit.
 
 **Step 1 → Step 1.5 gate:** Human approves all plans.
@@ -700,10 +704,14 @@ See `acceptance/tester-prompt.md` for the complete prompt template. The Acceptan
 **Structural acceptance gate (mandatory before declaring PASS).** After the Acceptance Tester writes its report and `traceability.json`, the Orchestrator runs:
 
 ```
-bash skills/autoforge/scripts/run-checkers.sh {plan_dir} --source-root {worktree_root}/main
+bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+     --source-root {worktree_root}/main \
+     --phase=accept
 ```
 
-This invokes `check-acceptance-report.sh`, `check-traceability.sh`, and `check-discipline-scan.sh` over the merged source tree. **Any `error`/`critical` finding (especially CR-AF09 orphan tests, CR-AF10 unmapped AC, CR-AF21 happy-path-only journeys, CR-AF20 "no error == success" assertions, CR-AF22 dependency-abandonment markers) blocks PASS** — treat these as acceptance failures and route through the fix cycle below. Warnings are listed in the report but do not block. This replaces the prior LLM-grep heuristics and matches the contract in delivery-discipline §F / §H / §M / §N.
+`--phase=accept` enables the full default check set: the always-on plan / module / pollution checks (`check-plan-readme.sh`, `check-module-plan.sh`, `check-plan-pollution.sh`), the discipline scan over the source tree (`check-discipline-scan.sh`), AND the acceptance-time checks (`check-acceptance-report.sh`, `check-traceability.sh`, `check-e2e-coverage.sh`). At this phase, `reports/acceptance.md` and `reports/traceability.json` are this delivery's own (the Acceptance Tester just wrote them) so gating against them is correct.
+
+**Any `error`/`critical` finding (especially CR-AF09 orphan tests, CR-AF10 unmapped AC, CR-AF21 happy-path-only journeys, CR-AF20 "no error == success" assertions, CR-AF22 dependency-abandonment markers) blocks PASS** — treat these as acceptance failures and route through the fix cycle below. Warnings are listed in the report but do not block. This replaces the prior LLM-grep heuristics and matches the contract in delivery-discipline §F / §H / §M / §N.
 
 ### Acceptance Fix Cycle
 
@@ -929,7 +937,7 @@ If a particular evolution is so heavy that in-place mutation would be misleading
    3. **Backfill the README** (Design Input + Evolution History only):
       - Insert `Feature Branch Family`, `Current Design Delivery`, `Autoforge Delivery`, and `Autoforge Delivery Tag` rows into the Design Input table per the template (keep `Feature Branch` as well — leave existing rows untouched). `Autoforge Delivery Tag` ← `—` (no tag was created at delivery-1's converged commit).
       - Add a `## Evolution History` section before `## Phase Status`, populated with one row for delivery-1: Baseline `—`, Target = the chosen `Current Design Delivery`, Autoforge Tag `—`, Modules `— / {total-from-Module-Index} / — / —`, Verdict = the existing Acceptance row's verdict (e.g. `Pass (90.4%)`), Summary `Legacy delivery (pre-evolve)`.
-   4. **Reconcile orphan plan files (CR-AF16).** Run `bash skills/autoforge/scripts/run-checkers.sh {plan_dir}` and inspect any `CR-AF16` findings of the form *"plan exists for M-{id} but no row in Module Status"*. These are plan files added outside the autoforge run (typically post-acceptance hotfixes — look for a `Source Issue` / `Source ADR` / `Hotfix on top of Phase N` marker in the file's Context table). For each:
+   4. **Reconcile orphan plan files (CR-AF16).** Run `bash skills/autoforge/scripts/run-checkers.sh {plan_dir} --phase=plan` and inspect any `CR-AF16` findings of the form *"plan exists for M-{id} but no row in Module Status"*. `--phase=plan` is required here because the legacy plan-dir already carries `reports/acceptance.md` and `reports/traceability.json` from the pre-evolve delivery-1 run; without the flag they would trigger E6-time gates (CR-AF09 / CR-AF10 / CR-AF23) against pre-evolve content that this reconciliation step is not responsible for fixing. E0.5 has not yet written any `.evolve-N/impact.md` marker, so the auto-detect fallback does not fire — pass the flag explicitly. These are plan files added outside the autoforge run (typically post-acceptance hotfixes — look for a `Source Issue` / `Source ADR` / `Hotfix on top of Phase N` marker in the file's Context table). For each:
       - **If the plan file looks like merged hotfix work** (has a `Source Issue`/`Source ADR` field, references existing modules as deps, and the file is reachable from `main` per `git log --all -- <plan-path>`): append a row to `## Module Status` with `Plan=Done · Dev=Done · Test=Done · Review=Approved · Merged=Yes` and the Notes column citing the source issue/ADR (e.g. `manual hotfix · issue #21`). Also append a corresponding row to `## Module Plans` so the index stays complete; mark the Phase column as `Hotfix` (not a numbered phase, since these landed outside the planned phase order).
       - **If the plan file is unrecognised** (no source-issue marker, never made it to `main`, or the user can't classify it): present the file path and the first 30 lines to the user via `AskUserQuestion` and ask whether to (a) add as completed hotfix, (b) drop the file (`git rm`), or (c) abort the migration so the user can resolve manually.
       - These reconciliation edits go into the same migration commit — no separate commit per orphan.
@@ -1064,6 +1072,35 @@ Restricted form of Step 1: only `revised` and `added` modules are re-planned. `k
    - For `removed` modules: drop the row (traceability lives in `versions/{N}.md`)
 
 5. **Commit re-plan** — `docs(plan): re-plan for delivery-{N} — {target-design-tag}`
+
+5.5. **Structural plan check (MANDATORY before human review)** — run
+
+   ```bash
+   bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+        --source-root {worktree_root}/main \
+        --phase=plan
+   ```
+
+   `--phase=plan` is critical at E4 specifically because the plan-dir
+   still carries `reports/acceptance.md` and `reports/traceability.json`
+   from delivery N-1 (E6 sub-step 1 archives them later). Without
+   `--phase=plan` the aggregator would dispatch
+   `check-acceptance-report.sh` / `check-traceability.sh` /
+   `check-e2e-coverage.sh` against the stale N-1 reports — the new
+   design's AC set has changed but the N-1 traceability still reflects
+   N-1, so CR-AF09 (orphan tests), CR-AF10 (unmapped AC), CR-AF26
+   (frontend F-ID without e2e spec), and CR-AF23 (E2E command record
+   outdated) would all fire on artifacts this step does not own.
+   This is the "checker mode mismatch" the `--phase` flag was added to
+   eliminate. If `run-checkers.sh` is invoked here without `--phase=plan`
+   the auto-detect heuristic (presence of `.evolve-{N}/impact.md`
+   without a paired `versions/{N}.md`) will fall back to `--phase=plan`
+   semantics — but pass the flag explicitly so the intent is recorded
+   in the dispatch log.
+
+   Any `error` / `critical` finding fails the gate: re-dispatch the
+   relevant Planner with the JSON output. Warnings flow into the human
+   review summary below but do not block.
 
 6. **Human review gate** — same review summary format as Step 1, with explicit "What changed and why" emphasis per module. The user can edit plans before execution.
 
