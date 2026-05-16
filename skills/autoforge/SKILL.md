@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.6.0
+version: 1.6.1
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
@@ -569,10 +569,11 @@ Review Dimensions:
    ```
    bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
         --source-root {worktree_root}/main \
-        --phase=execute
+        --phase=execute \
+        --json-only
    ```
 
-   `--phase=execute` enables `phase-audit.sh` in addition to the always-on plan-pollution check. The audit emits:
+   `--json-only` routes the human-readable banner to stderr so stdout is a pure JSON document — pipe straight into `python3 -c "import sys,json; d=json.load(sys.stdin); …"` without a banner-skip dance. Without the flag the agent has to remember the recipe (skip line 1 of stdout, drop `2>&1`, beware the auto-detect NOTE on stderr); two of the three 2026-05-15 castworks d3 run-checkers post-processing failures came from forgetting one of those rules. `--phase=execute` enables `phase-audit.sh` in addition to the always-on plan-pollution check. The audit emits:
 
    - **CR-AF30 worktree-cleanliness** — a per-module worktree (or the primary worktree) has uncommitted changes. The Module Agent / Integration Tester / Acceptance Tester / Developer either crashed mid-edit (the 2026-05-16 castworks d3 Phase-7 incident — a Module Agent edited five files and never returned a `tool_result`) or honoured neither §H nor the Pre-Return Verification block in its prompt.
    - **CR-AF31 stale-module-branch** — a per-module branch matching `autoforge/<run>/p<N>/M-*` exists locally without a worktree and is not yet an ancestor of `autoforge/<run>/main`. Indicates the cleanup step from a prior phase silently failed or the phase was abandoned before merge.
@@ -880,8 +881,11 @@ When invoked with `--execute docs/raw/plans/{plan-dir}/`:
    ```
    bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
         --source-root {worktree_root}/main \
-        --phase=execute
+        --phase=execute \
+        --json-only
    ```
+
+   `--json-only` is recommended whenever the agent will parse the result — stdout becomes a pure JSON document (`{"issues": [...]}`) consumable by `json.load(sys.stdin)`, no skip-line / `2>&1` dance.
 
    For each finding, reconcile by **what is on disk**, not by what the status table says (status tables are written by the Orchestrator and lag actual progress when a session crashes mid-step):
 

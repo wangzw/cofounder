@@ -10,7 +10,15 @@
 # to the dispatch table below.
 #
 # Usage:
-#   run-checkers.sh <plan-dir> [--source-root <dir>] [--phase=<phase>] [--gate=delivery-tag]
+#   run-checkers.sh <plan-dir> [--source-root <dir>] [--phase=<phase>] [--gate=delivery-tag] [--json-only]
+#
+# --json-only routes the human-readable banner (`FOUND ...`, `PASS ...`,
+# `DELIVERY-TAG GATE PASSED/FAILED ...`) to stderr so stdout carries
+# only the JSON document. Lets a caller do `json.load(sys.stdin)`
+# without a banner-skip dance — the recipe two callers in the
+# 2026-04-11-castworks d3 run kept getting wrong. Recommended for any
+# programmatic consumer; humans calling from a terminal can omit it
+# and read the banner on stdout as before.
 #
 # <plan-dir> is the autoforge plan directory, e.g.
 # `docs/raw/plans/2026-04-27-product-abc-x9k1/`.
@@ -69,8 +77,9 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: run-checkers.sh <plan-dir> [--source-root <dir>] [--phase=<phase>] [--gate=delivery-tag]" >&2
+  echo "Usage: run-checkers.sh <plan-dir> [--source-root <dir>] [--phase=<phase>] [--gate=delivery-tag] [--json-only]" >&2
   echo "  --phase=<plan|execute|accept|delivery-tag>" >&2
+  echo "  --json-only  route banner to stderr; stdout = pure JSON" >&2
 }
 
 PLAN_DIR="${1:-}"
@@ -84,9 +93,11 @@ shift
 SOURCE_ROOT="$(pwd)"
 GATE_MODE=""
 PHASE=""
+JSON_ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --source-root) SOURCE_ROOT="$2"; shift 2 ;;
+    --json-only) JSON_ONLY="1"; shift ;;
     --gate=delivery-tag)
       GATE_MODE="delivery-tag"
       if [ -n "$PHASE" ] && [ "$PHASE" != "delivery-tag" ]; then
@@ -123,6 +134,7 @@ export AF_SOURCE_ROOT="$SOURCE_ROOT"
 export AF_SCRIPT_DIR="$SCRIPT_DIR"
 export AF_GATE_MODE="$GATE_MODE"
 export AF_PHASE="$PHASE"
+export AF_JSON_ONLY="$JSON_ONLY"
 
 python3 - <<'PYEOF'
 import json, os, sys, glob
@@ -132,9 +144,18 @@ source_root = os.environ["AF_SOURCE_ROOT"]
 script_dir = os.environ["AF_SCRIPT_DIR"]
 gate_mode = os.environ.get("AF_GATE_MODE") or ""
 phase = os.environ.get("AF_PHASE") or ""
+json_only = bool(os.environ.get("AF_JSON_ONLY"))
 
 sys.path.insert(0, os.path.join(script_dir, "lib"))
 from autoforge_lint import run_cmd as run
+
+# In --json-only mode the banner goes to stderr so stdout is pure JSON
+# (the consumer can `json.load(sys.stdin)` without a skip-line dance).
+# Default keeps the prior behaviour: banner on stdout for human readers.
+banner_stream = sys.stderr if json_only else sys.stdout
+
+def banner(line: str) -> None:
+    print(line, file=banner_stream)
 
 
 # Auto-detect plan-phase when the caller didn't specify --phase and we're
@@ -395,15 +416,19 @@ if gate_mode == "delivery-tag":
     ]
     if not blockers:
         if not aggregated:
-            print("DELIVERY-TAG GATE PASSED — 0 issues found across autoforge checkers")
+            banner("DELIVERY-TAG GATE PASSED — 0 issues found across autoforge checkers")
+            if json_only:
+                # PASS path emits no JSON by default; --json-only callers
+                # rely on json.load(stdin) so give them an empty document.
+                print(json.dumps({"issues": []}, indent=2, ensure_ascii=False))
         else:
-            print(
+            banner(
                 f"DELIVERY-TAG GATE PASSED — {len(aggregated)} advisory "
                 f"warning(s) (no error/critical findings)"
             )
             print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
         sys.exit(0)
-    print(
+    banner(
         f"DELIVERY-TAG GATE FAILED — {len(blockers)} blocking finding(s) "
         f"(worst severity: {worst}); refusing to authorize tag creation:"
     )
@@ -411,10 +436,12 @@ if gate_mode == "delivery-tag":
     sys.exit(1)
 
 if not aggregated:
-    print("PASS 0 issues found across autoforge checkers")
+    banner("PASS 0 issues found across autoforge checkers")
+    if json_only:
+        print(json.dumps({"issues": []}, indent=2, ensure_ascii=False))
     sys.exit(0)
 
-print(f"FOUND {len(aggregated)} issue(s) across autoforge checkers (worst severity: {worst}):")
+banner(f"FOUND {len(aggregated)} issue(s) across autoforge checkers (worst severity: {worst}):")
 print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
 sys.exit(1)
 PYEOF

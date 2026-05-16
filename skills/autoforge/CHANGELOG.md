@@ -3,6 +3,35 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.1] — 2026-05-16
+
+### Added — `--json-only` flag on `run-checkers.sh`
+
+Three of the seventeen `run-checkers.sh` invocations in the 2026-05-15
+castworks delivery-3 session crashed in post-processing because the
+orchestrator wrote one-liners that did `json.load(sys.stdin)` directly
+on default-mode output — but default-mode stdout is `<banner line>\n
+<JSON document>`, not pure JSON. Each crash had a slightly different
+cause (double `sys.stdin.read()`, `tail -n +2` tripped by a
+`2>&1`-redirected stderr NOTE, or no skip at all) but all three boiled
+down to a fragile output contract for programmatic consumers.
+
+- **`scripts/run-checkers.sh`** — new `--json-only` flag. When set:
+  - `FOUND ...`, `PASS ...`, and `DELIVERY-TAG GATE PASSED/FAILED ...`
+    banners route to stderr instead of stdout.
+  - The PASS path (which would otherwise emit no JSON) emits
+    `{"issues": []}` on stdout so consumers can `json.load(stdin)`
+    in every state — pass, found, or gate.
+  - Backward-compatible: omit the flag and the prior banner-on-stdout
+    behaviour is preserved for terminal users.
+- **`SKILL.md`** — the two newly-added run-checkers call sites (Step 2
+  Phase-boundary audit gate, `--execute` Mode Resume Protocol) now
+  pass `--json-only` and document the `json.load(stdin)` consumer
+  recipe inline.
+- **`tests/test-run-checkers.sh`** — covers PASS / FOUND under
+  `--json-only` (stdout parses, banner reaches stderr) and asserts the
+  default mode still emits the banner on stdout.
+
 ## [1.6.0] — 2026-05-16
 
 ### Added — phase-boundary worktree audit + Resume Protocol

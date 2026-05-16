@@ -230,4 +230,44 @@ else
   pass
 fi
 
+# --- --json-only mode --------------------------------------------------
+# PASS path: stdout must be a parseable JSON document, banner on stderr.
+# Catches the 2026-05-15 castworks d3 failure mode where the orchestrator
+# wrote post-processing one-liners that did `json.load(stdin)` directly
+# on the default-mode output (which has a `FOUND …:` banner before the
+# JSON document) and crashed at JSON parse time.
+src_clean=$(mktempdir)
+start_test "--json-only PASS: stdout parses as JSON"
+out_stdout=$("$SCRIPT" "$plan" --source-root "$src_clean" --json-only 2>/dev/null) && rc=0 || rc=$?
+assert_exit_code 0 "$rc"
+start_test "  stdout is valid JSON with empty issues list"
+if printf '%s' "$out_stdout" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('issues')==[], d" 2>/dev/null; then
+  pass
+else
+  fail "stdout not parseable / not {\"issues\": []}: '$out_stdout'"
+fi
+start_test "  banner went to stderr"
+out_stderr=$("$SCRIPT" "$plan" --source-root "$src_clean" --json-only 2>&1 >/dev/null)
+assert_stdout_contains "PASS" "$out_stderr"
+
+# FOUND path with findings: stdout is JSON document, banner on stderr.
+start_test "--json-only FOUND: stdout parses as JSON with issues"
+out_stdout=$("$SCRIPT" "$plan" --source-root "$src2" --json-only 2>/dev/null) && rc=0 || rc=$?
+assert_exit_code 1 "$rc"
+start_test "  stdout is valid JSON with non-empty issues"
+if printf '%s' "$out_stdout" | python3 -c "import sys,json; d=json.load(sys.stdin); assert len(d.get('issues',[]))>=1; assert any(i.get('criterion_id')=='CR-AF12' for i in d['issues'])" 2>/dev/null; then
+  pass
+else
+  fail "stdout did not yield expected JSON with CR-AF12: '$out_stdout'"
+fi
+start_test "  banner went to stderr"
+out_stderr=$("$SCRIPT" "$plan" --source-root "$src2" --json-only 2>&1 >/dev/null) || true
+assert_stdout_contains "FOUND" "$out_stderr"
+
+# Default (no --json-only): banner stays on stdout for human readers.
+start_test "default mode (no --json-only): banner remains on stdout"
+out_stdout=$("$SCRIPT" "$plan" --source-root "$src_clean" 2>/dev/null) && rc=0 || rc=$?
+assert_exit_code 0 "$rc"
+assert_stdout_contains "PASS" "$out_stdout"
+
 summary
