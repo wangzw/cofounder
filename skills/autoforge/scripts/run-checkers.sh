@@ -15,10 +15,9 @@
 # --json-only routes the human-readable banner (`FOUND ...`, `PASS ...`,
 # `DELIVERY-TAG GATE PASSED/FAILED ...`) to stderr so stdout carries
 # only the JSON document. Lets a caller do `json.load(sys.stdin)`
-# without a banner-skip dance — the recipe two callers in the
-# 2026-04-11-castworks d3 run kept getting wrong. Recommended for any
-# programmatic consumer; humans calling from a terminal can omit it
-# and read the banner on stdout as before.
+# without a banner-skip dance. Recommended for any programmatic
+# consumer; humans calling from a terminal can omit it and read the
+# banner on stdout as before.
 #
 # <plan-dir> is the autoforge plan directory, e.g.
 # `docs/raw/plans/2026-04-27-product-abc-x9k1/`.
@@ -156,6 +155,10 @@ banner_stream = sys.stderr if json_only else sys.stdout
 
 def banner(line: str) -> None:
     print(line, file=banner_stream)
+
+
+def emit_json(doc: dict) -> None:
+    print(json.dumps(doc, indent=2, ensure_ascii=False))
 
 
 # Auto-detect plan-phase when the caller didn't specify --phase and we're
@@ -420,28 +423,28 @@ if gate_mode == "delivery-tag":
             if json_only:
                 # PASS path emits no JSON by default; --json-only callers
                 # rely on json.load(stdin) so give them an empty document.
-                print(json.dumps({"issues": []}, indent=2, ensure_ascii=False))
+                emit_json({"issues": []})
         else:
             banner(
                 f"DELIVERY-TAG GATE PASSED — {len(aggregated)} advisory "
                 f"warning(s) (no error/critical findings)"
             )
-            print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
+            emit_json({"issues": aggregated})
         sys.exit(0)
     banner(
         f"DELIVERY-TAG GATE FAILED — {len(blockers)} blocking finding(s) "
         f"(worst severity: {worst}); refusing to authorize tag creation:"
     )
-    print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
+    emit_json({"issues": aggregated})
     sys.exit(1)
 
 if not aggregated:
     banner("PASS 0 issues found across autoforge checkers")
     if json_only:
-        print(json.dumps({"issues": []}, indent=2, ensure_ascii=False))
+        emit_json({"issues": []})
     sys.exit(0)
 
 banner(f"FOUND {len(aggregated)} issue(s) across autoforge checkers (worst severity: {worst}):")
-print(json.dumps({"issues": aggregated}, indent=2, ensure_ascii=False))
+emit_json({"issues": aggregated})
 sys.exit(1)
 PYEOF
