@@ -158,6 +158,35 @@ Commit test files: `test(p{phase_number}): add phase-{phase_number} integration 
 
 {project_coding_standards}
 
+## Pre-Return Verification
+
+This is the contract that the parent Orchestrator's phase-audit gate (CR-AF30 in `scripts/phase-audit.sh`) enforces structurally. The 2026-05-16 castworks d3 run shipped two phase-integration reports (`integration-phase-2.md`, `integration-phase-6.md`) that were written but never committed — the merge gate now catches that pattern.
+
+**Before emitting your RESULT line** (PASS or FAIL), run in the primary worktree:
+
+```
+cd {worktree_path}
+git status --porcelain
+```
+
+Branch on the output:
+
+1. **Empty** — proceed to emit RESULT.
+
+2. **Non-empty and the only file is `integration-phase-{phase_number}.md` (or other test files you authored)** — you skipped step 4's commit. Go back to step 4, run the documented `git add` + `git commit -m "test(p{phase_number}): add phase-{phase_number} integration tests"` (or `docs(plan): commit phase-{phase_number} integration report` for report-only updates), re-run `git status --porcelain`, then emit RESULT.
+
+3. **Non-empty with source-tree changes** — the integration test run must not modify product source; that is the integration-test-fix-cycle Developer's job. Something is wrong. Abort with:
+
+   ```
+   PHASE: {phase_number}
+   RESULT: FAIL
+   FAILURES: pre-return-verification — unexpected source-tree changes: <git status output>
+   ```
+
+   so the Orchestrator can route it back through the fix cycle instead of merging contaminated state.
+
+Never `git checkout --` to make `git status` clean.
+
 ## Output
 
 ```

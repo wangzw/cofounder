@@ -3,6 +3,85 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.0] — 2026-05-16
+
+### Added — phase-boundary worktree audit + Resume Protocol
+
+The 2026-05-15 → 2026-05-16 castworks delivery-3 run surfaced two
+recurring failure modes that the prior gates could not catch:
+
+1. A Module Agent was dispatched in Phase 7, edited five files in its
+   per-module worktree, and never returned a `tool_result`. The
+   orchestrator blocked on the await; the next session resumed
+   without noticing that two sibling modules had committed cleanly
+   while the third had dirty in-flight work. A naïve merge would have
+   discarded the rescuable changes.
+2. A `p4/M-007-storage-migrations` branch survived from an earlier
+   phase without a worktree. Cleanup either failed silently or was
+   skipped during a crash-resume; the branch lingered indefinitely.
+
+Both are *post-commit-time* / *boundary-time* failures: every existing
+check operated mid-step, not at phase boundaries. This release adds the
+two structural checks that catch them mechanically.
+
+- **`scripts/phase-audit.sh`** — new checker. Two criteria:
+  - **`CR-AF30 worktree-cleanliness`** (severity `error`). Any
+    worktree whose branch starts with `autoforge/` MUST have an
+    empty `git status --porcelain`. Each dirty file becomes one
+    finding. Distinct from `CR-AF29` (which audits *non*-autoforge
+    worktrees for plan-dir pollution); the two together close the
+    "is everyone clean?" question across the whole repo.
+  - **`CR-AF31 stale-module-branch`** (severity `error`). Any local
+    branch matching `autoforge/<run>/p<N>/M-<id>-<slug>` exists
+    without a worktree AND is not yet an ancestor of the run's
+    feature branch (`autoforge/<run>/main`, with a fallback lookup
+    at the bare `autoforge/<run>`). The script never deletes
+    branches — that decision is escalated.
+
+  Same 3-state JSON contract + `autoforge_lint.emit` as the other
+  `check-*.sh` scripts. New smoke test in `tests/test-phase-audit.sh`
+  covering happy path, dirty-only, untracked-only, mixed, detached-HEAD
+  skip (incl. the round-2 regression for a detached worktree pinned to
+  a module-branch tip), idempotence, and argument errors.
+
+- **`scripts/run-checkers.sh`** — phase-audit wired into the dispatch
+  table for `--phase=execute`, `--phase=accept`, `--phase=delivery-tag`.
+  Suppressed at `--phase=plan` because Planners legitimately leave
+  the primary worktree dirty until the Orchestrator's batch commit;
+  firing CR-AF30 there would be a spurious gate.
+
+- **`SKILL.md` Step 2 → "After All Modules in Phase Complete"** —
+  new sub-step **3.5 Phase-boundary audit gate** between
+  "Handle decision requests" and "Merge module branches". Mandates a
+  `--phase=execute` run before any merge; documents how to route each
+  finding (re-dispatch finishing pass, escalate, surface to human)
+  and forbids auto-`git checkout --` / `branch -D`.
+
+- **`SKILL.md` --execute Mode** — new sub-step **2.5 Resume Protocol —
+  audit-driven reconciliation**. When a fresh session picks up an
+  interrupted run, it MUST run phase-audit before trusting the
+  README status tables and reconcile each finding against the
+  on-disk state (commits + dirty files + module-state JSON), not
+  the status table (which lags actual progress when a session
+  crashes mid-step). Four-row decision matrix for CR-AF30 outcomes.
+
+- **`module/agent-prompt.md`** — new **Pre-Return Verification**
+  section + step 6a in the Execution Flow. The Module Agent MUST
+  run `git status --porcelain` before emitting STATUS and either
+  commit / explicit `git stash push -u` / return `DECISION_REQUEST`
+  if the tree is dirty. Returning APPROVE with a dirty worktree is
+  the contract violation that CR-AF30 catches structurally.
+
+- **`integration/tester-prompt.md`** — same Pre-Return Verification
+  section. The 2026-05-16 castworks d3 incident shipped two
+  `integration-phase-{N}.md` reports that were written but never
+  committed; this contract makes that fail loudly at the source.
+
+The dual-layer defence (prompt-time discipline + post-step audit gate)
+mirrors the d1 / d2 soft-pass remediation in 1.5.0: discipline alone
+cannot prevent the failure, but discipline + structural gate makes a
+third recurrence mechanically unreachable.
+
 ## [1.5.0] — 2026-05-08
 
 ### Added — structural counter-pressure to the d1 / d2 soft-pass failure mode

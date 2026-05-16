@@ -5,31 +5,16 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$DIR/lib/test_helpers.sh"
 SCRIPT="$DIR/../scripts/check-plan-pollution.sh"
 
-# Helper: build a repo with a main branch + an autoforge feature-branch worktree.
+# Adapter from the legacy positional contract used by the call sites
+# below — (root, plan_dir, plan_filename, wt_subpath, feature_branch) —
+# to the shared make_autoforge_fixture helper. Explicit named locals
+# stop a silent mis-wire if either side's parameter order ever changes.
 make_repo_with_worktree() {
-  local root="$1"
-  local plan_dir_rel="$2"   # e.g. docs/raw/plans/test-plan
-  local plan_filename="$3"  # e.g. plan-M-001.md
-  local wt_subpath="$4"     # e.g. worktrees/main
-  local feature_branch="$5" # e.g. autoforge/test-plan-abcd
-  local wt_root="$root-worktrees"
-
-  (
-    # Set up main repo
-    mkdir -p "$root"
-    cd "$root"
-    git init -q -b main
-    git config user.email "test@example.com"
-    git config user.name "Test"
-    mkdir -p "$plan_dir_rel/plans"
-    echo "stub" > "$plan_dir_rel/plans/$plan_filename"
-    git add . >/dev/null
-    git commit -q -m initial
-    # Add the autoforge feature-branch worktree
-    git branch "$feature_branch"
-    mkdir -p "$wt_root"
-    git worktree add -q "$wt_root/$wt_subpath" "$feature_branch"
-  )
+  local root="$1" plan_dir_rel="$2" plan_filename="$3"
+  local wt_subpath="$4" feature_branch="$5"
+  make_autoforge_fixture \
+    "$root" main "$feature_branch" "$plan_dir_rel" \
+    "$wt_subpath" "$plan_filename"
 }
 
 # --- clean: main is clean, autoforge worktree has changes (legitimate) -----

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, asdict
 from typing import Iterable, Optional
@@ -95,6 +96,82 @@ def heading_set(body: str, level: int = 2) -> set[str]:
         if line.startswith(prefix) and not line.startswith(prefix + "#"):
             out.add(line[len(prefix):].strip())
     return out
+
+
+def run_cmd(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
+    """Run a subprocess and return (returncode, stdout, stderr) with
+    trailing newlines stripped. Used by every checker that shells out
+    to git — keeping the one-liner in the lib stops each checker from
+    growing its own copy with subtly different stderr/text handling.
+    """
+    p = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
+    return p.returncode, p.stdout.rstrip("\n"), p.stderr.rstrip("\n")
+
+
+def parse_worktree_list(porcelain_output: str) -> list[dict]:
+    """Shared by every checker that walks `git worktree list`. Keeping
+    the parser in one place stops checkers from drifting into subtly
+    different worktree-membership semantics — a divergence would cause
+    one checker to skip a worktree another inspects, with no
+    compile-time signal. Output keys: path, head, branch, detached, bare.
+    """
+    worktrees: list[dict] = []
+    current: dict = {}
+    for line in porcelain_output.splitlines():
+        if not line.strip():
+            if current:
+                worktrees.append(current)
+                current = {}
+            continue
+        parts = line.split(" ", 1)
+        key = parts[0]
+        val = parts[1] if len(parts) == 2 else ""
+        if key == "worktree":
+            current["path"] = val
+        elif key == "HEAD":
+            current["head"] = val
+        elif key == "branch":
+            current["branch"] = val
+        elif key == "detached":
+            current["detached"] = True
+        elif key == "bare":
+            current["bare"] = True
+    if current:
+        worktrees.append(current)
+    return worktrees
+
+
+def branch_short(worktree_entry: dict) -> str:
+    """Strip the `refs/heads/` prefix git uses in porcelain worktree
+    output; returns "" for detached / bare entries.
+    """
+    ref = worktree_entry.get("branch", "")
+    if ref.startswith("refs/heads/"):
+        return ref[len("refs/heads/"):]
+    return ref
+
+
+def parse_porcelain_line(line: str) -> tuple[str, str] | None:
+    """Parse one line of `git status --porcelain` into (status_code, path).
+    Handles the rename / copy form (`R  old -> new`) by returning the
+    destination path, and strips the surrounding double-quotes git uses
+    for paths containing spaces or shell-special characters. Returns
+    None when the line is malformed (too short, or yields an empty
+    path after stripping) — callers must treat None as "skip", never
+    record a Finding for it.
+    """
+    if len(line) < 4:
+        return None
+    status_code = line[:2]
+    rest = line[3:]
+    if " -> " in rest:
+        rest = rest.split(" -> ", 1)[1]
+    if rest.startswith('"') and rest.endswith('"'):
+        rest = rest[1:-1]
+    path = rest.strip()
+    if not path:
+        return None
+    return status_code, path
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:

@@ -64,3 +64,41 @@ summary() {
 mktempdir() {
   mktemp -d "${TMPDIR:-/tmp}/autoforge-test.XXXXXX"
 }
+
+# Build the canonical autoforge fixture: a project repo with a stub plan
+# file on a default branch plus an autoforge feature-branch worktree at
+# `<root>-worktrees/<wt-subpath>`. Used by every checker that walks
+# `git worktree list`. Plan file is always `plan-M-001.md` unless
+# a different filename is supplied.
+#
+# Args:
+#   1. root                 absolute path to the project repo (created)
+#   2. default_branch       e.g. main / master / develop
+#   3. feature_branch       e.g. autoforge/test-plan-aaaa
+#   4. plan_dir_rel         e.g. docs/raw/plans/test-plan
+#   5. wt_subpath           default: main
+#   6. plan_filename        default: plan-M-001.md
+make_autoforge_fixture() {
+  local root="$1"
+  local default_branch="$2"
+  local feature_branch="$3"
+  local plan_dir_rel="$4"
+  local wt_subpath="${5:-main}"
+  local plan_filename="${6:-plan-M-001.md}"
+  local wt_root="$root-worktrees"
+
+  mkdir -p "$root"
+  (
+    cd "$root"
+    git init -q -b "$default_branch"
+    git config user.email "test@example.com"
+    git config user.name "Test"
+    mkdir -p "$plan_dir_rel/plans"
+    echo "stub" > "$plan_dir_rel/plans/$plan_filename"
+    git add . >/dev/null
+    git commit -q -m initial
+    git branch "$feature_branch"
+    mkdir -p "$wt_root"
+    git worktree add -q "$wt_root/$wt_subpath" "$feature_branch"
+  )
+}

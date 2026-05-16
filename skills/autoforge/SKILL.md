@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.5.0
+version: 1.6.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
 ---
 
@@ -564,6 +564,27 @@ Review Dimensions:
    - Spawn a Developer agent (Variant 3 — Retry From Reviewer Rejection, or a custom prompt matching the chosen option) in the module's worktree with the chosen option as instructions. Pass: `module_design_path`, `module_plan_path`, `conventions_path`, and `project_coding_standards` as you would for any Developer spawn.
    - Spawn Tester to verify the fix (Tester will review/update tests as needed)
    - If pass → merge as normal; if fail → present updated diagnosis with new options to human; repeat until resolved or human chooses to skip/abort
+3.5. **Phase-boundary audit gate (MANDATORY before merge).** Run:
+
+   ```
+   bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+        --source-root {worktree_root}/main \
+        --phase=execute
+   ```
+
+   `--phase=execute` enables `phase-audit.sh` in addition to the always-on plan-pollution check. The audit emits:
+
+   - **CR-AF30 worktree-cleanliness** — a per-module worktree (or the primary worktree) has uncommitted changes. The Module Agent / Integration Tester / Acceptance Tester / Developer either crashed mid-edit (the 2026-05-16 castworks d3 Phase-7 incident — a Module Agent edited five files and never returned a `tool_result`) or honoured neither §H nor the Pre-Return Verification block in its prompt.
+   - **CR-AF31 stale-module-branch** — a per-module branch matching `autoforge/<run>/p<N>/M-*` exists locally without a worktree and is not yet an ancestor of `autoforge/<run>/main`. Indicates the cleanup step from a prior phase silently failed or the phase was abandoned before merge.
+
+   **Any `error`/`critical` finding BLOCKS the merge in step 4** — do not proceed. Routing per finding:
+
+   - **CR-AF30 in a per-module worktree of an APPROVE module** — the Module Agent violated its own contract; re-dispatch a "Module Agent finishing pass" (model `sonnet`) with the worktree path and the audit JSON, instructing it to commit or `git stash push -u -m "rescued from <agent>"` the in-flight files, then re-emit STATUS. Never `git checkout --` the files; the change is the only record of what the crashed agent did. Re-run this audit after the pass.
+   - **CR-AF30 in a per-module worktree of a DECISION_REQUEST / PLAN_REVISION_NEEDED module** — expected; surface the dirty files to the human as part of the decision context, do not auto-handle.
+   - **CR-AF30 in the primary worktree** — the most recent Integration Tester / Acceptance Tester / Developer left a report or fix uncommitted. Read the diff; if it is the report this phase just produced, commit it with the documented message (`docs(plan): commit pending integration phase-{n} report` or similar); otherwise escalate.
+   - **CR-AF31** — never auto-delete. Run `git log <branch> --not <feature-branch> --oneline` to see what is on the orphan branch; present to the human with three options: re-create worktree + resume Module Agent / merge directly if the commits look valid / `git branch -d` (plain `-d`, never `-D`).
+
+   Do not proceed to step 4 until the audit emits PASS. If a single re-dispatch pass still leaves CR-AF30 findings (two consecutive failed audits), STOP and escalate to the human — this is the same pattern as a Module Agent stuck in Diagnosis Mode.
 4. **Merge module branches** — in the primary worktree (already on the feature branch), for each approved module sequentially, run the canonical module-merge command sequence documented in the **Git Strategy → Merge Rules** section below (fast-forward merge; on conflict rebase the module branch first then retry).
 5. **Cleanup module worktrees and branches** — for each merged module:
    ```
@@ -854,6 +875,26 @@ When invoked with `--execute docs/raw/plans/{plan-dir}/`:
    - Primary worktree (`{worktree_root}/main/`): if exists and on feature branch → reuse; if missing → create
    - Module worktrees: handle based on module status (see step 4)
    - Stale worktrees (no matching status entry): remove with `git worktree remove`
+2.5. **Resume Protocol — audit-driven reconciliation (MANDATORY when resuming).** Before trusting the README status tables, run the phase audit to surface anything the prior session left behind:
+
+   ```
+   bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
+        --source-root {worktree_root}/main \
+        --phase=execute
+   ```
+
+   For each finding, reconcile by **what is on disk**, not by what the status table says (status tables are written by the Orchestrator and lag actual progress when a session crashes mid-step):
+
+   | Finding | What it means | Reconciliation |
+   |---------|--------------|----------------|
+   | CR-AF30 in `p{n}-M-{id}-{slug}/` + module's `module-state-M-{id}.json` says `developer_complete` or later | Agent finished its work but the orchestrator did not capture the return — the prior session was killed during the `Agent({Module Agent})` await | Read the worktree commits + dirty files. If commits match the expected `feat(M-{id})` / `test(M-{id})` / `docs(M-{id})` chain AND the dirty files are obviously continuations of that work → re-dispatch a Module Agent "finishing pass" to commit them and emit STATUS. If the dirty files look unrelated → escalate. |
+   | CR-AF30 in `p{n}-M-{id}-{slug}/` + no `module-state-M-{id}.json` OR state says `not_started` | Crashed Module Agent on its first attempt | Read dirty files; `git stash push -u -m "rescued from initial attempt"`; restart Module Agent from scratch (Variant 1). |
+   | CR-AF30 in `{worktree_root}/main/` | Pending Integration / Acceptance / orchestrator-level artifact | Inspect the diff. If it is a report the prior session generated but did not commit → commit with the documented message. If it is a partial fix → restart that step. |
+   | CR-AF31 (orphan module branch) | Either: (a) prior phase's cleanup step crashed after merge, leaving the branch behind; (b) prior phase was abandoned before merge | Run `git log <branch> --not autoforge/<run>/main --oneline`. Empty = case (a), safe to `git branch -d <branch>` (plain `-d`). Non-empty = case (b), present to the human with the unmerged commit list. |
+
+   **Never auto-discard.** No `git checkout --`, `git reset --hard`, or `git branch -D` without explicit human confirmation — the dirty files / unmerged commits may be the only record of work the prior agent completed before crashing. The audit script never deletes anything; the Orchestrator must not either.
+
+   Re-run the audit after every reconciliation step. Proceed to step 3 only when it emits PASS, OR when the only remaining findings are tied to modules whose status will be re-driven anyway in step 6 (entry point determination).
 3. **Read design and PRD** — same as Step 0.1 and 0.2, using paths from the plan README
 4. **Detect current state** — read plan README status tables and determine state per module:
 

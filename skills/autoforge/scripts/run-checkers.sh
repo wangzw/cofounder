@@ -25,14 +25,16 @@
 #                       runs check-plan-readme, check-module-plan,
 #                       check-discipline-scan, check-plan-pollution.
 #                       SKIPS check-acceptance-report, check-traceability,
-#                       and check-e2e-coverage even if reports/acceptance.md
-#                       and reports/traceability.json are present (e.g.
-#                       leftover from delivery N-1 in --evolve mode — they
-#                       are stale until the new acceptance run at E6).
+#                       check-e2e-coverage, AND phase-audit. (Planners
+#                       legitimately leave the primary worktree dirty
+#                       until the Orchestrator commits the plan batch,
+#                       so CR-AF30 would fire spuriously here.)
 #   --phase=execute   — Step 2 / Step E5 phase execution. Same suppression
-#                       set as plan: acceptance artifacts are still stale
-#                       (Step 2 runs per-module Reviewer + integration test
-#                       loops; acceptance happens at Step 3 / E6).
+#                       set as plan for acceptance/e2e artifacts (stale
+#                       until Step 3 / E6), BUT enables phase-audit —
+#                       called between phases as the merge gate that
+#                       catches dirty per-module worktrees (CR-AF30) and
+#                       orphan module branches (CR-AF31).
 #   --phase=accept    — Step 3 / Step E6 acceptance fix cycle. Enables the
 #                       full default check set: any reports/acceptance.md
 #                       and reports/traceability.json present are this
@@ -123,7 +125,7 @@ export AF_GATE_MODE="$GATE_MODE"
 export AF_PHASE="$PHASE"
 
 python3 - <<'PYEOF'
-import json, os, subprocess, sys, glob
+import json, os, sys, glob
 
 plan_dir = os.environ["AF_PLAN_DIR"]
 source_root = os.environ["AF_SOURCE_ROOT"]
@@ -131,10 +133,8 @@ script_dir = os.environ["AF_SCRIPT_DIR"]
 gate_mode = os.environ.get("AF_GATE_MODE") or ""
 phase = os.environ.get("AF_PHASE") or ""
 
-
-def run(cmd: list[str]) -> tuple[int, str, str]:
-    p = subprocess.run(cmd, capture_output=True, text=True)
-    return p.returncode, p.stdout, p.stderr
+sys.path.insert(0, os.path.join(script_dir, "lib"))
+from autoforge_lint import run_cmd as run
 
 
 # Auto-detect plan-phase when the caller didn't specify --phase and we're
@@ -264,6 +264,17 @@ dispatches.append((
     [os.path.join(script_dir, "check-plan-pollution.sh"), plan_dir,
      "--source-root", source_root],
 ))
+
+# Phase-boundary worktree audit (CR-AF30 + CR-AF31). Companion to
+# plan-pollution with the inverse scope: audits the autoforge/* worktrees
+# that plan-pollution skips. Suppressed at plan-phase because Planners
+# legitimately leave the primary worktree dirty until the batch commit.
+if phase in ("execute", "accept", "delivery-tag"):
+    dispatches.append((
+        "phase-audit",
+        [os.path.join(script_dir, "phase-audit.sh"), plan_dir,
+         "--source-root", source_root],
+    ))
 
 # E2E coverage. Runs only when acceptance.md exists OR when delivery-tag
 # phase is on, AND we're not in plan/execute (where N-1's acceptance.md

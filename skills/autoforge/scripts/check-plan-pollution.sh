@@ -70,10 +70,18 @@ export AF_SOURCE_ROOT="$SOURCE_ROOT"
 export AF_LIB_DIR="$SCRIPT_DIR/lib"
 
 python3 - <<'PYEOF'
-import json, os, subprocess, sys
+import json, os, sys
 
 sys.path.insert(0, os.environ["AF_LIB_DIR"])
-from autoforge_lint import Finding, emit, fail_with_script_error
+from autoforge_lint import (
+    Finding,
+    branch_short,
+    emit,
+    fail_with_script_error,
+    parse_porcelain_line,
+    parse_worktree_list,
+    run_cmd,
+)
 
 plan_dir_arg = os.environ["AF_PLAN_DIR"]
 source_root = os.environ["AF_SOURCE_ROOT"]
@@ -90,11 +98,7 @@ else:
 
 # Find the source-root's git toplevel — used to compute plan-dir relative
 # to each worktree (worktrees share the same tracked-path layout).
-def run(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
-    p = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
-    return p.returncode, p.stdout.rstrip("\n"), p.stderr.rstrip("\n")
-
-rc, top, err = run(["git", "rev-parse", "--show-toplevel"], cwd=source_root)
+rc, top, err = run_cmd(["git", "rev-parse", "--show-toplevel"], cwd=source_root)
 if rc != 0:
     # source-root is not a git working tree (commonly: test fixtures that
     # mock a plan-dir without initialising a repo). The pollution check has
@@ -121,33 +125,10 @@ except ValueError:
 plan_dir_rel = plan_dir_rel.rstrip("/")
 
 # Enumerate every worktree of this repository.
-rc, wt_out, err = run(["git", "worktree", "list", "--porcelain"], cwd=src_top)
+rc, wt_out, err = run_cmd(["git", "worktree", "list", "--porcelain"], cwd=src_top)
 if rc != 0:
     fail_with_script_error(f"git worktree list failed: {err}")
-
-worktrees: list[dict] = []
-current: dict = {}
-for line in wt_out.splitlines():
-    if not line.strip():
-        if current:
-            worktrees.append(current)
-            current = {}
-        continue
-    parts = line.split(" ", 1)
-    key = parts[0]
-    val = parts[1] if len(parts) == 2 else ""
-    if key == "worktree":
-        current["path"] = val
-    elif key == "HEAD":
-        current["head"] = val
-    elif key == "branch":
-        current["branch"] = val  # e.g. refs/heads/main
-    elif key == "detached":
-        current["detached"] = True
-    elif key == "bare":
-        current["bare"] = True
-if current:
-    worktrees.append(current)
+worktrees = parse_worktree_list(wt_out)
 
 findings: list[Finding] = []
 
@@ -157,12 +138,7 @@ for wt in worktrees:
     wt_path = wt.get("path")
     if not wt_path or not os.path.isdir(wt_path):
         continue
-    branch_ref = wt.get("branch", "")
-    branch_name = (
-        branch_ref[len("refs/heads/"):]
-        if branch_ref.startswith("refs/heads/")
-        else branch_ref
-    )
+    branch_name = branch_short(wt)
     # An autoforge feature-branch worktree is the legitimate location for
     # plan modifications; skip it. Detached heads are also skipped (rare,
     # but cannot map to a default branch by name).
@@ -173,7 +149,7 @@ for wt in worktrees:
     target = os.path.join(wt_path, plan_dir_rel)
     # `git status --porcelain -- <path>` works even when the path doesn't
     # currently exist (returns empty). No need to pre-check existence.
-    rc, st_out, st_err = run(
+    rc, st_out, st_err = run_cmd(
         ["git", "status", "--porcelain", "--", plan_dir_rel],
         cwd=wt_path,
     )
@@ -199,21 +175,11 @@ for wt in worktrees:
 
     # Non-empty status under the plan-dir on a non-autoforge worktree =
     # pollution. Emit one critical finding per dirty file.
-    lines = [ln for ln in st_out.splitlines() if ln.strip()]
-    for ln in lines:
-        # Porcelain format: "XY path" (X = staged status, Y = unstaged).
-        # Path may be quoted; split on the first whitespace after columns 2.
-        if len(ln) < 4:
+    for ln in st_out.splitlines():
+        parsed = parse_porcelain_line(ln)
+        if parsed is None:
             continue
-        status_code = ln[:2]
-        rest = ln[3:]
-        # Rename / copy entries have form "R  old -> new" — keep the right side.
-        if " -> " in rest:
-            rest = rest.split(" -> ", 1)[1]
-        # Strip surrounding double-quotes that git uses for special chars.
-        if rest.startswith('"') and rest.endswith('"'):
-            rest = rest[1:-1]
-        polluted_file = rest.strip()
+        status_code, polluted_file = parsed
 
         wt_display = os.path.relpath(wt_path, src_top) or wt_path
         findings.append(Finding(

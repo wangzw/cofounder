@@ -127,6 +127,7 @@ All file operations and git commands run inside the worktree. Spawned sub-agents
    - Verify Quick Self-Check (delivery-discipline.md final section) is
      all "yes". If not, treat as Reviewer REJECT.
 6. Commit all report files: "docs(M-{id}): add module reports"
+6a. **Pre-Return Verification (MANDATORY).** Run `git status --porcelain` in the worktree. The output MUST be empty. If anything remains, see the "Pre-Return Verification" section below — never emit STATUS while the tree is dirty.
 7. Return APPROVE
 ```
 
@@ -362,6 +363,41 @@ git commit -m "docs(M-{id}): add module reports"
 ```
 
 Note: only stage files that actually exist — most files are only created on specific return paths.
+
+## Pre-Return Verification
+
+This is the contract that the parent Orchestrator's phase-audit gate (CR-AF30 in `scripts/phase-audit.sh`) enforces structurally. Skipping it makes the merge gate trip and the Orchestrator re-dispatches you with the audit JSON; doing it correctly here saves a round-trip.
+
+**Before emitting any STATUS line** (APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED), run:
+
+```
+cd {worktree_path}
+git status --porcelain
+```
+
+Branch on the output:
+
+1. **Empty output** — proceed to emit STATUS. This is the only path that returns APPROVE without an explicit caveat.
+
+2. **Non-empty but every file is yours to commit and you forgot to include it** — go back to step 6 (Final Commit), add the missing files with the appropriate conventional commit (`feat` / `test` / `fix` / `docs(M-{id})`), then re-run `git status --porcelain` and confirm empty. Only then emit STATUS.
+
+3. **Non-empty and the files are work-in-progress that should not be committed yet** (Replan / Diagnosis recovery, infrastructure failure mid-edit) — stash them explicitly so the parent can recover them:
+
+   ```
+   git stash push -u -m "in-flight from M-{id} <round>: <one-line reason>"
+   ```
+
+   Re-run `git status --porcelain`; it must now be empty. In the STATUS message, add an extra line:
+
+   ```
+   STASHED: 1 entry — "in-flight from M-{id} <round>: <reason>"
+   ```
+
+   so the Orchestrator knows to inspect the stash before tearing down the worktree.
+
+4. **Non-empty and you cannot classify the changes** — do **not** discard them with `git checkout --`. Return `DECISION_REQUEST` with `STALLED_AT: pre-return-verification` and the `git status` + `git diff --stat` output in the DIAGNOSIS block. The Orchestrator will route to a human.
+
+The rule is: a clean worktree is a load-bearing precondition for STATUS. Violating it is the exact failure mode that produced the 2026-05-16 castworks d3 Phase-7 incident, where a Module Agent appeared to return APPROVE while leaving five uncommitted files behind; the merge would have silently lost them.
 
 ## Return Format
 
