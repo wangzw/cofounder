@@ -28,12 +28,16 @@
 #
 # Flags:
 #   --quiet   Suppress per-issue stdout lines; print only final summary.
-#   --strict  Exit 1 if any issues found (default: exit 1 on blockers only,
-#             which for X6 is always — all X6 findings are blockers).
+#   --strict  Accepted as a no-op for backward compatibility. The historical
+#             docstring described severity-aware exit logic that was never
+#             wired up — all findings route through sd_emit.sh →
+#             sd_lint.emit which exits 1 on any non-empty findings list
+#             regardless of severity. For X6 specifically this distinction
+#             is moot anyway: every X6 finding is severity=blocker.
 #
 # Exit codes:
 #   0  No findings.
-#   1  At least one blocker finding (or any finding with --strict).
+#   1  At least one finding (--strict is a no-op; see Flags above).
 #   2  Usage / environment error.
 #
 # Notes / limitations:

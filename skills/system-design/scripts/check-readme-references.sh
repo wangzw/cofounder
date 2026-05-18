@@ -31,16 +31,19 @@
 # writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes (per guide §9.1):
-#   0 — no violations found
-#   1 — one or more violations found (any blocker present, or --strict and
-#       any finding at all)
+#   0 — no findings
+#   1 — at least one finding of any severity
 #   2 — usage / I/O error
 #
 # Flags:
 #   --quiet   Currently a no-op (kept for argv compatibility — the §9 contract
 #             does not emit per-violation chatter on stdout/stderr; only the
 #             summary line + JSON document are printed).
-#   --strict  Treat warning-only findings as exit-1 too.
+#   --strict  Accepted as a no-op for backward compatibility. The historical
+#             "warnings stay at exit 0 by default" semantics was never wired
+#             up — sd_lint.emit() exits 1 on any non-empty findings list
+#             regardless of severity. See the in-code comment near `_ = strict`
+#             below for the runtime acknowledgment.
 #
 # Limitations:
 #   1. Multi-line markdown links (link text spanning multiple lines) are not

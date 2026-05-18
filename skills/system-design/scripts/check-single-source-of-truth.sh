@@ -60,9 +60,15 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Exit codes:
-#   0  No violations found
-#   1  At least one violation found AND (blocker present OR --strict set)
-#   2  Usage error or <design-dir> not found
+#   0  No findings.
+#   1  At least one finding of any severity.
+#   2  Usage error or <design-dir> not found.
+#
+# Note: --strict is accepted as a no-op for backward compatibility. The
+# historical "blocker OR --strict" exit logic was never wired up — all
+# findings route through sd_emit.sh → sd_lint.emit which exits 1 on any
+# non-empty findings list regardless of severity. Callers that care about
+# severity should inspect the JSON output's `severity` field per finding.
 #
 # Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 

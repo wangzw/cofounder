@@ -25,12 +25,19 @@
 #   check-architecture-coverage.sh <design-dir> [--quiet] [--strict]
 #
 #   --quiet   Suppress per-issue stdout; only print summary line.
-#   --strict  Exit 1 even when only mechanical violations exist (no blockers).
-#             Without --strict: exit 1 only when at least one blocker exists.
+#   --strict  Accepted as a no-op for backward compatibility. The historical
+#             docstring claimed --strict would promote mechanical-only
+#             violations to exit 1, with the default tolerating them at
+#             exit 0; that severity-aware exit logic was never wired up.
+#             All findings are routed through sd_emit.sh → sd_lint.emit
+#             which exits 1 on any non-empty findings list regardless of
+#             severity. To distinguish blockers from mechanical findings
+#             today, inspect the JSON output's `severity` field per
+#             finding (`error` = was blocker, `warning` = was mechanical).
 #
 # Exit codes:
-#   0  No violations found (or PRD path / architecture/ not resolvable — skipped).
-#   1  At least one blocker found; or at least one mechanical + --strict.
+#   0  No findings (or PRD path / architecture/ not resolvable — skipped).
+#   1  At least one finding of any severity.
 #   2  Usage error or <design-dir> not found / not readable.
 #
 # Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
