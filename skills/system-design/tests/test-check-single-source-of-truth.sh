@@ -69,12 +69,9 @@ interface User {
 assert_exit 0 "$CHECK" "$FIXTURE"
 teardown_fixture
 
-# The duplication-detection awk extractor in check-single-source-of-truth.sh
-# uses gawk's 3-arg match(string, regex, array). BSD awk on macOS lacks this
-# feature, so the strict-mode duplicate-detection tests below are skipped on
-# systems without gawk (CI Linux environments do have gawk).
-if command -v gawk >/dev/null 2>&1 || awk 'BEGIN{ if (match("ax", /a(x)/, a)) exit 0; exit 1 }' >/dev/null 2>&1; then
-
+# Duplication-detection tests. The extractor was previously gated by gawk's
+# 3-arg match() but has been rewritten to use the portable 2-arg form, so the
+# checker now runs on BSD awk (macOS) and gawk (Linux) alike.
 test_case "--strict: exit 1 when type duplicated without excerpt marker"
 setup_fixture
 write_file "modules/M-001-auth.md" '# Auth
@@ -127,7 +124,5 @@ interface User {
 run_command "$CHECK" "$FIXTURE" --strict
 [ "$LAST_EXIT" = "1" ] && _record_pass || _record_fail "expected 1 (strict divergence) got $LAST_EXIT"
 teardown_fixture
-
-fi  # end gawk-required block
 
 end_tests

@@ -143,10 +143,13 @@ emit_issue() {
     printf '[CR-X7] %s  %s — %s\n' "$severity" "$dup_rel" "$title" >&2
   fi
 
-  # Accumulate JSON finding
+  # Accumulate JSON finding. Multi-line description/fix text is collapsed
+  # to single-line spaces via tr (sed s/\n/ /g doesn't work line-by-line
+  # on most awk/sed implementations); embedded double-quotes are
+  # backslash-escaped so the resulting string is valid JSON.
   _jfile=$(printf '%s' "$dup_rel" | sed 's/"/\\"/g')
-  _jtitle=$(printf '%s' "$title" | sed 's/"/\\"/g; s/\n/ /g')
-  _jfix=$(printf '%s' "$fix" | sed 's/"/\\"/g; s/\n/ /g')
+  _jtitle=$(printf '%s' "$title" | tr '\n' ' ' | sed 's/"/\\"/g')
+  _jfix=$(printf '%s' "$fix" | tr '\n' ' ' | sed 's/"/\\"/g')
   _jentry="{\"criterion_id\":\"CR-X7\",\"file\":\"${_jfile}\",\"severity\":\"${severity}\",\"description\":\"${_jtitle}\",\"suggested_fix\":\"${_jfix}\"}"
   if [ -z "$JSON_FINDINGS" ]; then JSON_FINDINGS="$_jentry"; else JSON_FINDINGS="${JSON_FINDINGS},${_jentry}"; fi
 
@@ -284,9 +287,13 @@ BEGIN {
 
   if (!in_definition) {
     # Try to match a start line
-    # Pattern: optional "export " then keyword then whitespace then identifier
-    if (match(line, /^(export[[:space:]]+)?(interface|type|class|enum|struct)[[:space:]]+([A-Za-z_][A-Za-z0-9_<>,[:space:]]*)/, arr) ||
-        match(line, /^(export[[:space:]]+)?(interface|type|class|enum|struct)[[:space:]]+([A-Za-z_][A-Za-z0-9_<>, ]*)/)) {
+    # Pattern: optional "export " then keyword then whitespace then identifier.
+    # NOTE: only the 2-arg match() form is used here. The 3-arg variant is
+    # gawk-only and causes BSD awk on macOS to abort the entire awk script,
+    # silently producing zero output (callers wrap awk with 2>/dev/null), so
+    # all violations would be missed. The identifier is recovered via split()
+    # below, not via the gawk match array.
+    if (match(line, /^(export[[:space:]]+)?(interface|type|class|enum|struct)[[:space:]]+([A-Za-z_][A-Za-z0-9_<>, ]*)/)) {
       # Extract keyword and name using split on whitespace
       # We need the identifier right after the keyword (skip "export" if present)
       n = split(line, parts, /[[:space:]]+/)
