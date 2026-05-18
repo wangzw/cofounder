@@ -252,20 +252,23 @@ For each iteration:
      lint-fixup writers from regular writers in dispatch-log.
 
 3. After all fix-up writers ACK, re-run `scripts/run-checkers.sh`.
+   Capture this iteration's POST-dispatch JSON output. Compare to the
+   PRE-dispatch output that triggered this iteration's dispatch (the
+   output sitting in your context from Step 8d's initial run for
+   iteration 1, or from iteration K-1's post-dispatch capture for
+   iteration K>1).
    - Exit 0 → break, proceed to Step 9.
-   - Exit 1 → check **no-progress detector** below; if no progress,
-     surface to HITL immediately; otherwise continue to next iteration.
    - Exit 2 → HITL.
-
-   **No-progress detector**: compare iteration K's `run-checkers.sh`
-   JSON output to iteration K-1's (after sorting issues by
-   `(criterion_id, file, description)` for stable diff). If the
-   findings are byte-identical, the bundle did not change — every
-   dispatched writer ACKed no-op (e.g. a CR-PP27 conflict with no
-   canonical authority leaf participating, or every side believing
-   it is canonical). Burning further iterations cannot make progress;
-   break the loop immediately and surface the remaining findings to
-   HITL alongside a note that no-progress was detected.
+   - Exit 1 AND post-dispatch output differs from pre-dispatch
+     output → progress made; continue to next iteration.
+   - Exit 1 AND post-dispatch output is identical (after sorting
+     issues by `(criterion_id, file, description)` so insignificant
+     reordering does not mask real diffs) → **no progress**: every
+     dispatched writer ACKed no-op (e.g. a CR-PP27 conflict with no
+     canonical authority leaf, or every side believing it is
+     canonical). Burning further iterations cannot make progress;
+     break the loop immediately and surface the remaining findings
+     to HITL with a "no-progress detected" note.
 
 4. After `lint_fixup_max_iterations` still exit 1: REFUSE — print the
    remaining findings and surface to HITL. The user adjudicates
