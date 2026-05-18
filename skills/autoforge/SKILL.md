@@ -6,7 +6,7 @@ description: "Use when the user has a finalized system design (system-design ski
 
 # Autoforge — Multi-Role Automated Development
 
-Orchestrate agent teams to turn a system design into tested, PRD-validated code. Modules are planned **phase by phase** — phases run sequentially so upstream plans are finalized first, but Planners within a phase run in parallel (same-phase modules are independent by construction). Each Planner receives only its **dependency closure** of already-completed plans instead of every prior plan, keeping input size proportional to fan-in. Execution then runs modules in parallel with isolated git worktrees; each module gets a team (Developer, Tester, Reviewer). Fully automated with adaptive iteration — human intervenes only at explicit approval gates or when the agent has exhausted reasonable approaches and needs a trade-off decision.
+Orchestrate agent teams to turn a system design into tested, PRD-validated code. Conventions bootstrap runs first (one serialized step), then Tier-1 Planners run in foreground parallel; after that an event-driven execution loop saturates background agents (Planners + Module Agents) up to configured caps, scheduling each module as soon as its DAG ready-set is satisfied. Each Planner receives only its **dependency closure** of already-completed plans, keeping input size proportional to fan-in. A neighborhood-scope integration test runs per module merge (not at phase boundaries); plan revision signals (`PLAN_REVISION_NEEDED`, `CONVENTION_CONFLICT`) trigger the §5 R1-R5 flow. Fully automated with adaptive iteration — human intervenes only at explicit approval gates or when the agent has exhausted reasonable approaches and needs a trade-off decision.
 
 ## Input Modes
 
@@ -921,7 +921,7 @@ Restricted form of Step 1: only `revised` and `added` modules are re-planned. `k
 
 1. **Conventions update** — if Step E1.4 produced `_evolve-{N}.md`, merge it into `conventions.md` first via a single `sonnet` subagent, then `git rm` the addition file. Commit: `docs(plan): refresh conventions for delivery-{N}`.
 2. **Re-build phase order** — recompute the topological sort over the post-removal DAG (added modules joined; removed modules dropped). Preserve prior phase numbering for any module whose phase didn't change; only re-stamp phases that genuinely shifted.
-3. **Spawn Planners** — phase-by-phase with within-phase parallelism (same rules as Step 1). Each Planner receives the standard inputs PLUS:
+3. **Spawn Planners** — using the event-driven scheduler (same rules as Step 2). Each Planner receives the standard inputs PLUS:
 
    | Param | Source |
    |-------|--------|
