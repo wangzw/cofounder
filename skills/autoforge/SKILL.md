@@ -163,159 +163,92 @@ flowchart TD
          <plan-dir> gate-approve G1_skeleton_approved
     ```
 
-## Step 1 — Phased Planning (parallel within phases)
+## Step 1 — Conventions Bootstrap + Tier-1 Plans (foreground)
 
 > **Load now:** `planning/planner-prompt.md`, `planning/plan-readme-template.md`, `planning/module-plan-template.md`
 
-Plan modules **phase by phase**. Phases run sequentially — so every plan in Phase N-1 is complete before any Phase N Planner starts — but within a phase, Planners run **in parallel**. Same-phase modules are independent by the DAG construction (no dep between them), so parallelism is safe for interface consistency.
+The event-driven scheduler needs a starting state with:
+1. `conventions.md` written (so subsequent Planners share a base).
+2. Every tier-1 module's plan written (so tier-1 Module Agents have ready
+   plans, and tier-2 Planners have their dependency-closure inputs).
 
-Each Planner receives only its **dependency closure** of already-completed plans — the transitive set of upstream modules it consumes — instead of every prior plan. Combined with the shared `conventions.md`, this preserves cross-module coherence while keeping per-Planner input proportional to fan-in (typically 1–3 plans) rather than the full run size.
+These two are produced **in the foreground** (not via the event loop) so
+the human review gate stays simple. Once tier-1 plans pass the automated
+checker, control passes to Step 2's event loop.
 
-Planners run in the **primary worktree** (on the feature branch) — they only produce plan documents, no code. **Planners write files but do NOT commit** — the Orchestrator commits all plans together after all phases complete.
+### Conventions Bootstrap (single serialized step)
 
-### Planning Order
-
-Use the topological sort from Step 0. Plan one phase at a time; within a phase, spawn all Planners in a single message (multiple `Agent` tool calls in one response) and wait for the whole phase to finish before moving to the next.
-
-**Conventions-bootstrap exception:** the very first Planner (lowest M-id in Phase 1) runs alone to create `conventions.md`. Once it returns, the rest of Phase 1 spawns in parallel. This is the only serialized step in the planning flow.
-
-```
-Example: Phase 1 [M-001, M-002, M-008] → Phase 2 [M-003, M-005] → Phase 3 [M-006, M-007]
-  Round 1 (serialized): M-001 alone       # bootstraps conventions.md + its own plan
-  Round 2 (parallel):   M-002, M-008      # rest of Phase 1
-  Round 3 (parallel):   M-003, M-005      # Phase 2
-  Round 4 (parallel):   M-006, M-007      # Phase 3
-```
-
-### Dependency Closure
-
-For each module M about to be planned, the Orchestrator computes its **dependency closure** over the DAG:
-
-- `direct_deps(M)` = modules listed in M's `Deps` column of the Module Index
-- `closure(M)` = `direct_deps(M) ∪ { closure(d) for d in direct_deps(M) }` — transitive
-
-Only plans for modules in `closure(M)` are passed to M's Planner. By the phase ordering, all of them are already planned by the time M is planned (closure can only point to earlier phases, never to same or later phases). For Phase 1 modules the closure is empty.
-
-### Conventions Bootstrap
-
-The first Planner has an additional responsibility: create `docs/raw/plans/{plan-dir}/plans/conventions.md` defining project-wide implementation conventions derived from multiple sources:
-
-**Primary sources (provide to the first Planner):**
-- Design README: Tech Stack, Module Interaction Protocols, full Module Index
-- Design README: Implementation Conventions section (design-level translation of PRD policies)
-- PRD architecture.md: developer convention sections (Coding Conventions, Test Isolation, Development Workflow, Security Coding Policy, Backward Compatibility, Git & Branch Strategy, Code Review Policy, Observability Requirements, Performance Testing, AI Agent Configuration)
-
-**What conventions.md must include:**
-- Directory structure and file organization
-- Naming conventions (files, functions, types, variables)
-- Error handling patterns (error types, propagation strategy)
-- Shared type definitions (types referenced across module interaction protocols)
-- Import/export patterns
-- Test file organization and naming
-- Security patterns — input validation locations, injection prevention, secret handling (from PRD Security Coding Policy translated via design Implementation Conventions)
-- Test isolation rules — resource isolation, port binding, temp directories, timeouts, global state prohibition (from PRD Test Isolation translated via design Implementation Conventions)
-- Observability patterns — structured logging format, mandatory events, required log fields, health checks (from PRD Observability Requirements translated via design Implementation Conventions)
-- Performance testing — benchmark requirements, CI performance gates, resource limits (from PRD Performance Testing translated via design Implementation Conventions)
-- Development workflow — prerequisites, setup commands, CI gate ordering, build matrix (from PRD Development Workflow)
-- AI agent instruction file policy — which instruction files to maintain (CLAUDE.md, AGENTS.md), structure policy (concise index with references to convention files, not monolithic), content priorities, maintenance triggers (from PRD AI Agent Configuration)
-
-Subsequent Planners follow `conventions.md`. If they encounter a pattern not yet covered, they **must not edit `conventions.md` directly** — within-phase Planners run in parallel and would race. Instead, each Planner writes its additions to a per-module file:
+Spawn the **lowest-M-id tier-1 Planner** alone in the foreground (NOT
+background). Its job: produce `conventions.md` AND its own
+`plan-M-{id}.md`. Use the standard Planner prompt; the only special input
+is `is_first_module=true`.
 
 ```
-docs/raw/plans/{plan-dir}/plans/conventions-additions/M-{id}.md
-```
-
-After each phase of planning completes, the Orchestrator merges all `conventions-additions/*.md` from that phase into `conventions.md` (dedup, reconcile, then delete the merged addition files) before the next phase starts. This gives later phases a single consolidated conventions file to read.
-
-### Per-Phase Planning
-
-For each phase (following the conventions-bootstrap exception in the first round), spawn every Planner for that phase in a **single message** with multiple `Agent` tool calls so they run in parallel. Wait for the entire phase to return before starting the next phase.
-
-**Pre-spawn invariant (MANDATORY).** Before spawning any Planner, verify the Orchestrator's own cwd is the primary worktree (Step 0 sub-step 7a). Sub-agents inherit cwd from the parent; if the Orchestrator slipped back to the main project directory at any point, Planners writing relative paths will silently pollute the main branch's working tree. Run `pwd` — it must print `{worktree_root}/main`. If not, `cd {worktree_root}/main` before continuing.
-
-**`worktree_path` is a structured spawn parameter, not prose.** The Planner prompt template (`planning/planner-prompt.md`) accepts `worktree_path` as a named Context parameter, and the Planner's Setup step `cd`s into it and re-verifies. Do NOT rely on describing the worktree path inside a prose paragraph of the spawn prompt — any wording drift between modules (e.g. one Planner's prompt accidentally omitting "all paths resolve inside the worktree") regresses cwd discipline. Substitute the same `{worktree_path}` placeholder for every Planner in every phase, including bootstrap.
-
-```
-# Round 1 — bootstrap (only the very first Planner in Phase 1)
 Agent({
-  description: "Planner for M-001 (conventions bootstrap)",
-  prompt: <fill in planning/planner-prompt.md; is_first_module=true,
+  description: "Planner for M-{id} (conventions bootstrap)",
+  prompt: <fill in planning/planner-prompt.md;
+           is_first_module=true,
            dependency_closure_plan_paths=[],
            worktree_path={worktree_root}/main>,
   model: "opus",
   mode: "auto"
 })
-
-# Round 2+ — phase parallel (all remaining Planners in the current phase,
-# spawned as parallel Agent calls in one message)
-Agent({ description: "Planner for M-002", model: "opus", mode: "auto",
-        prompt: <is_first_module=false,
-                 dependency_closure_plan_paths=[closure(M-002)],
-                 worktree_path={worktree_root}/main> })
-Agent({ description: "Planner for M-008", model: "opus", mode: "auto",
-        prompt: <is_first_module=false,
-                 dependency_closure_plan_paths=[closure(M-008)],
-                 worktree_path={worktree_root}/main> })
 ```
 
-See `planning/planner-prompt.md` for the complete Planner prompt template.
-
-**Planner input:**
-
-| Input | Source | Notes |
-|-------|--------|-------|
-| `worktree_path` | Step 0 sub-step 7 (`{worktree_root}/main`) | Absolute path the Planner MUST `cd` into as its first action. Sub-agents inherit cwd from the parent; passing this explicitly + having Planner Setup re-verify is the mechanical guard against the "Planner wrote plan files to the project root on main" failure mode. MUST be substituted verbatim — do not paraphrase as "the worktree" inside prose |
-| Module design spec | `modules/M-{id}-{slug}.md` | Primary input for this module |
-| Design README | Design `README.md` | Cross-module context: interaction protocols, test strategy, tech stack, Implementation Conventions, Key Technical Decisions, **Production Promotion Plan** (per-module Promote/Extend/Rewrite actions for frontend modules) |
-| PRD architecture.md | `{prd-dir}/architecture.md` | Developer convention sections: Coding Conventions, Test Isolation, Security Coding Policy, Development Workflow, Observability Requirements, Performance Testing, Git & Branch Strategy, Code Review Policy, Backward Compatibility, AI Agent Configuration, **Frontend Implementation Path** (root of any PRD-stage frontend draft for user-facing modules) |
-| PRD feature specs | `features/F-*.md` | Features referenced in module's Source Features section. For user-facing features, the **Frontend Draft Reference** subsection records the draft path and confirmation date — used by Planner to decide draft-promotion vs build-from-scratch step ordering |
-| UI Promotion Guide | Module spec's UI Architecture section | If module has Promotion action = Promote/Extend: existing draft path, the contracts the draft must match, and the Promotion Requirements (i18n / a11y / perf / tests / coding-standard hardening). Planner uses this to generate "harden draft in place" steps instead of "write from scratch" steps |
-| PRD frontend draft source | `{repo-root}/{frontend-implementation-path}/{feature-area}/` | Actual draft code files in the project source tree (NOT under `{prd-dir}/`). Planner reads these for Promote/Extend modules to write concrete hardening steps. For Rewrite or backend-only modules: skip |
-| Dependency closure plans | `plans/plan-M-*.md` for every module in `closure(M)` | Concrete interface signatures, types, and file paths for the upstream modules this one consumes. Empty for Phase 1 modules. Replaces the prior "all previous plans" input. |
-| Implemented code | Source files on feature branch | For already-merged modules: actual code is source of truth over plans (populated during re-planning) |
-| Conventions | `plans/conventions.md` | First Planner creates; subsequent Planners read. Extensions are written to per-module `conventions-additions/M-{id}.md` files and merged by the Orchestrator between phases. |
-
-**Planner output:**
-- `docs/raw/plans/{plan-dir}/plans/plan-M-{id}-{slug}.md` (using `planning/module-plan-template.md`)
-- [First module only] `docs/raw/plans/{plan-dir}/plans/conventions.md`
-- [Subsequent modules, if needed] `docs/raw/plans/{plan-dir}/plans/conventions-additions/M-{id}.md`
-
-### After Each Phase of Planning
-
-Run between phases — before spawning the next phase's Planners — so later phases read a single consolidated conventions file:
-
-1. **Collect conventions additions** — list files under `plans/conventions-additions/` produced by this phase's Planners
-2. **Merge into `conventions.md`** — fold in any new sections, dedup and reconcile against existing content, preserve section order. For a non-trivial batch, spawn a `sonnet` subagent with the merge task; for zero or one addition, merge inline
-3. **Delete the merged addition files** so the directory is empty before the next phase writes into it
-4. **Proceed to the next phase**
-
-### After All Phases of Planning Complete
-
-1. **Generate plan README** — write `docs/raw/plans/{plan-dir}/README.md` using `planning/plan-readme-template.md`: dependency graph (mermaid), phase breakdown, module list with status
-2. **Commit plans** — single commit of all plan files on the feature branch: `docs(plan): add implementation plans for {project}`
-3. **Present to human** — provide a structured review summary so the user doesn't need to read every plan in full:
-   - Per module: step count, key decisions, integration points
-   - Cross-module: shared types defined in conventions.md, dependency flow
-   - Risks: any assumptions or trade-offs the Planners flagged
-   - If this is a **re-plan** (not initial planning), additionally provide:
-     - **What changed and why** — a diff summary per plan: which steps/integration points were modified, added, or removed
-     - **Trigger** — the issue that caused re-planning (ISSUE_TYPE, evidence, affected module)
-     - **Impact scope** — which plans were unchanged vs. revised; which already-implemented modules need code changes
-   - If `--plan-only` mode, stop here.
-3.5. **Structural plan check (mandatory before human review)** — run
-
+After return: verify `plans/conventions.md` and `plans/plan-M-{id}.md`
+exist. Update run-state:
 ```
-bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
-     --source-root {worktree_root}/main \
-     --phase=plan
+bash skills/autoforge/scripts/run-state-update.sh \
+     <plan-dir> set-plan-status M-{id} planned
 ```
 
-`--phase=plan` is mandatory here. It declares plan-time intent to the aggregator: only `check-plan-readme.sh`, `check-module-plan.sh`, `check-plan-pollution.sh`, and `check-discipline-scan.sh` fire. The acceptance-time checkers (`check-acceptance-report.sh`, `check-traceability.sh`, `check-e2e-coverage.sh`) are explicitly suppressed even if `reports/acceptance.md` and `reports/traceability.json` exist — in `--evolve` mode the plan-dir is mutated in place, so those files are still present from delivery N-1 until E6 archives them. Running E6-time gates against N-1 reports is the "checker mode mismatch" failure mode: at plan time the new design's AC set has changed but the prior `traceability.json` still reflects N-1, so CR-AF10 (unmapped AC), CR-AF09 (orphan tests), and CR-AF26 (frontend F-ID without e2e spec) would all fire on artifacts that this step is not responsible for fixing. The `--phase=plan` flag prevents that.
+### Tier-1 Planners (foreground, parallel)
 
-The aggregator merges the JSON output of the enabled checkers. **If any finding has `severity` of `error` or `critical`, the gate fails** — dispatch the Planner again with the JSON findings so the plan is fixed before any human ever sees it. A `CR-AF29` finding (plan-dir pollution) means the Orchestrator must follow the suggested-fix `cp` + `git restore` recipe to move the file to the feature-branch worktree and then re-run this step before proceeding. Warnings are surfaced to the human reviewer below but do not block the gate. This replaces the prior LLM-grep checks for required sections, wiring rows, AC mapping rows, and deferral discipline (delivery-discipline §C / §F / §L).
-4. **Human review gate** — user approves, requests edits, or rejects. If edits requested, modify plans, re-run step 3.5, and re-commit.
+Identify all other tier-1 modules (closure is empty). Spawn them all in
+**one message with multiple `Agent` tool calls in parallel** (still
+foreground — `run_in_background: false`, default). After all return,
+update each via `run-state-update.sh ... set-plan-status M-{id} planned`.
 
-**Step 1 → Step 1.5 gate:** Human approves all plans.
+### Conventions rolling-merge (during foreground tier-1)
+
+The Planners write `conventions-additions/M-{id}.md` files. As each
+Planner returns, before spawning the next round (or before proceeding to
+the auto-checker step), merge them:
+
+For each `conventions-additions/M-*.md` file:
+1. Read the addition.
+2. Compare against `conventions.md`. If purely additive → append.
+3. If a **semantic conflict** with existing rules is detected → STOP and
+   route to `CONVENTION_CONFLICT` revision (§5 revision flow).
+4. Commit: `docs(plan): merge conventions additions from M-{id}`.
+5. Delete the addition file.
+
+The Orchestrator is the single writer of `conventions.md`; no race
+because Planners only write to their own per-module files.
+
+### Tier-1 auto-checker (replaces G2)
+
+Once all tier-1 plans are written and conventions are merged, run:
+
+```
+bash skills/autoforge/scripts/run-checkers.sh <plan-dir> \
+     --source-root <worktree_root>/main \
+     --phase=plan --scope=tier-1 --json-only
+```
+
+Routing:
+- All PASS → proceed to Step 2.
+- `error` / `critical` findings → re-dispatch the corresponding tier-1
+  Planner with the findings JSON. Bounded to 3 auto-fix rounds before
+  escalating to a DECISION_REQUEST to the human.
+- `warning` only → log to `revisions/auto-warnings.md` and proceed.
+
+This is the autonomous safeguard that replaces the prior G2 (tier-1
+detailed plan review). Per the design's D5 decision, the human is not
+interrupted for tier-1 plans — they are gated by the checker.
+
+**Step 1 → Step 2 gate:** Tier-1 auto-checker PASS (or 3 auto-fix rounds
+exhausted, in which case the failure becomes a DECISION_REQUEST).
 
 ## Step 1.5 — Project Bootstrap (New Projects Only)
 
