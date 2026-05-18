@@ -207,13 +207,13 @@ for name, by_code in sorted(code_assignments.items()):
                     f"no canonical authority "
                     f"(architecture/shared-conventions.md) participates "
                     f"in this conflict — a Lint-Fixup writer cannot "
-                    f"unilaterally pick a winner. ACK no-op (PARTIAL "
-                    f"with blocker_scope: needs-human-decision); the "
-                    f"orchestrator's lint loop will exhaust iterations "
-                    f"and surface this finding to HITL. The user must "
-                    f"add the {name} mapping to shared-conventions.md "
-                    f"(preferred) or canonize one of the existing "
-                    f"values across all leaves."
+                    f"unilaterally pick a winner. ACK FULL_PASS no-op "
+                    f"per Lint-Fixup Mode §4. The orchestrator's "
+                    f"Step-8d no-progress detector will surface this "
+                    f"finding to HITL on the next iteration; the user "
+                    f"must then add the {name} mapping to "
+                    f"shared-conventions.md (preferred) or canonize "
+                    f"one of the existing values across all leaves."
                 )
             findings.append(Finding(
                 criterion_id="CR-PP27",

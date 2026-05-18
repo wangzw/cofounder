@@ -253,8 +253,19 @@ For each iteration:
 
 3. After all fix-up writers ACK, re-run `scripts/run-checkers.sh`.
    - Exit 0 → break, proceed to Step 9.
-   - Exit 1 → continue to next iteration.
+   - Exit 1 → check **no-progress detector** below; if no progress,
+     surface to HITL immediately; otherwise continue to next iteration.
    - Exit 2 → HITL.
+
+   **No-progress detector**: compare iteration K's `run-checkers.sh`
+   JSON output to iteration K-1's (after sorting issues by
+   `(criterion_id, file, description)` for stable diff). If the
+   findings are byte-identical, the bundle did not change — every
+   dispatched writer ACKed no-op (e.g. a CR-PP27 conflict with no
+   canonical authority leaf participating, or every side believing
+   it is canonical). Burning further iterations cannot make progress;
+   break the loop immediately and surface the remaining findings to
+   HITL alongside a note that no-progress was detected.
 
 4. After `lint_fixup_max_iterations` still exit 1: REFUSE — print the
    remaining findings and surface to HITL. The user adjudicates
