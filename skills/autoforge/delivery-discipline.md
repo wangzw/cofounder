@@ -2,8 +2,8 @@
 
 > **All autoforge sub-agents read this file.** It defines the patterns that
 > are forbidden in code and tests, and the signals that are required before
-> any gate (Tester PASS, Reviewer APPROVE, Module APPROVE, phase integration
-> PASS, acceptance PASS) is allowed to flip green.
+> any gate (Tester PASS, Reviewer APPROVE, Module APPROVE, neighborhood
+> integration PASS, acceptance PASS) is allowed to flip green.
 >
 > The autoforge pipeline does **not** trust agents to be diligent. It
 > structurally rejects work that contains the patterns below. Whenever a
@@ -134,7 +134,7 @@ Reviewer / Acceptance Tester REJECTs.
 
 Every PRD acceptance criterion (`F-NNN-AC-NN`) and every E2E journey
 scenario (`J-XXX-EE-NN`) must map to **at least one passing test** at the
-appropriate layer (module integration, phase integration, or acceptance).
+appropriate layer (module integration, neighborhood integration, or acceptance).
 Conversely, every test named after a PRD artifact must map back to a real
 PRD reference.
 
@@ -211,7 +211,7 @@ drift, schema drift, a dependency upgrade leftover) — the gate stays red
 until it is fixed or converted to a tracked issue with an explicit
 `test.skip`.
 
-The Phase Integration Tester runs the same full set. The Acceptance Tester
+The Neighborhood Integration Tester runs the same full set. The Acceptance Tester
 runs the same full set as the very last action before producing the
 acceptance verdict.
 
@@ -252,7 +252,7 @@ artifacts those tests cover is itself a violation of E and F.
 
 ## K. Long-Run Re-Anchor
 
-After every phase completes (in Step 2) and before each fix-cycle round
+After every tier (closure group) completes (in Step 2) and before each fix-cycle round
 (in Steps 2 / 3), the Orchestrator re-anchors to this discipline file:
 
 - Re-read this file's section headers.
@@ -445,7 +445,7 @@ When a sub-agent encounters a missing in-scope dependency:
    adjust the test to make it green.
 
 The orchestrator's re-anchor (§K) explicitly looks for stalled
-"upstream waiting" modules and does not declare a phase complete
+"upstream waiting" modules and does not declare a tier complete
 while any module is in that state for an in-scope dependency.
 
 **Forbidden patterns that signal abandonment** (Reviewer / Integration
@@ -461,6 +461,50 @@ and treat each as REJECT):
   been implemented, not waited on).
 - Acceptance report Verdict "PASS with caveats: M-XXX not yet built"
   when M-XXX is part of the design.
+
+---
+
+## O. Convention Conflicts Must Be Resolved, Not Silently Merged
+
+During the rolling-merge step the Orchestrator appends each module's
+`conventions-additions/M-{id}.md` into the live `conventions.md`. If a new
+addition **contradicts** (not merely extends) an existing section, silent
+merging produces a broken ruleset that downstream module agents will
+misinterpret.
+
+### CONVENTION_CONFLICT
+
+**When:** the Orchestrator's rolling-merge step detects that a new
+`conventions-additions/M-{id}.md` contradicts (not just extends) the
+existing `conventions.md`.
+
+**Source:** the Orchestrator itself, not a sub-agent. (Unique among
+ISSUE_TYPEs — every other type bubbles up from a Module Agent or
+Integration Tester.)
+
+**Example:** M-002's Planner adds "Wrap errors with `errors.Wrap`";
+M-008's Planner adds "Wrap errors with `fmt.Errorf(\"%w\", ...)`". Both
+sections cover the same scope with incompatible rules.
+
+**Handling:** routes through the §5 revision flow with
+`issue_type = CONVENTION_CONFLICT`. The Planner spawn for the conflict
+receives `conflicting_additions` listing both addition files; its task
+is to write a single replacement section, not to revise downstream
+module plans.
+
+**Detection mechanics:** see `scripts/lib/run_state.py` rolling-merge
+helper. The Orchestrator MUST trigger this flow rather than silently
+appending the later addition.
+
+The Orchestrator is **prohibited** from:
+
+- Silently overwriting the earlier addition with the later one.
+- Silently keeping the earlier addition and discarding the later one.
+- Merging both sections verbatim when they are semantically incompatible.
+- Deferring resolution to a module agent's discretion.
+
+Any of the above patterns, when discovered by a Reviewer or Acceptance
+Tester scanning `conventions.md`, is treated as a blocker finding (REJECT).
 
 ---
 
@@ -488,6 +532,9 @@ Before any sub-agent reports PASS / APPROVE, it must answer YES to all:
 14. No in-scope dependency was abandoned, stubbed, or skipped this
     round — every missing upstream surface is either implemented or
     escalated as PLAN_REVISION_NEEDED (§N)?
+15. (Orchestrator only) Every `conventions-additions/M-{id}.md` that
+    contradicts an existing `conventions.md` section was routed through
+    the CONVENTION_CONFLICT revision flow — not silently appended (§O)?
 
 Any "no" is a blocker. Fix it, or surface it as a finding / issue, before
 flipping the gate.
