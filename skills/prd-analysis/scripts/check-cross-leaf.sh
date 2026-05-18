@@ -167,6 +167,8 @@ for rel, text in texts.items():
         name, code = m.group(1), m.group(2)
         code_assignments[name][code].add(rel)
 
+SHARED_CONVENTIONS_LEAF = "architecture/shared-conventions.md"
+
 for name, by_code in sorted(code_assignments.items()):
     if len(by_code) > 1:
         leaves_affected = sorted({
@@ -176,11 +178,43 @@ for name, by_code in sorted(code_assignments.items()):
             f"{c} in [{', '.join(sorted(ls))}]"
             for c, ls in sorted(by_code.items())
         )
-        # Emit one finding per affected leaf — the writer for the
-        # canonical (shared-conventions.md) leaf will ACK no-op; the
-        # writers for the non-canonical leaves rewrite their code
-        # tables to align.
+        # Emit one finding per affected leaf. Resolution depends on
+        # whether the canonical authority (shared-conventions.md) is
+        # part of the conflict set:
+        #
+        #   - In conflict → its writer ACKs no-op (canonical authority
+        #     path); the non-canonical writers rewrite to align.
+        #   - NOT in conflict → no leaf carries authoritative value;
+        #     writers cannot pick a winner unilaterally, so the
+        #     suggested_fix explicitly routes to HITL. The Step-8d
+        #     lint loop will exhaust iterations and surface to the
+        #     user, who decides whether to add the code to
+        #     shared-conventions or canonize one of the existing
+        #     values.
+        canonical_present = SHARED_CONVENTIONS_LEAF in leaves_affected
         for leaf in leaves_affected:
+            if canonical_present:
+                fix = (
+                    f"architecture/shared-conventions.md is the "
+                    f"canonical source of truth for the error-code "
+                    f"catalogue. If this leaf is shared-conventions.md, "
+                    f"no edit needed (Lint-Fixup Mode no-op); otherwise "
+                    f"rewrite this leaf's {name} mapping to match "
+                    f"shared-conventions."
+                )
+            else:
+                fix = (
+                    f"no canonical authority "
+                    f"(architecture/shared-conventions.md) participates "
+                    f"in this conflict — a Lint-Fixup writer cannot "
+                    f"unilaterally pick a winner. ACK no-op (PARTIAL "
+                    f"with blocker_scope: needs-human-decision); the "
+                    f"orchestrator's lint loop will exhaust iterations "
+                    f"and surface this finding to HITL. The user must "
+                    f"add the {name} mapping to shared-conventions.md "
+                    f"(preferred) or canonize one of the existing "
+                    f"values across all leaves."
+                )
             findings.append(Finding(
                 criterion_id="CR-PP27",
                 file=leaf,
@@ -191,13 +225,7 @@ for name, by_code in sorted(code_assignments.items()):
                     f"built from one leaf will fail conformance with "
                     f"another."
                 ),
-                suggested_fix=(
-                    f"architecture/shared-conventions.md is the canonical "
-                    f"source of truth for the error-code catalogue. If "
-                    f"this leaf is shared-conventions.md, no edit needed "
-                    f"(Lint-Fixup Mode no-op); otherwise rewrite this "
-                    f"leaf's {name} mapping to match shared-conventions."
-                ),
+                suggested_fix=fix,
             ))
 
 # ─── Rule 3: dangling F-NNN / J-NNN references ─────────────────────

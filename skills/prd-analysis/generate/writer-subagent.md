@@ -379,21 +379,28 @@ The dispatch prompt for a lint-fixup writer carries:
    Edits MUST stay on the target leaf — never edit siblings (the
    orchestrator dispatches one fix-up per affected file; siblings
    get their own writers).
-2. **Re-run the formal hard gate** for your leaf type AND
-   `scripts/check-cross-leaf.sh` to verify any edits you DID make
-   resolve the listed findings on your leaf and did not regress any
-   other formal rule. Use the normal per-artifact `check-*.sh`
-   script for your leaf class, plus `scripts/check-cross-leaf.sh
-   <prd-dir>`. If you ACKed no-op (canonical authority path),
-   re-running is still required to confirm no regression.
-3. **Loop on remaining findings on your leaf** (filter by `file:`
-   matching your assigned leaf) until both checks PASS or 3
-   consecutive iterations fail (same cap as standard pre-check).
-   A cross-leaf finding that persists because the SIBLING has not
-   yet been fixed is normal — the orchestrator iterates the whole
-   loop up to `lint_fixup_max_iterations`, so your sibling's fix-up
-   in iteration K may resolve a finding that still appears on your
-   leaf in iteration K-1.
+2. **Re-run only the per-artifact check** for your leaf type
+   (`check-feature.sh` / `check-journey.sh` / `check-readme.sh` /
+   `check-architecture-index.sh` / `check-architecture-topic.sh`)
+   to confirm any edits you made did not regress an in-leaf formal
+   rule. Use the standard retry-until-PASS / 3-fail escalation
+   loop from the base "Formal pre-check" table for in-leaf
+   regressions.
+
+   **Do NOT re-run `scripts/check-cross-leaf.sh` for retry
+   purposes.** A cross-leaf finding on your leaf may persist after
+   your edit because the SIBLING leaf has not yet been edited
+   (the orchestrator dispatches all affected sides in parallel
+   and runs `run-checkers.sh` again at the iteration boundary).
+   Re-checking cross-leaf and looping locally would falsely report
+   3-fail and escalate to HITL on a state the orchestrator is
+   designed to converge across iterations.
+3. **One pass on cross-leaf findings, no local retry.** For each
+   CR-PP27 cross-leaf finding listed in `## Lint-Fixup Findings`:
+   apply your edit (or take the no-op path if you're the canonical
+   authority — §1) exactly once. Do not loop. The orchestrator's
+   Step-8d loop (max `lint_fixup_max_iterations`) is responsible for
+   bundle-level convergence; your job is correctness on this leaf.
 4. **ACK normally**: `OK trace_id=R<N>-LFX-<NNN> role=writer
    linked_issues= self_review_status=FULL_PASS fail_count=0`.
    Lint-Fixup Mode never emits a self-review archive — formal fixes

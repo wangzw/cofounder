@@ -97,6 +97,20 @@ assert_stdout_contains "AUTH_DENIED"
 teardown_fixture
 
 # ============================================================
+test_case "CR-PP27 code conflict without canonical leaf routes to HITL"
+setup_fixture
+# Both F-008 and F-009 disagree on AUTH_DENIED, no shared-conventions
+# leaf in the bundle. The suggested_fix must explicitly route to HITL
+# (no canonical authority to align to).
+write_file "features/F-008-rpc.md" "$(mk_feature F-008 '| AUTH_DENIED | -32000 |')"
+write_file "features/F-009-cli.md" "$(mk_feature F-009 '| AUTH_DENIED | -32001 |')"
+assert_exit 1 "$CHECK" "$FIXTURE"
+assert_stdout_contains "CR-PP27"
+assert_stdout_contains "AUTH_DENIED"
+assert_stdout_contains "no canonical authority"
+teardown_fixture
+
+# ============================================================
 test_case "CR-PP27 code conflict emits one finding per affected leaf"
 setup_fixture
 write_file "architecture/shared-conventions.md" "---

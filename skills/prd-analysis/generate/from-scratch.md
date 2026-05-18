@@ -222,13 +222,23 @@ scripts/run-checkers.sh <prd-dir>
 For each iteration:
 
 1. Capture the JSON document on stdout after the `FOUND ...` summary
-   line. Group the `issues` array by `file:` field. Every issue in
-   the array carries a concrete leaf path — `check-cross-leaf.sh`
-   deliberately emits one finding PER affected leaf for cross-leaf
-   conflicts (CR-PP27 flag spelling / error-code conflicts) so each
-   side of the conflict gets its own dispatch.
+   line. Group the `issues` array by `file:` field. Most findings
+   carry a concrete leaf path — `check-cross-leaf.sh` deliberately
+   emits one finding PER affected leaf for cross-leaf conflicts
+   (CR-PP27 flag spelling / error-code conflicts) so each side of
+   the conflict gets its own dispatch.
 
-2. For each affected file, dispatch ONE writer sub-agent
+   **Non-dispatchable findings:** some pre-existing check scripts
+   (`check-feature.sh`, `check-journey.sh`) emit findings against a
+   directory path (e.g. `file: features/` for id-gap or "ids start
+   at F-002" warnings) or against an empty path (`file: ""`, per
+   issue-schema.md). These are bundle-structural problems no single
+   writer can fix. Filter them out of the dispatch loop and surface
+   them DIRECTLY to HITL alongside the iteration outcome — do not
+   spend lint-fixup iterations on them.
+
+2. For each affected file (real leaf paths only — see filter above),
+   dispatch ONE writer sub-agent
    (`generate/writer-subagent.md`) in **Lint-Fixup Mode** (see that
    prompt's "Lint-Fixup Mode" section). The dispatch prompt MUST
    include:
