@@ -191,11 +191,17 @@ Path: `<design-dir>/<relative-path>` (from `plan.add[].path` or `plan.modify[].p
 Before writing the self-review archive, you MUST run the per-artifact check script for your
 leaf type:
 
-| Your leaf path | Script to run |
-|----------------|---------------|
+| Your leaf path | Scripts to run (in order) |
+|----------------|---------------------------|
 | `README.md` | `scripts/check-readme.sh <design-dir>` |
-| `modules/M-NNN-*.md` | `scripts/check-module.sh <design-dir>` |
-| `api/API-NNN-*.md` | `scripts/check-api.sh <design-dir>` |
+| `modules/M-NNN-*.md` | `scripts/check-module.sh <design-dir>` AND `scripts/check-placeholder-json.sh <design-dir>` |
+| `api/API-NNN-*.md` | `scripts/check-api.sh <design-dir>` AND `scripts/check-placeholder-json.sh <design-dir>` |
+
+For leaf classes that list multiple scripts, run each one and aggregate findings; all must
+exit 0 before you ACK FULL_PASS. `check-placeholder-json.sh` enforces CR-SD17 (no `<TODO>`,
+`...`, `<...>` placeholders inside `\`\`\`json` fences) on every module and API leaf — it
+was previously caught only by the LLM cross-reviewer at much higher cost (chaos round-1
+6/40 issues were of this shape).
 
 Each script walks ALL files of that artifact type, so you may see findings against leaves
 other writers are responsible for. Filter by `file:` matching your assigned leaf — that's
@@ -276,6 +282,95 @@ format. This subagent prompt deliberately does NOT duplicate the table to avoid 
    the self-review file (you are PARTIAL, not FULL_PASS).
 6. FORBIDDEN: writing a self-review file when all rows are PASS. The empty-FAIL file would only
    carry PASS evidence prose with no downstream consumer.
+
+---
+
+## Lint-Fixup Mode (orchestrator-invoked between fan-out and review)
+
+The orchestrator's Step 8d (pre-review lint loop — see `generate/from-scratch.md`
+and `generate/new-version.md`) dispatches writers in **Lint-Fixup Mode** when
+`scripts/run-checkers.sh` surfaces bundle-level formal findings after fan-out.
+These are mechanical inconsistencies no single writer could have detected during
+its own dispatch (sibling leaves were not yet on disk) — e.g. dependency-layering
+violations across modules (`check-dependency-layering.sh`), placeholder tokens in
+JSON code blocks (`check-placeholder-json.sh`), feature/module-mapping or
+architecture-coverage gaps, README-link rot, and mermaid-block syntax errors
+across leaves.
+
+### Dispatch contract
+
+The dispatch prompt for a lint-fixup writer carries:
+
+- `trace_id` of the form `R<N>-LFX-<NNN>` (the `LFX` infix distinguishes
+  fix-up writers from regular writers in `dispatch-log.jsonl`).
+- The target leaf path the writer owns for this fixup (one leaf per
+  dispatch — orchestrator groups findings by `file:` before dispatch).
+- A `## Lint-Fixup Findings` section listing the formal-checker
+  findings against this leaf, copied verbatim from the JSON document
+  emitted by `run-checkers.sh`. Each finding carries `criterion_id`,
+  `description`, and `suggested_fix`.
+- Sibling-leaf paths referenced by any finding's `suggested_fix`
+  (read-only context — the writer Reads them to understand the
+  consistency target but DOES NOT edit them; the sibling's own
+  fix-up dispatch handles the other side if both need edits).
+
+### Behavior
+
+1. **Read the target leaf and listed sibling leaves.** For each
+   finding, decide whether the target leaf actually needs an edit.
+   For cross-leaf conflict findings the `suggested_fix` names the
+   canonical authority — if your target leaf IS the canonical
+   authority, no edit on this leaf is needed; the sibling leaf's
+   own fix-up dispatch will align to you. For all other findings
+   (placeholder-json, in-leaf rule), apply the `suggested_fix`
+   directly. Edits MUST stay on the target leaf — never edit
+   siblings (the orchestrator dispatches one fix-up per affected
+   file; siblings get their own writers).
+2. **Re-run only the per-artifact check** for your leaf type
+   (`check-readme.sh` / `check-module.sh` / `check-api.sh`, plus
+   `check-placeholder-json.sh` for module / api leaves) to confirm
+   any edits you made did not regress an in-leaf formal rule. Use
+   the standard retry-until-PASS / 3-fail escalation loop from the
+   base "Formal pre-check" table for in-leaf regressions.
+
+   **Do NOT re-run the bundle-level cross-leaf checks** (e.g.
+   `check-dependency-layering.sh`, `check-feature-module-mapping.sh`)
+   for retry purposes. A cross-leaf finding on your leaf may persist
+   after your edit because the SIBLING leaf has not yet been edited
+   (the orchestrator dispatches all affected sides in parallel and
+   runs `run-checkers.sh` again at the iteration boundary).
+   Re-checking cross-leaf locally and looping would falsely report
+   3-fail and escalate to HITL on a state the orchestrator is
+   designed to converge across iterations.
+3. **One pass on cross-leaf findings, no local retry.** Apply your
+   edit (or take the no-op path if you're the canonical authority —
+   §1) exactly once. Do not loop. The orchestrator's Step-8d loop
+   (max `lint_fixup_max_iterations`) is responsible for bundle-level
+   convergence; your job is correctness on this leaf.
+4. **ACK normally**: `OK trace_id=R<N>-LFX-<NNN> role=writer
+   linked_issues= self_review_status=FULL_PASS fail_count=0`.
+   Lint-Fixup Mode never emits a self-review archive — formal fixes
+   are auto-fixes (guide §4.1), not substantive blockers. The same
+   ACK shape is used whether you edited the leaf or ACKed no-op
+   (canonical authority path).
+5. **FORBIDDEN**: filing findings as issue files. Lint-fixup findings
+   are NOT review-emitted issues — they live in dispatch context only
+   and are not persisted under `.review/round-N/issues/`. The
+   orchestrator re-runs `run-checkers.sh` after each iteration; the
+   audit trail of which files needed fix-up is in
+   `dispatch-log.jsonl` (R<N>-LFX-* entries).
+
+### Difference from per-issue reviser
+
+A lint-fixup writer is NOT a reviser:
+
+| Aspect | Lint-Fixup Writer | Per-Issue Reviser |
+|--------|-------------------|-------------------|
+| Source of findings | `run-checkers.sh` (script) | LLM cross-reviewer (issue files) |
+| Input artifact | Inline finding list in dispatch | `.review/round-N/issues/I-NNN.md` |
+| Output side-effect | None beyond edits | Issue state transition (new → fixed) |
+| Trace_id infix | `LFX` | `R` |
+| When invoked | After fan-out, before review | After review, during revise |
 
 ---
 

@@ -77,6 +77,15 @@ retry_policy:
   backoff_ms: [1000, 3000, 10000]
   schema_retry_upgrade_tier: true
 
+# Pre-review lint loop (Step 8d in generate/from-scratch.md and
+# generate/new-version.md). After fan-out and before entering the
+# LLM-driven review pipeline, the orchestrator runs run-checkers.sh
+# and dispatches writers in Lint-Fixup Mode to resolve any remaining
+# bundle-level formal findings (cross-leaf, dangling refs). This cap
+# bounds the fix-up loop: after this many iterations still failing,
+# the orchestrator surfaces the remaining findings to HITL.
+lint_fixup_max_iterations: 3
+
 partial_failure_policy:
   generate_phase: continue_with_failures
   review_phase: abort_round

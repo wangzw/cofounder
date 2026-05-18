@@ -110,6 +110,24 @@ review pipeline will re-confirm).
   leaf type (per `generate/writer-subagent.md`); fixes failures on its
   own leaf in place; substantive CRs go into the self-review
 
+### Step 8d — Pre-Review Lint Loop (script-driven, cross-leaf cleanup)
+
+Identical to FromScratch Step 8d — see `generate/from-scratch.md`
+"Step 8d — Pre-Review Lint Loop". Runs `scripts/run-checkers.sh`
+explicitly after Step 8b and, on formal findings, enters a fix-up
+loop (max `lint_fixup_max_iterations`) dispatching writers in
+Lint-Fixup Mode to resolve mechanical inconsistencies surfaced by
+`check-dependency-layering.sh`, `check-placeholder-json.sh`,
+`check-feature-module-mapping.sh`, `check-architecture-coverage.sh`,
+`check-analytics-coverage.sh`, `check-readme-references.sh`, and
+`check-mermaid.sh` BEFORE the LLM-driven cross-reviewer runs.
+
+NewVersion mode tends to surface more cross-leaf inconsistencies
+than FromScratch because evolve `modify` rows may rename module
+interfaces, shift error codes, or change endpoint paths — and
+untouched sibling leaves carry the old form. Step 8d catches these
+cheaply.
+
 ### Step 9 — Enter Review Loop
 
 Load `review/index.md` and execute the review-mode steps with

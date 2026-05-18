@@ -146,7 +146,92 @@ Fan-out one writer per entry in `plan.add`. Each writer:
 - Returns single-line ACK.
 
 Orchestrator: collect `self_review_status` and `fail_count` from each
-ACK. Proceed to Step 9.
+ACK. Proceed to Step 8d.
+
+### Step 8d — Pre-Review Lint Loop (script-driven, cross-leaf cleanup)
+
+Per-leaf formal checks were already enforced inside each writer's
+Step-8 self-audit (writer-subagent.md "Formal pre-check"). Several
+formal rules are **bundle-level** and cannot be checked by any one
+writer in isolation — most notably `check-dependency-layering.sh`
+(forward-only layering across modules), `check-feature-module-mapping.sh`
+(every PRD feature covered by ≥1 module), `check-architecture-coverage.sh`
+and `check-analytics-coverage.sh` (per-PRD-section coverage),
+`check-readme-references.sh` (every README link resolves), and
+`check-mermaid.sh` (diagram syntax across all leaves). These fire
+only once the full fan-out is on disk.
+
+Run the bundle-level formal gate explicitly here, BEFORE entering
+the LLM-driven review pipeline. Findings at this step are mechanical
+inconsistencies that an LLM cross-reviewer would have caught at much
+higher cost (chaos system-design round-1 saw 85% of issues from one
+parser bug alone, plus 15% from CR-SD17 placeholder violations) —
+preempt them with a script-driven fix-up loop:
+
+```bash
+scripts/run-checkers.sh <design-dir>
+```
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | Bundle is formally clean | proceed to Step 9 |
+| 1    | Bundle has formal finding(s) | enter the fix-up loop below |
+| 2    | Script-level error | HITL |
+
+**Fix-up loop** (max iterations: `lint_fixup_max_iterations` in
+`common/config.yml`, default `3`):
+
+For each iteration:
+
+1. Capture the JSON document on stdout after the `FOUND ...` summary
+   line. Group the `issues` array by `file:` field. Most findings
+   carry a concrete leaf path so each affected file can be dispatched
+   to a fix-up writer.
+
+   **Non-dispatchable findings:** some scripts emit findings against
+   a directory path (e.g. `file: modules/` for id-gap warnings) or
+   against an empty path (`file: ""`). These are bundle-structural
+   problems no single writer can fix. Filter them out of the dispatch
+   loop and surface them DIRECTLY to HITL alongside the iteration
+   outcome — do not spend lint-fixup iterations on them.
+
+2. For each affected file (real leaf paths only — see filter above),
+   dispatch ONE writer sub-agent (`generate/writer-subagent.md`) in
+   **Lint-Fixup Mode** (see that prompt's "Lint-Fixup Mode" section).
+   The dispatch prompt MUST include:
+   - The target file path the writer owns for this fixup.
+   - The full list of findings tied to that file (criterion_id,
+     description, suggested_fix), copied verbatim from the JSON.
+   - For findings whose suggested_fix references sibling leaves
+     (e.g. cross-leaf conflicts naming both files), the sibling
+     leaf path so the writer may Read it for context.
+   - `trace_id` of the form `R<N>-LFX-<NNN>` where `LFX` distinguishes
+     lint-fixup writers from regular writers in dispatch-log.
+
+3. After all fix-up writers ACK, re-run `scripts/run-checkers.sh`.
+   Capture this iteration's POST-dispatch JSON output. Compare to
+   the PRE-dispatch output that triggered this iteration's dispatch
+   (the output sitting in your context from Step 8d's initial run
+   for iteration 1, or from iteration K-1's post-dispatch capture
+   for iteration K>1).
+   - Exit 0 → break, proceed to Step 9.
+   - Exit 2 → HITL.
+   - Exit 1 AND post-dispatch output differs from pre-dispatch
+     output → progress made; continue to next iteration.
+   - Exit 1 AND post-dispatch output is identical (after sorting
+     issues by `(criterion_id, file, description)`) → **no
+     progress**: every dispatched writer ACKed no-op. Burning
+     further iterations cannot make progress; break the loop
+     immediately and surface the remaining findings to HITL with
+     a "no-progress detected" note.
+
+4. After `lint_fixup_max_iterations` still exit 1: REFUSE — print
+   the remaining findings and surface to HITL.
+
+The orchestrator MUST NOT skip this step even when Step 8 ACKed
+every writer FULL_PASS — per-writer self-audit does not cover
+bundle-level rules. Skipping causes those findings to enter the
+(more expensive) LLM cross-reviewer cycle instead.
 
 ### Step 9 — Enter Review Loop
 
