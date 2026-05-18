@@ -48,4 +48,26 @@ rc=$?
 set -e
 assert_exit_code 2 "$rc" "$out"
 
+start_test "init rejects dep referencing unknown module"
+plan=$(mktempdir); mkdir -p "$plan"
+cat > "$plan/modules.json" <<'JSON'
+[{"id":"M-001","deps":["M-999"]}]
+JSON
+set +e
+out=$(bash "$SCRIPT" "$plan" "$plan/modules.json" 2>&1)
+rc=$?
+set -e
+assert_exit_code 2 "$rc" "$out"
+
+start_test "init rejects duplicate module ids"
+plan=$(mktempdir); mkdir -p "$plan"
+cat > "$plan/modules.json" <<'JSON'
+[{"id":"M-001","deps":[]},{"id":"M-001","deps":[]}]
+JSON
+set +e
+out=$(bash "$SCRIPT" "$plan" "$plan/modules.json" 2>&1)
+rc=$?
+set -e
+assert_exit_code 2 "$rc" "$out"
+
 summary

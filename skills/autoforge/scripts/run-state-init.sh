@@ -60,7 +60,18 @@ for m in modules:
         print(f"ERROR: malformed entry {m!r}; need {{id, deps}}", file=sys.stderr)
         sys.exit(2)
 
-state = create_initial_state(modules)
+ids = [m["id"] for m in modules]
+if len(ids) != len(set(ids)):
+    dupes = sorted({mid for mid in ids if ids.count(mid) > 1})
+    print(f"ERROR: duplicate module ids: {dupes}", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    state = create_initial_state(modules)
+except ValueError as exc:
+    print(f"ERROR: {exc}", file=sys.stderr)
+    sys.exit(2)
+
 save_state(os.path.join(plan_dir, "run-state.json"), state)
 print(f"initialized run-state.json with {len(modules)} modules")
 PYEOF
