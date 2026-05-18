@@ -77,4 +77,37 @@ print('OK')
 ")
 assert_stdout_contains "OK" "$out"
 
+start_test "freeze sets frozen_at and current_revision"
+plan=$(mktempdir); setup_plan_dir "$plan"
+bash "$SCRIPT" "$plan" freeze 7
+out=$(python3 -c "
+import json
+s = json.load(open('$plan/run-state.json'))
+assert s['current_revision'] == 7, s['current_revision']
+assert s['frozen_at'], 'frozen_at must be non-null'
+print('OK')
+")
+assert_stdout_contains "OK" "$out"
+
+start_test "unfreeze clears frozen_at and current_revision"
+plan=$(mktempdir); setup_plan_dir "$plan"
+bash "$SCRIPT" "$plan" freeze 3
+bash "$SCRIPT" "$plan" unfreeze
+out=$(python3 -c "
+import json
+s = json.load(open('$plan/run-state.json'))
+assert s['frozen_at'] is None, s['frozen_at']
+assert s['current_revision'] is None, s['current_revision']
+print('OK')
+")
+assert_stdout_contains "OK" "$out"
+
+start_test "freeze rejects missing revision-seq argument"
+plan=$(mktempdir); setup_plan_dir "$plan"
+set +e
+out=$(bash "$SCRIPT" "$plan" freeze 2>&1)
+rc=$?
+set -e
+assert_exit_code 2 "$rc" "$out"
+
 summary

@@ -3,10 +3,15 @@
 #
 # Cross-validates run-state.json against on-disk truth:
 #   - modules marked exec_status=merged must have their branch as an
-#     ancestor of the feature branch (or be merged into it)
+#     ancestor of the feature branch (or have a matching feat({mid})
+#     commit in feature-branch history if the module branch was deleted
+#     post-merge)
 #   - modules in inflight.modules must have an associated worktree
-#   - modules marked running whose module-state-M-*.json claims
-#     approved/later state indicate a lost notification
+#
+# (A future check for "modules marked running whose module-state-M-*.json
+# claims approved/later state — indicating a lost completion notification"
+# is planned but requires a stable Module Agent state schema first; see
+# follow-ups in the DAG scheduling design spec.)
 #
 # Usage: check-scheduler-state.sh <plan-dir> [--source-root <dir>]
 #
