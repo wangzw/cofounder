@@ -103,4 +103,65 @@ print('OK')
 ")
 assert_stdout_contains "OK" "$out"
 
+start_test "filter_modules_by_scope all four code paths"
+out=$(python3 -c "
+import sys; sys.path.insert(0, '$LIB')
+from run_state import create_initial_state, filter_modules_by_scope
+modules = [
+    {'id': 'M-001', 'deps': []},
+    {'id': 'M-002', 'deps': ['M-001']},
+    {'id': 'M-003', 'deps': ['M-001', 'M-002']},
+]
+s = create_initial_state(modules)
+
+# 'all' returns full list
+result = filter_modules_by_scope(s, 'all')
+assert isinstance(result, list), type(result)
+assert set(result) == {'M-001', 'M-002', 'M-003'}, result
+
+# 'tier-1' returns only tier-1 modules
+result = filter_modules_by_scope(s, 'tier-1')
+assert isinstance(result, list), type(result)
+assert result == ['M-001'], result
+
+# 'module-M-001' returns single-element list
+result = filter_modules_by_scope(s, 'module-M-001')
+assert isinstance(result, list), type(result)
+assert result == ['M-001'], result
+
+# unknown module raises ValueError
+try:
+    filter_modules_by_scope(s, 'module-M-999')
+    assert False, 'expected ValueError'
+except ValueError:
+    pass
+
+# unknown scope shape raises ValueError
+try:
+    filter_modules_by_scope(s, 'banana')
+    assert False, 'expected ValueError'
+except ValueError:
+    pass
+
+print('OK')
+")
+assert_stdout_contains "OK" "$out"
+
+start_test "cycle detection raises ValueError mentioning cycle"
+out=$(python3 -c "
+import sys; sys.path.insert(0, '$LIB')
+from run_state import create_initial_state
+try:
+    create_initial_state([
+        {'id': 'A', 'deps': ['B']},
+        {'id': 'B', 'deps': ['A']},
+    ])
+    print('FAIL: no error raised')
+except ValueError as e:
+    msg = str(e)
+    assert 'cycle' in msg.lower(), f'expected cycle in message, got: {msg!r}'
+    print('OK')
+")
+assert_stdout_contains "OK" "$out"
+
 summary

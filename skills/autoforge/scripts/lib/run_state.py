@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Iterable
 
 VERSION = 1
 
@@ -40,6 +39,9 @@ def _topological_tier(modules: list[dict]) -> dict[str, int]:
         if not deps:
             tier[mid] = 1
         else:
+            for d in deps:
+                if d not in by_id:
+                    raise ValueError(f"module {mid!r} has dep {d!r} which is not in the module list")
             tier[mid] = 1 + max(resolve(d, seen) for d in deps)
         return tier[mid]
 
@@ -49,7 +51,14 @@ def _topological_tier(modules: list[dict]) -> dict[str, int]:
 
 
 def _closure(modules: list[dict]) -> dict[str, list[str]]:
-    """Transitive deps for each module, in topological order."""
+    """Transitive deps for each module, in topological order.
+
+    Delegates to _topological_tier first so any cycle raises a descriptive
+    ValueError before this function starts its own walk.
+    """
+    # Cycle detection is fully handled by _topological_tier; any cycle
+    # raises ValueError with a clear message before we recurse below.
+    _topological_tier(modules)
     by_id = {m["id"]: m for m in modules}
     closure: dict[str, list[str]] = {}
 
@@ -59,6 +68,8 @@ def _closure(modules: list[dict]) -> dict[str, list[str]]:
         out: list[str] = []
         seen: set[str] = set()
         for d in by_id[mid].get("deps", []):
+            if d not in by_id:
+                raise ValueError(f"module {mid!r} has dep {d!r} which is not in the module list")
             for sub in resolve(d):
                 if sub not in seen:
                     seen.add(sub)
@@ -120,6 +131,7 @@ def create_initial_state(modules: list[dict], *, scheduler: dict | None = None) 
 
 
 def load_state(path: str) -> dict:
+    """Load and return the run-state document at `path`. Propagates FileNotFoundError / json.JSONDecodeError."""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -170,7 +182,7 @@ def ready_set_execution(state: dict) -> list[str]:
     return [mid for _, _, mid in ready]
 
 
-def filter_modules_by_scope(state: dict, scope: str) -> Iterable[str]:
+def filter_modules_by_scope(state: dict, scope: str) -> list[str]:
     """Return module ids matching a --scope argument.
 
     Supported scopes:
