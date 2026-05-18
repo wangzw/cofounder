@@ -66,31 +66,34 @@ When the orchestrator dispatches a sub-agent via the Claude Code Agent tool, it 
 
 ```mermaid
 flowchart TD
-  init["Step 0: Initialize\nRead design, build dep graph,\ncreate feature branch"]
-  plan["Step 1: Phased Planning\nParallel within phases;\ndependency-closure context"]
-  human{"Human Review\nApprove / edit plans"}
-  needsBootstrap{"New project?\n(no existing source)"}
-  bootstrap["Step 1.5: Project Bootstrap\nInit project on feature branch"]
-  execute["Step 2: Phase Execution\nPer phase: parallel module teams\n+ phase integration test"]
-  planrev["Re-plan\nRevise plans from current state\n(what's done + what's blocked)"]
-  decision["Human Decision\nPick from agent-proposed\noptions"]
-  accept["Step 3: PRD Acceptance\nE2E tests + requirements traceability"]
-  merge["Step 4: Merge to Main\nRebase + ff-merge feature branch"]
+  S0[Step 0: Prep<br/>+ Skeleton + DAG]
+  G0{G0: Phase breakdown<br/>human approve}
+  G1{G1: Skeleton review<br/>human approve}
+  BOOT[Conventions bootstrap<br/>serial: M-001 Planner foreground]
+  T1P[Tier-1 Planners<br/>foreground parallel]
+  T1G[Tier-1 auto checker<br/>--scope=tier-1]
+  LOOP[Event loop starts<br/>max_planners=3, max_modules=6]
+  BG[(Background Agents<br/>Planner / Module / Integration)]
+  EVT{Completion notification}
+  REV{PLAN_REVISION?}
+  DEC{DECISION_REQUEST?}
+  CONV{CONVENTION_CONFLICT?}
+  DONE{ready & inflight empty?}
+  ACC[Step 3: Acceptance Tester]
+  G3{G3: Final acceptance}
+  MAIN[Step 4: Merge to main]
 
-  init --> plan
-  plan --> human
-  human -- approved --> needsBootstrap
-  human -- revise --> plan
-  needsBootstrap -- yes --> bootstrap
-  needsBootstrap -- "no (existing codebase)" --> execute
-  bootstrap --> execute
-  execute -- "significant plan issue" --> planrev
-  planrev --> human
-  execute -- "stalled, needs trade-off" --> decision
-  decision --> execute
-  execute --> accept
-  accept -- pass --> merge
-  accept -- fix cycle --> execute
+  S0 --> G0 --> G1 --> BOOT --> T1P --> T1G --> LOOP
+  LOOP --> BG --> EVT
+  EVT --> REV
+  REV -- yes --> FREEZE[Freeze → Cancel inflight → Re-plan → R4 diff review] --> LOOP
+  REV -- no --> DEC
+  DEC -- yes --> HUMAN[Human picks option] --> LOOP
+  DEC -- no --> CONV
+  CONV -- yes --> CONFLICT[Human resolves conflict] --> LOOP
+  CONV -- no --> DONE
+  DONE -- no --> LOOP
+  DONE -- yes --> ACC --> G3 --> MAIN
 ```
 
 ## Step 0 — Initialization
@@ -122,9 +125,43 @@ flowchart TD
    pwd                                # MUST print {worktree_root}/main
    ```
    If either verification fails, abort with HITL — do NOT continue. After this point, the Orchestrator MUST NOT `cd` back to the main project directory for any operation until Step 4 (Merge to Main).
-8. **Present plan to user** — show: module count, phase breakdown with dependency rationale, branch names, output paths. User confirms before proceeding.
+8. **Build Module Index JSON** — extract every module from the design README's Module Index table into `<plan-dir>/modules.json`:
+   ```json
+   [
+     {"id": "M-001", "deps": []},
+     {"id": "M-002", "deps": ["M-001"]}
+   ]
+   ```
+   Use this JSON as the source of truth for the scheduler — the table in
+   the design README is human-readable; this file is machine-readable.
 
-**Step 0 → Step 1 gate:** User confirms phase breakdown and branch naming.
+9. **Initialize run-state.json:**
+   ```
+   bash skills/autoforge/scripts/run-state-init.sh \
+        <plan-dir> <plan-dir>/modules.json
+   ```
+   Confirm the file appeared and reports the expected module count.
+
+10. **Compute and present the DAG + tier breakdown** — show the user:
+    - Module count, tier breakdown (Tier 1: [M-001, M-005, M-007], Tier 2: [M-002], ...)
+    - DAG visualization (mermaid)
+    - Branch and worktree-root paths
+    - Scheduler caps (`max_planners`, `max_modules`) from config.yml
+
+11. **G0 — Phase breakdown gate (human approve)** — user confirms tier breakdown, branch naming, output paths.
+
+12. **G1 — Skeleton review gate (human approve)** — present a short skeleton document containing:
+    - Module list with one-line purpose each (from design README)
+    - DAG mermaid (re-shown)
+    - Module Interaction Protocols — the contracts between modules (copy verbatim from design README)
+    - Key Technical Decisions summary (3-5 bullets)
+    Do **not** include detailed per-module plans here. User approves before any Planner runs.
+
+    On approval:
+    ```
+    bash skills/autoforge/scripts/run-state-update.sh \
+         <plan-dir> gate-approve G1_skeleton_approved
+    ```
 
 ## Step 1 — Phased Planning (parallel within phases)
 
