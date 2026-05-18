@@ -402,6 +402,10 @@ documented in the README and each pattern MUST be addressed by at least one Feat
 section explicitly omitted for single-journey products). Broken traceability means coding agents
 cannot verify completeness of their implementation against requirements.
 
+`scripts/check-cross-leaf.sh` mechanically detects dangling F-NNN / J-NNN references (a leaf cites
+an id no file in the bundle defines) and emits CR-PP06 findings at the bundle level (post-fan-out,
+before review entry).
+
 ```yaml
 - id: CR-PP06
   name: "traceability-chain"
@@ -892,6 +896,13 @@ event names consumed by dependent features' state machines. Event payloads in Co
 Events MUST match consumer expectations. Integration acceptance criteria (Testability f) MUST
 reference exact event names. Mismatched event names cause silent integration failures invisible in
 unit tests.
+
+`scripts/check-cross-leaf.sh` mechanically detects two recurring shapes at the bundle level:
+(a) CLI flag underscore-vs-kebab inconsistency (same logical flag spelled both `--foo_bar` and
+`--foo-bar` across leaves) and (b) JSON-RPC error code numeric assignment conflicts (the same
+UPPER_SNAKE_CASE error name mapped to ≥2 distinct `-32NNN` integers). Both fire CR-PP27 at the
+bundle level (post-fan-out, before review entry) — substantive review still handles
+semantic event-flow / payload mismatches that need contextual judgment.
 
 ```yaml
 - id: CR-PP27
