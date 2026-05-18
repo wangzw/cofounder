@@ -161,6 +161,89 @@ assert_stdout_contains "When, Then"
 teardown_fixture
 
 # ============================================================
+# ============================================================
+test_case "CR-PP15 detects compound AC with 'then:' + list"
+setup_fixture
+write_file "features/F-001-x.md" '---
+id: F-001
+title: x
+status: draft
+---
+
+## Acceptance Criteria
+- Given chaos is installed, When the operator runs install.sh, Then: the daemon stops, the binaries replace the old, the data dir is preserved, the DNS snapshot is rewritten, and the script exits 0.
+'
+assert_exit 1 "$CHECK" "$FIXTURE"
+assert_stdout_contains "CR-PP15F"
+assert_stdout_contains "compound"
+teardown_fixture
+
+# ============================================================
+test_case "CR-PP15 detects compound AC without colon (>=4 commas)"
+setup_fixture
+write_file "features/F-001-x.md" '---
+id: F-001
+title: x
+status: draft
+---
+
+## Acceptance Criteria
+- Given the daemon is starting, When bootstrap runs, Then it creates chaos0, establishes an SSH session, starts the userspace stack, installs policy routes, and chaos status returns healthy.
+'
+assert_exit 1 "$CHECK" "$FIXTURE"
+assert_stdout_contains "CR-PP15F"
+assert_stdout_contains "compound"
+teardown_fixture
+
+# ============================================================
+test_case "CR-PP15 does not fire on simple single-assertion AC"
+setup_fixture
+write_file "features/F-001-x.md" '---
+id: F-001
+title: x
+status: draft
+---
+
+## Acceptance Criteria
+- Given a user with Viewer role, When they POST to /api/projects, Then the system returns HTTP 403 and no database record is created.
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
+# ============================================================
+test_case "CR-PP15 does not fire on AC with commas inside backticks"
+setup_fixture
+write_file "features/F-001-x.md" '---
+id: F-001
+title: x
+status: draft
+---
+
+## Acceptance Criteria
+- Given the installer runs, When it executes, Then it prints `"hello, world, again, friend, hello"` and exits with code 0.
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
+# ============================================================
+test_case "CR-PP15 does not fire below comma threshold"
+setup_fixture
+write_file "features/F-001-x.md" '---
+id: F-001
+title: x
+status: draft
+---
+
+## Acceptance Criteria
+- Given a setup, When an action happens, Then result A occurs, result B occurs.
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
+# ============================================================
 test_case "idempotent — same input twice yields identical stdout"
 setup_fixture
 write_file "features/F-001-x.md" '---

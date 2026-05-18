@@ -614,8 +614,12 @@ excerpt instead.
 ## CR-PP15F acceptance-criteria-format (formal)
 
 Every feature file MUST contain a `## Acceptance Criteria` section with at least one
-Given/When/Then block (all three keywords present). This is the mechanical format check;
-the substantive testability assessment is CR-PP15 (below).
+Given/When/Then block (all three keywords present). In addition, every individual AC
+bullet's "then" clause MUST NOT bundle ≥3 independent observable post-conditions into a
+single Given/When/Then triple — compound ACs defeat localized debuggability (failure of any
+sub-step has no localization) and are mechanically detected by counting comma-separated
+assertions in the then-clause (excluding code spans and parenthetical asides). This is the
+mechanical format check; the substantive testability assessment is CR-PP15 (below).
 
 ```yaml
 - id: CR-PP15F

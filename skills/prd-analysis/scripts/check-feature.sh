@@ -6,7 +6,10 @@
 #
 #   CR-PP02   id-format-monotonic — F-NNN format, no duplicates, no gaps
 #   CR-PP04   no-tbd-remaining     — no TBD / TODO / FIXME tokens
-#   CR-PP15F  acceptance-criteria-format — BDD Given/When/Then present
+#   CR-PP15F  acceptance-criteria-format — BDD Given/When/Then present;
+#             also flags compound bullets whose "then" clause bundles
+#             ≥3 independent assertions (split into individual
+#             Given/When/Then triples)
 #   CR-FM01   frontmatter-required-fields — id / title / status
 #
 # Usage: check-feature.sh <prd-dir>
@@ -202,6 +205,57 @@ for _, fname in sorted(nums):
                     "rewrite the section with at least one Given/When/Then block"
                 ),
             ))
+
+        # CR-PP15F compound-AC: each bullet that fuses ≥3 independent
+        # post-conditions into a single Given/When/Then triple is harder
+        # to debug (failure of any sub-step has no localization) and
+        # routinely flagged by reviewers (e.g. chaos round-1 I-034,
+        # I-043). Heuristic, applied per bullet:
+        #
+        #   strong  → "then:" with ≥2 commas in the then-clause
+        #   weaker  → "then "  with ≥4 commas in the then-clause
+        #
+        # Commas inside backticks and parentheses are stripped before
+        # counting so that code spans and parenthetical OS labels do
+        # not trigger the rule.
+        backtick_re = re.compile(r"`[^`]*`")
+        paren_re = re.compile(r"\([^()]*\)")
+        bullet_then_re = re.compile(
+            r"(?i)^\s*[-*]\s+.*?\bthen(?P<sep>:?)\s+(?P<rest>.+?)\s*$"
+        )
+        for raw_line in ac_block.splitlines():
+            m_bullet = bullet_then_re.match(raw_line)
+            if not m_bullet:
+                continue
+            then_clause = m_bullet.group("rest")
+            then_has_colon = m_bullet.group("sep") == ":"
+            # Strip backtick code spans and parenthetical asides so
+            # their commas do not count toward the comma threshold.
+            stripped = backtick_re.sub("", then_clause)
+            stripped = paren_re.sub("", stripped)
+            comma_count = stripped.count(",")
+            threshold = 2 if then_has_colon else 4
+            if comma_count >= threshold:
+                snippet = raw_line.strip()
+                if len(snippet) > 100:
+                    snippet = snippet[:100] + "…"
+                findings.append(Finding(
+                    criterion_id="CR-PP15F",
+                    file=rel,
+                    severity="warning",
+                    description=(
+                        f"compound Acceptance Criterion: 'then' clause bundles "
+                        f"{comma_count + 1} comma-separated assertions in one "
+                        f"Given/When/Then triple — failure of any sub-step has "
+                        f"no localization. Bullet: {snippet!r}"
+                    ),
+                    suggested_fix=(
+                        "split the bullet into one Given/When/Then triple per "
+                        "observable post-condition; reserve a single aggregate "
+                        "AC (e.g. timing budget) if a cross-step assertion is "
+                        "genuinely required"
+                    ),
+                ))
 
 emit(findings, scope_label="(features/)")
 PYEOF
