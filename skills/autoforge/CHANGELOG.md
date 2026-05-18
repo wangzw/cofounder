@@ -3,6 +3,41 @@
 All notable changes to the `autoforge` skill are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — DAG Scheduling Redesign
+
+### BREAKING CHANGES
+
+- **Scheduler is now event-driven**, replacing the previous phase-by-phase model. Modules are scheduled by DAG ready-set, not by phase index.
+- **`phase_number` parameter removed** from all sub-agent prompts. Replaced by `tier_number` (informational only).
+- **In-progress autoforge runs cannot migrate forward.** Restart against the new SKILL.md in a fresh plan-dir.
+- Integration Tester now runs **per module merge**, scoped to the neighborhood (`{M} ∪ closure(M)`), not per phase boundary.
+- Tier-1 plan review (G2) **removed**. Replaced by `--scope=tier-1` automated checker (CR-AF15/CR-AF16 only).
+
+### Added
+
+- **`scripts/run-state-init.sh`** — initialize `run-state.json` from a Module Index.
+- **`scripts/run-state-update.sh`** — apply state transitions; regenerate `run-status.md` + DAG mermaid.
+- **`scripts/check-scheduler-state.sh`** — CR-AF33 scheduler-state consistency.
+- **`scripts/check-idle-timeout.sh`** — CR-AF32 event-loop idle timeout.
+- **`scripts/lib/run_state.py`** — schema + ready-set computation.
+- **`scripts/lib/run_status_render.py`** — render run-status.md + mermaid.
+- **`--scope=tier-N` / `--scope=module-M-id`** in `run-checkers.sh`.
+- **`CONVENTION_CONFLICT` ISSUE_TYPE** in `delivery-discipline.md`.
+- **`needs_patch` exec_status** for already-merged modules needing a code change.
+- **`CANCELLED` Module Agent STATUS** for graceful return during a freeze.
+
+### Changed
+
+- **`SKILL.md`** Steps 0–4 rewritten (~1000 lines of prose changes).
+- **`integration/tester-prompt.md`** rewritten for neighborhood scope.
+- **`planning/planner-prompt.md`** adds 4 revision-flow input parameters.
+- **`module/agent-prompt.md`** adds `needs_patch` resumption and CANCELLED return path.
+- **`common/config.yml`** adds `scheduler` section (`max_planners`, `max_modules`, `idle_timeout_minutes`, batch-commit cadence).
+
+### Migration note
+
+Existing autoforge runs (in `docs/raw/plans/<old-plan-dir>/`) keep their on-disk artifacts and may be inspected. They cannot be resumed under the new scheduler. New runs use the new flow from Step 0.
+
 ## [1.6.1] — 2026-05-16
 
 ### Added — `--json-only` flag on `run-checkers.sh`
