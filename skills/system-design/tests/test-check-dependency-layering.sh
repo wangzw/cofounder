@@ -81,4 +81,71 @@ assert_exit 1 "$CHECK" "$FIXTURE"
 assert_stdout_contains "M-002"
 teardown_fixture
 
+# ════════════════════════════════════════════════
+# CR-X6 — inbound-block exclusion (parser-bug regression)
+# ════════════════════════════════════════════════
+#
+# The module template structures `## Dependencies` as two bold-paragraph
+# sub-blocks: `**Depends on (outbound):**` and `**Depended on by
+# (inbound):**`. Naive M-NNN extraction over the whole section would treat
+# the inbound list as outbound deps and produce mass false-positive
+# reverse-layer findings (chaos round-1 saw 34 such issues — all from this
+# same parsing bug, all "fixed" by writers moving the inbound list out of
+# `## Dependencies` as a workaround).
+test_case "CR-X6: inbound bold-paragraph sub-block must NOT be treated as outbound deps"
+setup_fixture
+write_file "README.md" '# Design
+
+## Dependency Layering
+
+| Layer | Modules |
+|-------|---------|
+| 1 | M-001 |
+| 2 | M-002 |
+'
+write_file "modules/M-001-x.md" "---
+id: M-001
+---
+
+# M-001
+
+## Dependencies
+
+**Depends on (outbound):** none.
+
+**Depended on by (inbound):**
+- M-002 — calls M-001 to do its job
+"
+write_module "M-002" "- M-001"
+assert_exit 0 "$CHECK" "$FIXTURE"
+teardown_fixture
+
+test_case "CR-X6: 'Inbound:' bold marker also excluded"
+setup_fixture
+write_file "README.md" '# Design
+
+## Dependency Layering
+
+| Layer | Modules |
+|-------|---------|
+| 1 | M-001 |
+| 2 | M-002 |
+'
+write_file "modules/M-001-x.md" "---
+id: M-001
+---
+
+# M-001
+
+## Dependencies
+
+**Outbound:** none.
+
+**Inbound:**
+- M-002 — caller
+"
+write_module "M-002" "- M-001"
+assert_exit 0 "$CHECK" "$FIXTURE"
+teardown_fixture
+
 end_tests

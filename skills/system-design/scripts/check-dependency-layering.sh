@@ -340,13 +340,34 @@ for module_file in "${MODULE_FILES[@]}"; do
 
   rel_file="modules/${base}"
 
-  # Extract the Deps section
+  # Extract the Deps section.
+  #
+  # The module template structures `## Dependencies` as two bold-paragraph
+  # sub-blocks: `**Depends on (outbound):**` and `**Depended on by
+  # (inbound):**`. Treating the whole section as outbound produces
+  # mass false-positive reverse-layer findings — the chaos
+  # system-design round-1 had 34 such issues, ALL from this bug. The
+  # awk below skips inbound sub-blocks (bold-paragraph or H3 form) by
+  # tracking an `in_excluded` state that toggles on the inbound marker
+  # and resets on the next bold-paragraph or H3 boundary.
   deps_section=$(awk '
     /^##[[:space:]]+(Dependencies|Module[[:space:]]+Deps|Deps(\s.*)?|Internal\s+\(modules\))([[:space:]]|$)/ {
-      in_section=1; next
+      in_section=1; in_excluded=0; next
     }
-    in_section && /^##[[:space:]]/ { in_section=0 }
-    in_section { print }
+    in_section && /^##[[:space:]]/ { in_section=0; in_excluded=0 }
+    in_section {
+      lower = tolower($0)
+      # Enter excluded mode on inbound markers (bold-paragraph or H3).
+      if (lower ~ /^\*\*depended[[:space:]]+on[[:space:]]+by/ \
+          || lower ~ /^\*\*inbound[[:space:]]*[:*(]/ \
+          || lower ~ /^###[[:space:]]+depended[[:space:]]+on[[:space:]]+by/ \
+          || lower ~ /^###[[:space:]]+inbound\b/) {
+        in_excluded=1; next
+      }
+      # New bold-paragraph or H3 marker resets exclusion.
+      if ($0 ~ /^\*\*[A-Z]/ || $0 ~ /^### /) { in_excluded=0 }
+      if (!in_excluded) print
+    }
   ' "$module_file")
 
   [ -z "$deps_section" ] && continue
