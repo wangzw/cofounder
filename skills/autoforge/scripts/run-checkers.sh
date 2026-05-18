@@ -79,6 +79,7 @@ usage() {
   echo "Usage: run-checkers.sh <plan-dir> [--source-root <dir>] [--phase=<phase>] [--gate=delivery-tag] [--json-only]" >&2
   echo "  --phase=<plan|execute|accept|delivery-tag>" >&2
   echo "  --json-only  route banner to stderr; stdout = pure JSON" >&2
+  echo "  --scope=<all|tier-N|module-M-id>  filter module-plan checker (default all)" >&2
 }
 
 PLAN_DIR="${1:-}"
@@ -93,10 +94,15 @@ SOURCE_ROOT="$(pwd)"
 GATE_MODE=""
 PHASE=""
 JSON_ONLY=""
+SCOPE="all"
 while [ $# -gt 0 ]; do
   case "$1" in
     --source-root) SOURCE_ROOT="$2"; shift 2 ;;
     --json-only) JSON_ONLY="1"; shift ;;
+    --scope=*)
+      SCOPE="${1#--scope=}"
+      shift
+      ;;
     --gate=delivery-tag)
       GATE_MODE="delivery-tag"
       if [ -n "$PHASE" ] && [ "$PHASE" != "delivery-tag" ]; then
@@ -134,6 +140,7 @@ export AF_SCRIPT_DIR="$SCRIPT_DIR"
 export AF_GATE_MODE="$GATE_MODE"
 export AF_PHASE="$PHASE"
 export AF_JSON_ONLY="$JSON_ONLY"
+export AF_SCOPE="$SCOPE"
 
 python3 - <<'PYEOF'
 import json, os, sys, glob
@@ -244,7 +251,33 @@ if os.path.isfile(readme):
     ))
 
 # Per-module plans
+scope = os.environ.get("AF_SCOPE", "all")
+allowed_ids: set | None
+if scope == "all":
+    allowed_ids = None
+else:
+    # Read run-state.json (if it exists) to resolve tier scope.
+    state_path = os.path.join(plan_dir, "run-state.json")
+    if not os.path.isfile(state_path):
+        print(f"ERROR: --scope={scope} requires run-state.json at {state_path}",
+              file=sys.stderr)
+        sys.exit(2)
+    sys.path.insert(0, os.path.join(script_dir, "lib"))
+    from run_state import load_state, filter_modules_by_scope
+    try:
+        state = load_state(state_path)
+        allowed_ids = set(filter_modules_by_scope(state, scope))
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(2)
+
+import re as _scope_re
+_MODULE_ID_RE = _scope_re.compile(r"plan-(M-\d+)")
 for path in sorted(glob.glob(os.path.join(plan_dir, "plans", "plan-M-*.md"))):
+    if allowed_ids is not None:
+        m = _MODULE_ID_RE.search(os.path.basename(path))
+        if not m or m.group(1) not in allowed_ids:
+            continue
     dispatches.append((
         f"module-plan({os.path.basename(path)})",
         [os.path.join(script_dir, "check-module-plan.sh"), path],
