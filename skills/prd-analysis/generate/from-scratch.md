@@ -222,9 +222,11 @@ scripts/run-checkers.sh <prd-dir>
 For each iteration:
 
 1. Capture the JSON document on stdout after the `FOUND ...` summary
-   line. Group the `issues` array by `file:` field; findings whose
-   file is empty (`""`) or `(cross-leaf)` are global — assign them
-   to a synthetic file `(bundle)` for dispatch routing.
+   line. Group the `issues` array by `file:` field. Every issue in
+   the array carries a concrete leaf path — `check-cross-leaf.sh`
+   deliberately emits one finding PER affected leaf for cross-leaf
+   conflicts (CR-PP27 flag spelling / error-code conflicts) so each
+   side of the conflict gets its own dispatch.
 
 2. For each affected file, dispatch ONE writer sub-agent
    (`generate/writer-subagent.md`) in **Lint-Fixup Mode** (see that
@@ -248,6 +250,12 @@ For each iteration:
    remaining findings and surface to HITL. The user adjudicates
    (e.g. some findings may be false positives, or the cross-leaf
    conflict requires a design decision a writer cannot make alone).
+
+For cross-leaf conflict findings (CR-PP27), expect the canonical
+authority's writer to ACK no-op (per Lint-Fixup Mode "Behavior" §1)
+and the non-canonical sibling's writer to apply the rewrite. The
+conflict resolves on the sibling's edit; the canonical writer's
+no-op is correct, not a failure.
 
 The orchestrator MUST NOT skip this step even when Step 8 ACKed every
 writer FULL_PASS — per-writer self-audit does not cover bundle-level

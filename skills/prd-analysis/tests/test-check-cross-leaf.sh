@@ -57,6 +57,23 @@ assert_stdout_contains "--route_via"
 teardown_fixture
 
 # ============================================================
+test_case "CR-PP27 flag conflict emits one finding per affected leaf"
+setup_fixture
+write_file "features/F-001-cli.md" "$(mk_feature F-001 'CLI accepts `--route-via <name>` flag.')"
+write_file "features/F-002-cli.md" "$(mk_feature F-002 'Subcommand exposes `--route_via <name>` flag.')"
+run_command "$CHECK" "$FIXTURE"
+# Both leaves should be referenced as the `file:` of separate findings
+# so Step 8d can dispatch one fix-up writer per leaf.
+count_f1=$(echo "$LAST_STDOUT" | grep -c '"file": "features/F-001-cli.md"' || true)
+count_f2=$(echo "$LAST_STDOUT" | grep -c '"file": "features/F-002-cli.md"' || true)
+if [ "$count_f1" -ge 1 ] && [ "$count_f2" -ge 1 ]; then
+    _record_pass
+else
+    _record_fail "expected both leaves to appear as file: in JSON; got f1=$count_f1 f2=$count_f2"
+fi
+teardown_fixture
+
+# ============================================================
 test_case "CR-PP27 detects conflicting error code numeric assignments"
 setup_fixture
 write_file "architecture/shared-conventions.md" "---
@@ -77,6 +94,26 @@ write_file "features/F-008-rpc.md" "$(mk_feature F-008 '| Code name | JSON-RPC c
 assert_exit 1 "$CHECK" "$FIXTURE"
 assert_stdout_contains "CR-PP27"
 assert_stdout_contains "AUTH_DENIED"
+teardown_fixture
+
+# ============================================================
+test_case "CR-PP27 code conflict emits one finding per affected leaf"
+setup_fixture
+write_file "architecture/shared-conventions.md" "---
+id: arch
+---
+
+| AUTH_DENIED | -32000 |
+"
+write_file "features/F-008-rpc.md" "$(mk_feature F-008 '| AUTH_DENIED | -32001 |')"
+run_command "$CHECK" "$FIXTURE"
+count_arch=$(echo "$LAST_STDOUT" | grep -c '"file": "architecture/shared-conventions.md"' || true)
+count_feat=$(echo "$LAST_STDOUT" | grep -c '"file": "features/F-008-rpc.md"' || true)
+if [ "$count_arch" -ge 1 ] && [ "$count_feat" -ge 1 ]; then
+    _record_pass
+else
+    _record_fail "expected both leaves as file: in JSON; got arch=$count_arch feat=$count_feat"
+fi
 teardown_fixture
 
 # ============================================================

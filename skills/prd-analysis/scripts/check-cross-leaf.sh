@@ -4,7 +4,7 @@
 # Per guide §1.1 + §9: emits one issue per finding in JSON; 3-state
 # returncode; idempotent. Implements three mechanically-checkable
 # cross-leaf rules that historically only an LLM cross-reviewer caught
-# (e.g. chaos round-1 I-007, I-036, I-066, I-067, I-029):
+# (e.g. chaos round-1 I-007, I-036, I-066, I-067):
 #
 #   CR-PP27   cross-feature contract — CLI flag underscore-vs-kebab
 #             inconsistency (same logical flag spelled both `--foo_bar`
@@ -16,6 +16,19 @@
 #   CR-PP06   feature-traceability — dangling F-NNN / J-NNN reference
 #             (a leaf references an id that no file in the bundle
 #             defines)
+#
+# For Rule 1 / Rule 2 conflicts, the script emits ONE finding PER
+# affected leaf — not a single finding with an arbitrary "first leaf".
+# This ensures the Step 8d fix-up loop (generate/from-scratch.md) can
+# dispatch a writer for every leaf participating in the conflict; the
+# writer for the canonical-authority leaf may legitimately ACK without
+# edit (see writer-subagent.md "Lint-Fixup Mode" no-op path).
+#
+# Symbol-reference dangling (e.g. F-006 referencing
+# `EgressManager.Subscribe` on F-003 when F-003 does not expose that
+# method) is OUT OF SCOPE — that requires parsing each feature's
+# Implementation Notes / Component Contracts and is reserved for the
+# LLM cross-reviewer.
 #
 # Auto-discovered by run-checkers.sh; participates in the formal hard
 # gate enforced post-fan-out before review entry. Designed to NOT run
@@ -110,23 +123,29 @@ for canonical, spellings in sorted(flags_by_canonical.items()):
         spelling_summary = ", ".join(
             f"{sp} ({', '.join(sorted(ls))})" for sp, ls in sorted(spellings.items())
         )
-        findings.append(Finding(
-            criterion_id="CR-PP27",
-            file=leaves_affected[0],
-            severity="error",
-            description=(
-                f"CLI flag --{canonical} has inconsistent spellings across "
-                f"leaves: {spelling_summary}. Same operator-facing string "
-                f"must be byte-identical everywhere or users following one "
-                f"doc hit 'unknown flag' errors when they switch to another."
-            ),
-            suggested_fix=(
-                f"standardize on kebab-case (Go cobra convention): replace "
-                f"every underscore variant with --{canonical}; verify CLI "
-                f"feature, journey touchpoints, README, and architecture "
-                f"leaves all carry the same spelling"
-            ),
-        ))
+        # Emit one finding per affected leaf so the Step 8d fix-up
+        # loop dispatches a writer for each side of the conflict; the
+        # writer whose leaf already uses the kebab-case form will
+        # legitimately ACK no-op.
+        for leaf in leaves_affected:
+            findings.append(Finding(
+                criterion_id="CR-PP27",
+                file=leaf,
+                severity="error",
+                description=(
+                    f"CLI flag --{canonical} has inconsistent spellings "
+                    f"across leaves: {spelling_summary}. Same operator-"
+                    f"facing string must be byte-identical everywhere or "
+                    f"users following one doc hit 'unknown flag' errors "
+                    f"when they switch to another."
+                ),
+                suggested_fix=(
+                    f"if this leaf already uses kebab-case --{canonical}, "
+                    f"no edit is needed (Lint-Fixup Mode no-op); otherwise "
+                    f"rewrite every underscore variant in this leaf to "
+                    f"--{canonical}. Go cobra convention is kebab-case."
+                ),
+            ))
 
 # ─── Rule 2: JSON-RPC error code numeric assignment conflicts ──────
 #
@@ -157,21 +176,29 @@ for name, by_code in sorted(code_assignments.items()):
             f"{c} in [{', '.join(sorted(ls))}]"
             for c, ls in sorted(by_code.items())
         )
-        findings.append(Finding(
-            criterion_id="CR-PP27",
-            file=leaves_affected[0],
-            severity="critical",
-            description=(
-                f"JSON-RPC error code {name} has conflicting numeric "
-                f"assignments across leaves: {summary}. Any client built "
-                f"from one leaf will fail conformance with another."
-            ),
-            suggested_fix=(
-                f"pick one canonical value (architecture/shared-conventions.md "
-                f"is the architectural source of truth) and rewrite the other "
-                f"leaves' code tables to match exactly"
-            ),
-        ))
+        # Emit one finding per affected leaf — the writer for the
+        # canonical (shared-conventions.md) leaf will ACK no-op; the
+        # writers for the non-canonical leaves rewrite their code
+        # tables to align.
+        for leaf in leaves_affected:
+            findings.append(Finding(
+                criterion_id="CR-PP27",
+                file=leaf,
+                severity="critical",
+                description=(
+                    f"JSON-RPC error code {name} has conflicting numeric "
+                    f"assignments across leaves: {summary}. Any client "
+                    f"built from one leaf will fail conformance with "
+                    f"another."
+                ),
+                suggested_fix=(
+                    f"architecture/shared-conventions.md is the canonical "
+                    f"source of truth for the error-code catalogue. If "
+                    f"this leaf is shared-conventions.md, no edit needed "
+                    f"(Lint-Fixup Mode no-op); otherwise rewrite this "
+                    f"leaf's {name} mapping to match shared-conventions."
+                ),
+            ))
 
 # ─── Rule 3: dangling F-NNN / J-NNN references ─────────────────────
 #

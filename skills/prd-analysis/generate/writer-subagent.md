@@ -368,22 +368,38 @@ The dispatch prompt for a lint-fixup writer carries:
 
 ### Behavior
 
-1. **Read the target leaf and listed sibling leaves.** Apply the
-   `suggested_fix` for every finding in the `## Lint-Fixup Findings`
-   list. Edits MUST stay on the target leaf — never edit siblings
-   (the orchestrator dispatches one fix-up per affected file).
+1. **Read the target leaf and listed sibling leaves.** For each
+   finding, decide whether the target leaf actually needs an edit.
+   For cross-leaf conflict findings (CR-PP27 flag spelling, CR-PP27
+   error-code conflict) the `suggested_fix` names the canonical
+   authority — if your target leaf IS the canonical authority, no
+   edit on this leaf is needed; the sibling leaf's own fix-up
+   dispatch will align to you. For all other findings (CR-PP06
+   dangling ref, etc.), apply the `suggested_fix` directly.
+   Edits MUST stay on the target leaf — never edit siblings (the
+   orchestrator dispatches one fix-up per affected file; siblings
+   get their own writers).
 2. **Re-run the formal hard gate** for your leaf type AND
-   `scripts/check-cross-leaf.sh` to verify the edits resolve every
-   listed finding and did not regress any other formal rule. Use the
-   normal per-artifact `check-*.sh` script for your leaf class, plus
-   `scripts/check-cross-leaf.sh <prd-dir>`.
+   `scripts/check-cross-leaf.sh` to verify any edits you DID make
+   resolve the listed findings on your leaf and did not regress any
+   other formal rule. Use the normal per-artifact `check-*.sh`
+   script for your leaf class, plus `scripts/check-cross-leaf.sh
+   <prd-dir>`. If you ACKed no-op (canonical authority path),
+   re-running is still required to confirm no regression.
 3. **Loop on remaining findings on your leaf** (filter by `file:`
    matching your assigned leaf) until both checks PASS or 3
    consecutive iterations fail (same cap as standard pre-check).
+   A cross-leaf finding that persists because the SIBLING has not
+   yet been fixed is normal — the orchestrator iterates the whole
+   loop up to `lint_fixup_max_iterations`, so your sibling's fix-up
+   in iteration K may resolve a finding that still appears on your
+   leaf in iteration K-1.
 4. **ACK normally**: `OK trace_id=R<N>-LFX-<NNN> role=writer
    linked_issues= self_review_status=FULL_PASS fail_count=0`.
    Lint-Fixup Mode never emits a self-review archive — formal fixes
-   are auto-fixes (guide §4.1), not substantive blockers.
+   are auto-fixes (guide §4.1), not substantive blockers. The same
+   ACK shape is used whether you edited the leaf or ACKed no-op
+   (canonical authority path).
 5. **FORBIDDEN**: filing findings as issue files. Lint-fixup findings
    are NOT review-emitted issues — they live in dispatch context only
    and are not persisted under `.review/round-N/issues/`. The
