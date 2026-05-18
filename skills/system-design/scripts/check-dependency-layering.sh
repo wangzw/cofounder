@@ -364,8 +364,12 @@ for module_file in "${MODULE_FILES[@]}"; do
           || lower ~ /^###[[:space:]]+inbound\b/) {
         in_excluded=1; next
       }
-      # New bold-paragraph or H3 marker resets exclusion.
-      if ($0 ~ /^\*\*[A-Z]/ || $0 ~ /^### /) { in_excluded=0 }
+      # New bold-paragraph or H3 marker resets exclusion. Matched
+      # case-insensitively (via tolower) so that lowercase
+      # `**outbound:**` written after `**inbound:**` still exits
+      # excluded mode — without this the outbound block would be
+      # silently skipped.
+      if (lower ~ /^\*\*[a-z]/ || lower ~ /^### /) { in_excluded=0 }
       if (!in_excluded) print
     }
   ' "$module_file")

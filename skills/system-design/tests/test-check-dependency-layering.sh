@@ -120,6 +120,37 @@ write_module "M-002" "- M-001"
 assert_exit 0 "$CHECK" "$FIXTURE"
 teardown_fixture
 
+test_case "CR-X6: lowercase outbound marker after inbound still exits exclusion"
+# Regression: tolower-based inbound matching combined with case-sensitive
+# exit-marker check would leave in_excluded=1 forever for writers who use
+# lowercase headers, silently swallowing the outbound deps section.
+setup_fixture
+write_file "README.md" '# Design
+
+## Dependency Layering
+
+| Layer | Modules |
+|-------|---------|
+| 1 | M-001 |
+| 2 | M-002 |
+'
+write_file "modules/M-001-x.md" "---
+id: M-001
+---
+
+# M-001
+
+## Dependencies
+
+**inbound:**
+- M-002 — call site (must NOT trigger reverse-layer)
+
+**outbound:** none.
+"
+write_module "M-002" "- M-001"
+assert_exit 0 "$CHECK" "$FIXTURE"
+teardown_fixture
+
 test_case "CR-X6: 'Inbound:' bold marker also excluded"
 setup_fixture
 write_file "README.md" '# Design
