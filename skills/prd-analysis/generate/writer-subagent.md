@@ -339,6 +339,72 @@ duplicate the table to avoid drift.
 
 ---
 
+## Lint-Fixup Mode (orchestrator-invoked between fan-out and review)
+
+The orchestrator's Step 8d (pre-review lint loop — see `generate/from-scratch.md`
+and `generate/new-version.md`) dispatches writers in **Lint-Fixup Mode** when
+`scripts/run-checkers.sh` surfaces bundle-level formal findings after fan-out.
+These are mechanical inconsistencies no single writer could have detected during
+its own dispatch (sibling leaves were not yet on disk) — e.g. CR-PP06 dangling
+F-NNN / J-NNN references, CR-PP27 CLI flag underscore-vs-kebab conflicts, CR-PP27
+JSON-RPC error-code numeric assignment conflicts (see `scripts/check-cross-leaf.sh`).
+
+### Dispatch contract
+
+The dispatch prompt for a lint-fixup writer carries:
+
+- `trace_id` of the form `R<N>-LFX-<NNN>` (the `LFX` infix distinguishes
+  fix-up writers from regular writers in `dispatch-log.jsonl`).
+- The target leaf path the writer owns for this fixup (one leaf per
+  dispatch — orchestrator groups findings by `file:` before dispatch).
+- A `## Lint-Fixup Findings` section listing the formal-checker
+  findings against this leaf, copied verbatim from the JSON document
+  emitted by `run-checkers.sh`. Each finding carries `criterion_id`,
+  `description`, and `suggested_fix`.
+- Sibling-leaf paths referenced by any finding's `suggested_fix`
+  (read-only context — the writer Reads them to understand the
+  consistency target but DOES NOT edit them; the sibling's own
+  fix-up dispatch handles the other side if both need edits).
+
+### Behavior
+
+1. **Read the target leaf and listed sibling leaves.** Apply the
+   `suggested_fix` for every finding in the `## Lint-Fixup Findings`
+   list. Edits MUST stay on the target leaf — never edit siblings
+   (the orchestrator dispatches one fix-up per affected file).
+2. **Re-run the formal hard gate** for your leaf type AND
+   `scripts/check-cross-leaf.sh` to verify the edits resolve every
+   listed finding and did not regress any other formal rule. Use the
+   normal per-artifact `check-*.sh` script for your leaf class, plus
+   `scripts/check-cross-leaf.sh <prd-dir>`.
+3. **Loop on remaining findings on your leaf** (filter by `file:`
+   matching your assigned leaf) until both checks PASS or 3
+   consecutive iterations fail (same cap as standard pre-check).
+4. **ACK normally**: `OK trace_id=R<N>-LFX-<NNN> role=writer
+   linked_issues= self_review_status=FULL_PASS fail_count=0`.
+   Lint-Fixup Mode never emits a self-review archive — formal fixes
+   are auto-fixes (guide §4.1), not substantive blockers.
+5. **FORBIDDEN**: filing findings as issue files. Lint-fixup findings
+   are NOT review-emitted issues — they live in dispatch context only
+   and are not persisted under `.review/round-N/issues/`. The
+   orchestrator re-runs `run-checkers.sh` after each iteration; the
+   audit trail of which files needed fix-up is in
+   `dispatch-log.jsonl` (R<N>-LFX-* entries).
+
+### Difference from per-issue reviser
+
+A lint-fixup writer is NOT a reviser:
+
+| Aspect | Lint-Fixup Writer | Per-Issue Reviser |
+|--------|-------------------|-------------------|
+| Source of findings | `run-checkers.sh` (script) | LLM cross-reviewer (issue files) |
+| Input artifact | Inline finding list in dispatch | `.review/round-N/issues/I-NNN.md` |
+| Output side-effect | None beyond edits | Issue state transition (new → fixed) |
+| Trace_id infix | `LFX` | `R` |
+| When invoked | After fan-out, before review | After review, during revise |
+
+---
+
 ## Domain-Specific Generation Guidance
 
 ### Leaf Class: Journey File (`journeys/J-NNN-{slug}.md`)

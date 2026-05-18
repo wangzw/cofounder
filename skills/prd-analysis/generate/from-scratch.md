@@ -190,13 +190,77 @@ populated (or explicitly deferred via `null + Drift:`). Skipping
 this step therefore manifests as a Step 9 hard-gate failure rather
 than a silent pass.
 
+### Step 8d — Pre-Review Lint Loop (script-driven, cross-leaf cleanup)
+
+Per-leaf formal checks were already enforced inside each writer's
+Step-8 self-audit (writer-subagent.md "Formal pre-check"). Some
+formal rules are **bundle-level** and cannot be checked by any one
+writer in isolation — e.g. CLI flag underscore-vs-kebab consistency
+(`check-cross-leaf.sh` CR-PP27), JSON-RPC error-code numeric conflicts
+(CR-PP27), and dangling F-NNN / J-NNN references (CR-PP06). These
+fire only once the full fan-out is on disk.
+
+Run the bundle-level formal gate explicitly here, BEFORE entering the
+LLM-driven review pipeline. Findings at this step are mechanical
+inconsistencies that an LLM cross-reviewer would have caught at much
+higher cost (chaos round-1 I-007, I-036, I-066, I-067 are all this
+shape) — preempt them with a script-driven fix-up loop:
+
+```bash
+scripts/run-checkers.sh <prd-dir>
+```
+
+| Exit | Meaning | Next action |
+|------|---------|-------------|
+| 0    | Bundle is formally clean | proceed to Step 9 |
+| 1    | Bundle has formal finding(s) | enter the fix-up loop below |
+| 2    | Script-level error | HITL |
+
+**Fix-up loop** (max iterations: `lint_fixup_max_iterations` in
+`common/config.yml`, default `3`):
+
+For each iteration:
+
+1. Capture the JSON document on stdout after the `FOUND ...` summary
+   line. Group the `issues` array by `file:` field; findings whose
+   file is empty (`""`) or `(cross-leaf)` are global — assign them
+   to a synthetic file `(bundle)` for dispatch routing.
+
+2. For each affected file, dispatch ONE writer sub-agent
+   (`generate/writer-subagent.md`) in **Lint-Fixup Mode** (see that
+   prompt's "Lint-Fixup Mode" section). The dispatch prompt MUST
+   include:
+   - The target file path the writer owns for this fixup.
+   - The full list of findings tied to that file (criterion_id,
+     description, suggested_fix), copied verbatim from the JSON.
+   - For findings whose suggested_fix references sibling leaves
+     (e.g. CR-PP27 cross-leaf conflicts naming both files), the
+     sibling leaf path so the writer may Read it for context.
+   - `trace_id` of the form `R<N>-LFX-<NNN>` where `LFX` distinguishes
+     lint-fixup writers from regular writers in dispatch-log.
+
+3. After all fix-up writers ACK, re-run `scripts/run-checkers.sh`.
+   - Exit 0 → break, proceed to Step 9.
+   - Exit 1 → continue to next iteration.
+   - Exit 2 → HITL.
+
+4. After `lint_fixup_max_iterations` still exit 1: REFUSE — print the
+   remaining findings and surface to HITL. The user adjudicates
+   (e.g. some findings may be false positives, or the cross-leaf
+   conflict requires a design decision a writer cannot make alone).
+
+The orchestrator MUST NOT skip this step even when Step 8 ACKed every
+writer FULL_PASS — per-writer self-audit does not cover bundle-level
+rules. Skipping causes those findings to enter the (more expensive)
+LLM cross-reviewer cycle instead.
+
 ### Step 9 — Enter Review Loop
 
 Load `review/index.md` and execute the review-mode steps with
 `round=1`. The review pipeline handles formal hard gate (re-runs
 `scripts/run-checkers.sh` over the full bundle as a belt-and-suspenders
-check on top of each writer's per-leaf self-audit), cross-reviewer
-dispatch, summarizer, judge.
+check on top of each writer's per-leaf self-audit AND Step-8d's
+bundle-level fix-up loop), cross-reviewer dispatch, summarizer, judge.
 
 Verdict routing (per `review/index.md` Step 8):
 
