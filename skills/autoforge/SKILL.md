@@ -295,353 +295,127 @@ This step only applies when creating a new project from scratch. It initializes 
    ```
    Substitute `{worktree_path}` with the absolute primary-worktree path (`{worktree_root}/main`).
 
-## Step 2 — Phase Execution
+## Step 2 — Event-driven Execution Loop
 
-> **Load now:** `module/agent-prompt.md`, `module/developer-prompt.md`, `module/tester-prompt.md`, `module/reviewer-prompt.md`
-> **Load at phase integration test:** `integration/tester-prompt.md`
+> **Load now:** `module/agent-prompt.md`, `module/developer-prompt.md`, `module/tester-prompt.md`, `module/reviewer-prompt.md`, `integration/tester-prompt.md`
 
-Execute phases sequentially. Within each phase, execute modules in parallel.
+After Step 1 hands over, the Orchestrator enters an event-driven loop. It
+saturates two background-agent caps (Planners, Module Agents) plus
+neighborhood Integration Testers, processing completion notifications as
+they arrive.
 
-### Per-Module Flow
-
-For each module, spawn a **Module Agent** (second-level orchestrator) in an isolated git worktree. The Module Agent manages the Developer → Tester → Reviewer cycle internally.
-
-**Create worktree and branch before spawning the agent:**
+### Loop body
 
 ```
-# Variables
-worktree_root = {project-root}/../{project-dirname}-worktrees/autoforge-{design-dir-name}-{hash4}
-module_branch = autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
-module_worktree = {worktree_root}/p{n}-M-{id}-{slug}
+loop:
+  ready_plan = ready_set_planning(state)    # tier-2+ Planners
+  ready_exec = ready_set_execution(state)   # any tier whose closure is merged
 
-# Create worktree forked from feature branch
-git worktree add -b {module_branch} {module_worktree} autoforge/{design-dir-name}-{hash4}
+  while |inflight.planners| < scheduler.max_planners and ready_plan:
+    M = pop ready_plan          # priority: lower tier first, then revising > pending
+    spawn_planner(M, run_in_background=true)
+    run-state-update.sh ... set-plan-status M planning
+    run-state-update.sh ... inflight-add planners M
+
+  while |inflight.modules| < scheduler.max_modules and ready_exec:
+    M = pop ready_exec          # priority: needs_patch > lower tier > higher tier
+    spawn_module_agent(M, run_in_background=true)
+    run-state-update.sh ... set-exec-status M running
+    run-state-update.sh ... inflight-add modules M
+
+  if nothing in-flight and queues empty and human_gates.G3 not pending:
+    break   # go to Step 3
+
+  await any background-agent completion notification
+    OR scheduler.idle_timeout_minutes elapsed
+
+  process_result(returned_agent)   # see "Result handling" below
 ```
 
-**Before spawning, detect frontend draft source** (if the module has one):
+### Result handling
 
-Read the module design spec's UI Architecture section. If `Promotion action` is `Promote` or `Extend`, extract the `Draft path` (a repo-relative directory under PRD `architecture/tech-stack.md` → "Frontend Implementation Path"; the draft already lives in the project source tree, not under `{prd-dir}/`). This becomes `draft_source_path`. If `Promotion action` is `Rewrite`, or the module is backend / shared-library (no UI Architecture section), set `draft_source_path` to empty.
+When a **Planner** returns:
+- Check the plan file is present and well-formed (`run-checkers.sh ... --phase=plan --scope=module-M-{id}`).
+- If checker has `error`/`critical` findings: auto-re-dispatch up to 3 rounds; on 3rd failure, route to DECISION_REQUEST.
+- If conventions-additions present: rolling-merge it; if conflict detected, route to `CONVENTION_CONFLICT` revision.
+- `run-state-update.sh ... set-plan-status M-{id} planned`
+- `run-state-update.sh ... inflight-remove planners M-{id}`
 
-**Then spawn the Module Agent in the worktree directory:**
+When a **Module Agent** returns:
+- `inflight-remove modules M-{id}`
+- On STATUS = APPROVE: ff-merge the module branch, update `set-exec-status M-{id} integrating`, spawn neighborhood Integration Tester for M-{id} in background.
+- On STATUS = CANCELLED (during freeze): `set-exec-status M-{id} cancelled`; record commit chain in `revisions/{seq}/cancelled-modules.json`.
+- On STATUS = DECISION_REQUEST: pause loop, present to human, apply choice, re-dispatch.
+- On STATUS = PLAN_REVISION_NEEDED: enter §5 revision flow.
 
+When an **Integration Tester** returns:
+- On PASS: `set-exec-status M-{id} merged` — this unblocks downstream modules.
+- On FAIL: classify (own bug / upstream bug / design gap) and run the corresponding fix path:
+  - **Own bug:** Spawn Developer in M's worktree (preserved from `integrating`). After fix, re-run Integration Tester with `is_rerun: true`.
+  - **Upstream bug:** Mark the upstream module `set-exec-status M-{upstream} needs_patch`. Touch ready set — downstreams become non-ready. Re-open upstream worktree, spawn Module Agent in `needs_patch` mode. Cascade.
+  - **Design gap:** Trigger `PLAN_REVISION_NEEDED` per §5.
+- Bounded to 10 fix rounds, then DECISION_REQUEST.
+
+### Neighborhood Integration Tester spawn
+
+When spawning the Integration Tester:
 ```
 Agent({
-  description: "Module Agent for M-{id}: {module-name}",
+  description: "Neighborhood Integration Tester for M-{id}",
+  prompt: <fill in integration/tester-prompt.md>,
   model: "sonnet",
   mode: "auto",
-  prompt: "You are a Module Agent implementing M-{id}: {module-name}.
-    Your working directory is: {module_worktree}
-    [Paste full contents of module/agent-prompt.md with parameters filled in]
-
-    Parameters:
-    - module_design_path: {path}
-    - module_plan_path: {path}
-    - design_readme_path: {path}
-    - report_dir: docs/raw/plans/{plan-dir}/reports/
-    - feature_branch: autoforge/{design-dir-name}-{hash4}
-    - module_branch: {module_branch}
-    - worktree_path: {module_worktree}
-    - conventions_path: docs/raw/plans/{plan-dir}/plans/conventions.md
-    - project_coding_standards: {unified conventions from: (1) CLAUDE.md/AGENTS.md overrides, (2) design README Implementation Conventions + Key Technical Decisions, (3) PRD architecture.md developer convention sections — merged in priority order, or 'none'}
-    - promotion_action: {Promote | Extend | Rewrite | None — None for backend/shared-library modules}
-    - draft_source_path: {extracted draft path, or empty if Promotion action = Rewrite / None}
-    - stall_threshold: 3
-    - hard_ceiling: 20
-    - developer_prompt_path: {absolute path to skills/autoforge/module/developer-prompt.md}
-    - tester_prompt_path: {absolute path to skills/autoforge/module/tester-prompt.md}
-    - reviewer_prompt_path: {absolute path to skills/autoforge/module/reviewer-prompt.md}"
+  run_in_background: true
 })
 ```
 
-Module Agents within the same phase are spawned in parallel. See `module/agent-prompt.md` for the complete instructions.
+Parameters:
+- `target_module`: M-{id}
+- `closure_module_ids`: state['modules'][M]['closure']
+- `neighborhood_design_paths`: design specs for {M} ∪ closure
+- `already_merged_modules`: all merged modules NOT in closure (informational)
+- `worktree_path`: {worktree_root}/main
+- `conventions_path`, `project_coding_standards`, `is_rerun`: as before
+- `discipline_path`: absolute path to `skills/autoforge/delivery-discipline.md`
 
-### Module Agent Internal Flow
+The Integration Tester writes its report to `reports/integration-M-{id}.md`.
 
-```mermaid
-flowchart TD
-  dev["Developer\nImplement code + unit tests"]
-  test["Tester\nWrite/update integration tests\n+ run all"]
-  review["Reviewer\nSpec compliance + code quality"]
-  done["Return: APPROVE"]
-  plancheck{"Plan issue\nflagged?"}
-  planrev["Return: PLAN_REVISION_NEEDED\nOrchestrator revises plan"]
-  progress{"Making progress?\n(fewer failures)"}
-  stall{"Stalled ≥ 3\nconsecutive rounds?"}
-  replanned{"Already\nreplanned?"}
-  replan["Replan Mode\nRe-analyze, try different strategy"]
-  diagnose["Diagnosis Mode\nRoot cause + 2-3 options"]
-  decision["Return: DECISION_REQUEST\nHuman picks option"]
+### Idle-timeout handling
 
-  dev --> plancheck
-  plancheck -- no --> qgate
-  qgate{"Quality gate\nlint, build, type-check"}
-  qgate -- pass --> test
-  qgate -- fail --> dev
-  plancheck -- yes --> planrev
-  test -- FAIL --> progress
-  progress -- yes --> dev
-  dev -- "fix + retry" --> test
-  progress -- no --> stall
-  stall -- no --> dev
-  stall -- yes --> replanned
-  replanned -- no --> replan
-  replan -- "reset stall, continue" --> dev
-  replanned -- yes --> diagnose
-  diagnose -- "quality trade-off" --> decision
-  diagnose -- "viable option found" --> dev
-  test -- PASS --> review
-  review -- REJECT --> progress
-  dev -- "retry from review" --> review
-  review -- APPROVE --> done
-```
+When the loop wakes from `idle_timeout_minutes` without a completion notification:
+1. Run `bash skills/autoforge/scripts/check-idle-timeout.sh <plan-dir>`.
+2. If CR-AF32 fires: present the dump to the human with three options:
+   - "Investigate this inflight agent" (gives Orchestrator commands to inspect specific worktree)
+   - "Force-remove from inflight" (removes the entry; next loop iteration respawns)
+   - "Terminate run"
+3. Continue loop after human input.
 
-**Quality gate (between Developer and Tester):**
+### Status updates on cadence
 
-After Developer completes and before Tester runs, the Module Agent executes the project's CI gate commands from Development Workflow conventions (lint, build, type-check). If any fail, the Developer is given the failure output and must fix before proceeding. This catches formatting, import, and type errors early before test execution. If the Development Workflow specifies race detection, the Module Agent adds the race detection flag to test commands in subsequent Tester runs.
+The Orchestrator commits `run-status.md` + DAG mermaid on the configured cadence (`scheduler.status_commit_every_k` transitions or `scheduler.status_commit_every_seconds` seconds, whichever comes first). Plan-state-internal events (single `set-plan-status` calls) update the file but do not necessarily commit each time.
 
-**Adaptive retry model:**
+Implementation: a counter in the orchestrator's session; when threshold met, `git add run-status.md README.md && git commit -m "docs(plan): update run-status"`.
 
-The Module Agent continues iterating as long as **measurable progress** is being made (fewer test failures or fewer required review findings each round). The goal is autonomous completion — human intervention is a last resort, not a quick fallback.
+### Session resume
 
-| Condition | Action |
-|-----------|--------|
-| Sub-agent flags PLAN_ISSUE (fundamental plan error) | Module Agent returns **PLAN_REVISION_NEEDED** — Orchestrator revises the plan and restarts the module |
-| Sub-agent flags PLAN_ISSUE (minor deviation) | Module Agent notes the deviation and continues with a local workaround |
-| Progress (fewer failures than previous round) | Continue — spawn Developer with fix context |
-| No progress for 1-2 rounds | Continue — may need more iterations |
-| No progress for 3 consecutive rounds | Enter **Replan Mode** — agent re-analyzes the problem and tries a fundamentally different approach (not just a different fix, a different strategy) |
-| Replanned approach also stalls (3 more non-progress rounds) | Enter **Diagnosis Mode** — if a reasonable option exists that maintains quality, try it autonomously; if remaining options involve quality trade-offs, return DECISION_REQUEST |
-| Hard ceiling (20 total retries) | Enter **Diagnosis Mode** → return DECISION_REQUEST |
+If this Orchestrator session dies and is restarted with the same plan-dir:
+1. `run-state.json` already exists. Read it.
+2. Every entry in `inflight.*` is by definition orphaned (the harness does not reconnect to dead agents). For each:
+   - Modules → `set-exec-status M-{id} cancelled`. Append a `resumed-from-orphan` marker to `revisions/auto-warnings.md`. Next loop iteration will respawn from ready set.
+   - Planners → `set-plan-status M-{id} pending`. (Plan file may or may not exist; the next Planner spawn will overwrite as needed.)
+   - Integration Testers → simply `inflight-remove`; next module-merge event will respawn.
+3. Resume the main loop normally.
 
-**Replan Mode** is the critical differentiator: when the current approach isn't working, the agent doesn't ask for help — it steps back, re-reads the design spec, identifies what's fundamentally wrong, and devises an alternative implementation strategy. Only after exhausting reasonable alternatives does it involve the human, and only when the choice involves genuine trade-offs.
+### Termination
 
-See `module/agent-prompt.md` for the complete Replan Mode, Diagnosis Mode, and decision request logic.
+When the loop breaks:
+- All modules: `plan_status=planned` AND `exec_status=merged`.
+- All inflight buckets empty.
+- No revision in progress.
 
-### Developer Role
+Run `bash skills/autoforge/scripts/run-checkers.sh <plan-dir> --source-root <worktree-root>/main --phase=execute --json-only`. Resolve any `error`/`critical` findings before proceeding to Step 3.
 
-```
-Input:
-  - Module plan file (plan-M-xxx.md)
-  - Module design spec (M-xxx.md)
-  - Worktree path (isolated workspace)
-  - [On retry from Tester]: failure-details (which tests failed, error messages, test file paths)
-  - [On retry from Reviewer]: review-M-{id}.md (required fixes with severity)
-
-Output:
-  - Implemented code + unit tests in worktree
-  - Commit on worktree branch with message: "feat(M-{id}): implement {description}"
-  - developer-notes.md in report directory (implementation notes, decisions made, issues encountered)
-
-Responsibilities:
-  - Follow plan steps sequentially
-  - Write unit tests covering module internal logic
-  - Ensure all unit tests pass before handoff
-  - On Tester retry: read failure details, fix source code (NOT test files), commit with "fix(M-{id}): {description}"
-  - On Reviewer retry: address required review comments only, commit with "fix(M-{id}): address review feedback"
-```
-
-### Tester Role
-
-```
-Input:
-  - Module design spec (M-xxx.md) — for acceptance criteria and edge cases
-  - Worktree path (to read implemented code)
-  - Changed files list
-  - developer-notes.md
-
-Output:
-  - Integration test code committed: "test(M-{id}): add/update integration tests"
-  - test-report.md in report directory (overwritten each round — Module Agent preserves history in retry_history)
-  - [On failure] failure-details.md in report directory (overwritten each round)
-
-Responsibilities:
-  Every run (first or subsequent):
-    - Read module design spec's acceptance criteria and edge cases
-    - Read the current code and developer notes
-    - If no integration tests exist yet: write them from scratch
-    - If integration tests already exist: review them against the current code
-      - Tests still valid → keep as-is
-      - Public interface changed → update affected tests
-      - New behaviors introduced (e.g., after Replan) → add new tests
-      - Tests testing removed/changed behavior → update or remove
-    - Run ALL tests (unit + integration)
-    - If all pass: return PASS with test-report.md
-    - If any fail: return FAIL with failure-details.md
-```
-
-### Reviewer Role
-
-```
-Input:
-  - Module design spec (M-xxx.md)
-  - Worktree path (to read code)
-  - test-report.md
-
-Output:
-  - review-result: APPROVE or REJECT
-  - review-M-{id}.md in report directory (overwritten each round): findings table with severity (required/suggested)
-
-Review Dimensions:
-  - Spec compliance: does code implement all interfaces and behaviors defined in design?
-  - Code quality: naming, structure, error handling, no obvious bugs
-  - Test sufficiency: do tests cover design's acceptance criteria and edge cases?
-  - No scope creep: code doesn't add unrequested functionality
-```
-
-### After All Modules in Phase Complete
-
-1. **Collect results** — all Module Agents in the phase run in parallel and return APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED. Subagents cannot interact with the user directly — they return structured results to the Orchestrator, which handles all human communication.
-2. **Handle plan revisions** — if any module returned PLAN_REVISION_NEEDED, route by severity:
-
-   **a. PLAN_TEXT_ERROR (minor)** — this module's plan has incorrect text (wrong signature, wrong path):
-   - Spawn a Planner agent to revise this module's plan
-   - Commit: `docs(plan): re-plan from phase {n} — {reason}`
-   - Restart the Module Agent (reset retry state)
-
-   **b. UPSTREAM_BUG / UPSTREAM_INSUFFICIENT / INTERFACE_REDESIGN (significant)** — the issue cannot be resolved by changing this module alone:
-   - **Pause execution** of the current phase
-   - **Return to Step 1 (Re-planning)** with the following additional context:
-     - The issue report from the Module Agent (ISSUE_TYPE, evidence, suggested fix)
-     - Current project state: which modules are already implemented and merged, which are in progress
-     - The actual code on the feature branch (Planners read the real code, not just the old plans)
-   - Re-planning follows the same phased-parallel process as Step 1 (phases serialized, Planners within a phase in parallel, dependency-closure context) but starts from the current state:
-     - Planners re-evaluate ALL plans (completed and remaining), grouped into phases by the DAG
-     - Each Planner still receives only its dependency closure; for already-merged upstream modules in that closure, the Planner reads the actual source code (authoritative) in addition to the old plan
-     - For already-implemented modules that need changes: plan produces fix/enhancement steps
-     - For not-yet-implemented modules: plan is revised to account for the new reality
-     - `conventions.md` is updated if needed via the same `conventions-additions/` flow
-   - Commit revised plans: `docs(plan): re-plan from phase {n} — {reason}`
-   - **Human review gate** — present the re-plan review summary (see Step 1, item 3) with emphasis on what changed and why. The user should be able to understand the re-plan without re-reading unchanged plans.
-   - After approval: resume execution from the appropriate phase, using `--execute` mode logic to determine which modules need re-execution
-
-   **c. UPSTREAM_NOT_IMPLEMENTED (autonomous, no human gate by default)** — the dependency this module needs has no implementation yet, even though it is in scope of the design / PRD. **Per delivery-discipline §N, the orchestrator's job is to make the missing capability exist this round, not to abandon the requesting module.** Do NOT bubble this up to the user as a DECISION_REQUEST unless steps below also fail.
-   - **Identify the owner module** of the missing capability:
-     - If the design names a module that owns this surface, that module is the owner.
-     - If no module owns it, dispatch a `heavy`-tier Planner to allocate the surface to the most appropriate module (or split a new module M-NEW), commit the revised plan with `docs(plan): allocate {capability} to M-{id} for {requester}`, and treat that module as the owner for the rest of this step.
-   - **Schedule the owner module before the requester resumes:**
-     - If the owner module is in an earlier phase that already completed: re-open it in `--execute` mode (recreate worktree, dispatch Module Agent with the augmented plan that adds the missing surface), wait for APPROVE.
-     - If the owner module is in the same phase: defer the requester's resumption until the owner completes; the owner is run with full Module Agent pipeline (Developer → Tester → Reviewer → discipline gate).
-     - If the owner module would have been later: pull it forward into the current phase by adding it to the active phase's module set; the DAG is recomputed for downstream phases.
-   - **Once the owner returns APPROVE**: restart the requester Module Agent with the same plan (the `module-state-M-{requester-id}.json` was preserved on PLAN_REVISION_NEEDED). The requester's Developer reads the now-implemented upstream and proceeds.
-   - **Forbidden orchestrator responses to UPSTREAM_NOT_IMPLEMENTED:**
-     - Returning APPROVE for the requester with a stub of the missing capability.
-     - Marking the requester's relevant ACs `NOT_COVERED` and proceeding — these are in-scope, not deferrable (delivery-discipline §L).
-     - Pausing the requester indefinitely while continuing to merge other modules; the dependency MUST be resolved within this phase.
-   - Only escalate to DECISION_REQUEST after the Planner has tried at least one allocation and the owner module hits its own DECISION_REQUEST (genuine ambiguity), OR the missing capability is genuinely outside the design scope (in which case it is `UPSTREAM_INSUFFICIENT` and routes to b above).
-3. **Handle decision requests** — if any module returned DECISION_REQUEST:
-   - Orchestrator presents the module's diagnosis and proposed options to the user (the Orchestrator runs in the main conversation and can communicate with the user directly)
-   - Human picks an option (or provides their own instruction)
-   - Spawn a Developer agent (Variant 3 — Retry From Reviewer Rejection, or a custom prompt matching the chosen option) in the module's worktree with the chosen option as instructions. Pass: `module_design_path`, `module_plan_path`, `conventions_path`, and `project_coding_standards` as you would for any Developer spawn.
-   - Spawn Tester to verify the fix (Tester will review/update tests as needed)
-   - If pass → merge as normal; if fail → present updated diagnosis with new options to human; repeat until resolved or human chooses to skip/abort
-3.5. **Phase-boundary audit gate (MANDATORY before merge).** Run:
-
-   ```
-   bash skills/autoforge/scripts/run-checkers.sh {plan_dir} \
-        --source-root {worktree_root}/main \
-        --phase=execute \
-        --json-only
-   ```
-
-   `--json-only` routes the human-readable banner to stderr so stdout is a pure JSON document — pipe straight into `python3 -c "import sys,json; d=json.load(sys.stdin); …"` without a banner-skip dance.
-
-   `--phase=execute` enables `phase-audit.sh` in addition to the always-on plan-pollution check. The audit emits:
-
-   - **CR-AF30 worktree-cleanliness** — a per-module worktree (or the primary worktree) has uncommitted changes. The Module Agent / Integration Tester / Acceptance Tester / Developer either crashed mid-edit (the 2026-05-16 castworks d3 Phase-7 incident — a Module Agent edited five files and never returned a `tool_result`) or honoured neither §H nor the Pre-Return Verification block in its prompt.
-   - **CR-AF31 stale-module-branch** — a per-module branch matching `autoforge/<run>/p<N>/M-*` exists locally without a worktree and is not yet an ancestor of `autoforge/<run>/main`. Indicates the cleanup step from a prior phase silently failed or the phase was abandoned before merge.
-
-   **Any `error`/`critical` finding BLOCKS the merge in step 4** — do not proceed. Routing per finding:
-
-   - **CR-AF30 in a per-module worktree of an APPROVE module** — the Module Agent violated its own contract; re-dispatch a "Module Agent finishing pass" (model `sonnet`) with the worktree path and the audit JSON, instructing it to commit or `git stash push -u -m "rescued from <agent>"` the in-flight files, then re-emit STATUS. Never `git checkout --` the files; the change is the only record of what the crashed agent did. Re-run this audit after the pass.
-   - **CR-AF30 in a per-module worktree of a DECISION_REQUEST / PLAN_REVISION_NEEDED module** — expected; surface the dirty files to the human as part of the decision context, do not auto-handle.
-   - **CR-AF30 in the primary worktree** — the most recent Integration Tester / Acceptance Tester / Developer left a report or fix uncommitted. Read the diff; if it is the report this phase just produced, commit it with the documented message (`docs(plan): commit pending integration phase-{n} report` or similar); otherwise escalate.
-   - **CR-AF31** — never auto-delete. Run `git log <branch> --not <feature-branch> --oneline` to see what is on the orphan branch; present to the human with three options: re-create worktree + resume Module Agent / merge directly if the commits look valid / `git branch -d` (plain `-d`, never `-D`).
-
-   Do not proceed to step 4 until the audit emits PASS. If a single re-dispatch pass still leaves CR-AF30 findings (two consecutive failed audits), STOP and escalate to the human — this is the same pattern as a Module Agent stuck in Diagnosis Mode.
-4. **Merge module branches** — in the primary worktree (already on the feature branch), for each approved module sequentially, run the canonical module-merge command sequence documented in the **Git Strategy → Merge Rules** section below (fast-forward merge; on conflict rebase the module branch first then retry).
-5. **Cleanup module worktrees and branches** — for each merged module:
-   ```
-   git worktree remove {worktree_root}/p{n}-M-{id}-{slug}
-   git branch -d autoforge/{design-dir-name}-{hash4}/p{n}/M-{id}-{slug}
-   ```
-   For modules with DECISION_REQUEST or PLAN_REVISION_NEEDED: keep worktree alive for fix/restart process.
-6. **Phase integration test** — spawn **Integration Tester** agent in the primary worktree:
-   ```
-   Agent({
-     description: "Integration Tester for phase {n}",
-     prompt: <fill in integration/tester-prompt.md with parameters below>,
-     model: "sonnet",
-     mode: "auto"
-   })
-   ```
-
-   **Integration Tester parameters:**
-
-   | Parameter | Source |
-   |-----------|--------|
-   | `phase_number` | Current phase number |
-   | `feature_branch` | `autoforge/{design-dir-name}-{hash4}` |
-   | `design_readme_path` | Design README.md path from Step 0 |
-   | `module_design_paths` | Design specs for all modules in this phase |
-   | `module_ids` | List of module IDs in this phase |
-   | `previous_phase_modules` | Module IDs from all previous phases |
-   | `report_dir` | `docs/raw/plans/{plan-dir}/reports/` |
-   | `conventions_path` | `docs/raw/plans/{plan-dir}/plans/conventions.md` |
-   | `project_coding_standards` | Unified project conventions (same as passed to Module Agents) |
-   | `is_rerun` | `false` on first run; `true` when re-running after fix cycle |
-   | `discipline_path` | Absolute path to `skills/autoforge/delivery-discipline.md` (the shared delivery-discipline ruleset; same value passed to every sub-agent) |
-
-   See `integration/tester-prompt.md` for the complete prompt template.
-
-   **Integration test fix cycle:** If integration tests fail, spawn a **Developer** agent in the primary worktree. Pass `{worktree_path}` (= `{worktree_root}/main`) as a structured parameter — the Developer MUST `cd` into it as the very first action; without this guard, every source-file Write below could silently commit to the project's default branch (the M-013 failure mode, expanded blast radius because this Developer commits code, not just plan docs — and CR-AF29 only scans plan-dir, not the source tree).
-
-   ~~~~
-   You are a Developer fixing integration test failures in phase {n}.
-
-   ## Setup (MANDATORY — do this before reading anything)
-
-   ```
-   cd {worktree_path}
-   pwd                                # MUST print {worktree_path}
-   git rev-parse --abbrev-ref HEAD    # MUST start with "autoforge/" (the feature branch)
-   git rev-parse --show-toplevel      # MUST equal {worktree_path}
-   ```
-
-   If any check fails, abort with a FAIL message naming the discrepancy. Do
-   NOT proceed: relative-path Writes and commits below would land on the
-   project's default branch, and the source-tree pollution would not be
-   caught by CR-AF29 (which only scans plan-dir).
-
-   ## Failure Context
-   {paste failures section from integration report: test names, error messages, modules involved}
-
-   ## Your Task
-   - Read the failing integration tests to understand what's expected
-   - Read the design specs for the involved modules: {module_design_paths for involved modules}
-   - Fix the source code to make the integration tests pass
-   - Do NOT modify the integration test files
-   - Run all tests (unit + module-integration + phase-integration) to verify
-   - Commit with message: "fix(p{n}): {brief description}"
-
-   ## Inputs
-   - Project conventions: {conventions_path}
-
-   ## Rules
-   - Fix the minimum necessary — do not refactor unrelated code
-   - If the fix requires changes across multiple modules, make them in a single commit
-
-   ## Project Coding Standards
-
-   {project_coding_standards}
-   ~~~~
-
-   Re-run integration tests after each fix (with `is_rerun: true` — reviews and updates existing tests as needed).
-
-   Continue fix cycles as long as progress is being made (fewer failing tests each round) up to a maximum of **10 fix rounds**. If stalled for 3 consecutive rounds without progress, re-analyze the failure pattern and try a different approach. If still blocked after 10 rounds or after exhausting reasonable approaches, request human decision with the diagnosis and proposed options.
-
-7. **Update status** — update plan README.md status table, commit: `docs(plan): update status after phase-{n}`
-8. **Update design doc** — update Module Index `Impl` column for completed modules (`—` → `Done`), update design-level Status if needed (Finalized → Implementing). Commit: `docs(design): update impl status after phase-{n}`
-9. **Proceed to next phase**
+**Step 2 → Step 3 gate:** Loop terminated cleanly (no outstanding revision; `check-scheduler-state.sh` PASS).
 
 ## Step 3 — PRD Acceptance Validation
 
