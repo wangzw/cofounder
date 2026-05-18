@@ -275,4 +275,59 @@ out_stdout=$("$SCRIPT" "$plan" --source-root "$src_clean" 2>/dev/null) && rc=0 |
 assert_exit_code 0 "$rc"
 assert_stdout_contains "PASS" "$out_stdout"
 
+# --- --phase=execute + run-state.json wires CR-AF32/AF33 -----------------
+# Regression test: run-checkers.sh must dispatch check-scheduler-state.sh
+# and check-idle-timeout.sh when --phase=execute and run-state.json exists.
+# We inject an inflight module with no matching worktree to trigger CR-AF33.
+rs_repo=$(mktempdir); rs_plan=$(mktempdir)
+mkdir -p "$rs_plan/plans" "$rs_plan/reports"
+cp "$plan/README.md" "$rs_plan/README.md"
+# Build a minimal git repo so phase-audit and plan-pollution don't error.
+(
+  cd "$rs_repo"
+  git init -q -b main
+  git config user.email t@example.com; git config user.name t
+  echo seed > seed.txt; git add seed.txt; git commit -q -m seed
+  git branch autoforge/feature
+)
+# Initialise run-state.json via the Python library, then inject an inflight
+# module (no matching worktree exists -> CR-AF33 must fire).
+python3 - <<PYEOF
+import sys
+sys.path.insert(0, '$DIR/../scripts/lib')
+from run_state import create_initial_state, save_state
+modules = [{'id': 'M-001', 'deps': []}]
+s = create_initial_state(modules)
+s['inflight']['modules'] = ['M-001']
+save_state('$rs_plan/run-state.json', s)
+PYEOF
+
+start_test "--phase=execute with inflight module -> CR-AF33 fires (exit 1)"
+rs_out=$("$SCRIPT" "$rs_plan" --source-root "$rs_repo" --phase=execute --json-only 2>/dev/null) && rs_rc=0 || rs_rc=$?
+assert_exit_code 1 "$rs_rc" "expected exit 1 from CR-AF33 finding; out=$rs_out"
+start_test "  CR-AF33 present in --json-only stdout"
+if printf '%s' "$rs_out" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ids = [i.get('criterion_id') for i in d.get('issues', [])]
+assert 'CR-AF33' in ids, f'CR-AF33 not in {ids}'
+" 2>/dev/null; then
+  pass
+else
+  fail "CR-AF33 not found in JSON output: '$rs_out'"
+fi
+
+# Guard: without run-state.json the dispatches must NOT fire (no false positives).
+no_rs_plan=$(mktempdir); mkdir -p "$no_rs_plan/plans" "$no_rs_plan/reports"
+cp "$plan/README.md" "$no_rs_plan/README.md"
+start_test "--phase=execute without run-state.json -> no scheduler-state/idle-timeout (exit 0)"
+no_rs_out=$("$SCRIPT" "$no_rs_plan" --source-root "$src" --phase=execute --json-only 2>/dev/null) && no_rs_rc=0 || no_rs_rc=$?
+assert_exit_code 0 "$no_rs_rc" "no run-state.json should not trigger CR-AF32/AF33; out=$no_rs_out"
+start_test "  no CR-AF33 in output when run-state.json absent"
+if printf '%s' "$no_rs_out" | grep -qF "CR-AF33"; then
+  fail "CR-AF33 appeared despite missing run-state.json"
+else
+  pass
+fi
+
 summary

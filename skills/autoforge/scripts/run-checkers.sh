@@ -333,6 +333,20 @@ if phase in ("execute", "accept", "delivery-tag"):
          "--source-root", source_root],
     ))
 
+# Scheduler-state and idle-timeout: execute phase only. These complement
+# phase-audit by guarding the run-state.json side rather than the
+# git/worktree side. Skip when run-state.json is absent (older runs).
+if phase in ("execute",) and os.path.isfile(os.path.join(plan_dir, "run-state.json")):
+    dispatches.append((
+        "scheduler-state",
+        [os.path.join(script_dir, "check-scheduler-state.sh"), plan_dir,
+         "--source-root", source_root],
+    ))
+    dispatches.append((
+        "idle-timeout",
+        [os.path.join(script_dir, "check-idle-timeout.sh"), plan_dir],
+    ))
+
 # E2E coverage. Runs only when acceptance.md exists OR when delivery-tag
 # phase is on, AND we're not in plan/execute (where N-1's acceptance.md
 # would otherwise drag a stale e2e record into the gate). Reasoning:
