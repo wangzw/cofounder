@@ -234,7 +234,7 @@ Track progress in memory AND persist to `{report_dir}/module-state-M-{id}.json` 
 
 Each `retry_history` entry: `{round, action, result, metric_before, metric_after, key_details}`. `key_details` should include: failing test names, error messages, review findings — enough for Replan/Diagnosis to analyze patterns.
 
-**Persistence model:** The Module Agent reads `module-state-M-{id}.json` once at startup to recover state from a prior session interruption. During execution, state is maintained in memory and written to the JSON file after every state change (sub-agent completion, stall count update, mode transition). On return (APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED), the final state is written before exiting. This ensures the `--execute` mode can recover the module's exact state if the session is interrupted.
+**Persistence model:** The Module Agent reads `module-state-M-{id}.json` once at startup to recover state from a prior session interruption. During execution, state is maintained in memory and written to the JSON file after every state change (sub-agent completion, stall count update, mode transition). On return (APPROVE, DECISION_REQUEST, PLAN_REVISION_NEEDED, or CANCELLED), the final state is written before exiting. This ensures the `--execute` mode can recover the module's exact state if the session is interrupted.
 
 **On startup**, check if `{report_dir}/module-state-M-{id}.json` exists:
 - If yes → load state from file (resume from previous session)
@@ -272,6 +272,33 @@ elif total_retries >= hard_ceiling:
 ```
 
 **Stall count reset:** When measurable progress occurs (strictly fewer failures than the previous round), `stall_count` resets to 0 unconditionally. This is a hard reset — progress always restarts the stall counter regardless of its current value.
+
+## Resumption from `needs_patch`
+
+If the Orchestrator spawns you with the `needs_patch` flag set (passed as a
+spawn parameter or inferred from the worktree being pre-populated with
+prior commits on a module branch), your task is to apply a targeted patch
+to already-merged code rather than implement the module from scratch.
+
+Inputs in this mode:
+- `patch_reason`: a short paragraph explaining what triggered the patch
+  (typically "downstream module M-{id} required interface change X" or
+  "neighborhood integration test for M-{id} found upstream bug Y").
+- `patch_steps`: 1-N concrete change steps written by the Planner during
+  the revision flow, appended to the existing module plan under a
+  `## Patch Steps (revision-{seq})` heading. Read these in addition to
+  the original plan steps.
+
+Flow:
+1. Run normal Setup verification (cd to worktree, confirm branch).
+2. Read `patch_steps` from the plan file.
+3. Skip the "Implementation from scratch" step. Spawn Developer with
+   a Variant-3-style prompt (review fix) targeting `patch_steps`.
+4. Run Quality Gate → Tester → Reviewer per the normal cycle.
+5. Return APPROVE / DECISION_REQUEST / PLAN_REVISION_NEEDED as usual.
+
+The Orchestrator will re-run the neighborhood Integration Tester for this
+module after merge.
 
 ## Replan Mode
 
@@ -350,12 +377,13 @@ Before returning, write the structured return data to a file so it survives sess
 - **On DECISION_REQUEST**: write the full diagnosis + options + retry history to `{report_dir}/decision-request-M-{id}.md`
 - **On PLAN_REVISION_NEEDED**: write the full issue report + evidence + suggested fix to `{report_dir}/plan-revision-M-{id}.md`
 - **On APPROVE**: no additional file needed (test-report + review are sufficient)
+- **On CANCELLED**: no additional file needed; `module-state-M-{id}.json` already captures the final in-progress state
 
 This ensures the Orchestrator can reconstruct the return data from files if the session is interrupted between the Module Agent returning and the Orchestrator processing the result.
 
 ## Final Commit
 
-Before returning (APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED), commit all report files in `{report_dir}`:
+Before returning (APPROVE, DECISION_REQUEST, PLAN_REVISION_NEEDED, or CANCELLED), commit all report files in `{report_dir}`:
 
 ```
 for f in {report_dir}/developer-notes-M-{id}.md {report_dir}/test-report-M-{id}.md {report_dir}/review-M-{id}.md {report_dir}/failure-details-M-{id}.md {report_dir}/decision-request-M-{id}.md {report_dir}/plan-revision-M-{id}.md {report_dir}/module-state-M-{id}.json; do [ -f "$f" ] && git add "$f"; done
@@ -368,7 +396,7 @@ Note: only stage files that actually exist — most files are only created on sp
 
 This is the contract that the parent Orchestrator's phase-audit gate (CR-AF30 in `scripts/phase-audit.sh`) enforces structurally. Skipping it makes the merge gate trip and the Orchestrator re-dispatches you with the audit JSON; doing it correctly here saves a round-trip.
 
-**Before emitting any STATUS line** (APPROVE, DECISION_REQUEST, or PLAN_REVISION_NEEDED), run:
+**Before emitting any STATUS line** (APPROVE, DECISION_REQUEST, PLAN_REVISION_NEEDED, or CANCELLED), run:
 
 ```
 cd {worktree_path}
@@ -398,6 +426,22 @@ Branch on the output:
 4. **Non-empty and you cannot classify the changes** — do **not** discard them with `git checkout --`. Return `DECISION_REQUEST` with `STALLED_AT: pre-return-verification` and the `git status` + `git diff --stat` output in the DIAGNOSIS block. The Orchestrator will route to a human.
 
 The rule is: a clean worktree is a load-bearing precondition for STATUS. Violating it is the exact failure mode that produced the 2026-05-16 castworks d3 Phase-7 incident, where a Module Agent appeared to return APPROVE while leaving five uncommitted files behind; the merge would have silently lost them.
+
+## On Cancellation by the Orchestrator
+
+If the Orchestrator signals a freeze (`run-state.json.frozen_at != null`)
+while you are running, **do NOT discard your current commits**. The
+revision flow expects to inspect your worktree state. Specifically:
+- Complete the current sub-agent (Developer / Tester / Reviewer) if it has
+  already started. Do not begin a new sub-agent.
+- Run the Pre-Return Verification — commit any uncommitted in-flight
+  files using the normal conventional-commit format.
+- Persist `module-state-M-{id}.json` with the final state.
+- Return STATUS = CANCELLED (a new return value) instead of APPROVE.
+
+The Orchestrator records your CANCELLED return and your commit chain in
+`revisions/{seq}/cancelled-modules.json`. The revision flow's R5 step
+decides whether to resume from your commits or reset.
 
 ## Return Format
 
@@ -475,4 +519,15 @@ WORK_DONE:
   {what was already implemented before the issue was detected — list of committed files}
 
 REPORTS: {report_dir}/developer-notes-M-{id}.md
+```
+
+**On CANCELLED:**
+
+```
+STATUS: CANCELLED
+MODULE: M-{id} {module-name}
+CANCELLED_AFTER: {Developer / Tester / Reviewer / none — sub-agent not yet started}
+COMMITS: {number of commits on this branch at time of cancellation}
+WORKTREE: {worktree_path}
+MODULE_STATE: {report_dir}/module-state-M-{id}.json
 ```
