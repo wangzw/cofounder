@@ -35,6 +35,40 @@ You will receive these parameters from the Orchestrator:
 - `removed_modules`: list of module IDs being removed in this delivery — your plan **must not** reference any of them as a dependency or import target
 - `evolution_class`: `revised-direct | revised-downstream | added` for this module. `revised-direct` = its own design file changed semantically; `revised-downstream` = its design is unchanged but a dependency's interface changed; `added` = brand-new module in this delivery
 
+### Optional revision parameters (§5)
+
+These parameters are populated by the orchestrator only when this Planner
+spawn is part of a revision flow (not on initial planning). If absent,
+treat the values as empty and proceed with normal planning.
+
+- `revision_trigger`: object describing why this revision was started:
+  ```yaml
+  seq: 1
+  source_module: M-007
+  issue_type: PLAN_TEXT_ERROR | UPSTREAM_BUG | UPSTREAM_INSUFFICIENT |
+              INTERFACE_REDESIGN | UPSTREAM_NOT_IMPLEMENTED |
+              CONVENTION_CONFLICT
+  evidence: <path to reports/plan-revision-M-{id}.md, or raw conflict block>
+  ```
+  Read the evidence file/section in full before proposing plan changes.
+
+- `cancelled_state_snapshot`: path to `revisions/{seq}/cancelled-modules.json`.
+  Each entry includes module id, status at cancellation, commit count, and
+  worktree path. Use this to decide whether to instruct cancelled modules to
+  resume from existing commits or reset.
+
+- `merged_code_authority`: boolean. When `true`, for any module in your
+  dependency closure whose status is `merged`, treat the **actual code on
+  the feature branch** as authoritative — not the stale plan file. Read the
+  source files and reflect their real interfaces in your new plan. Stale
+  plans are advisory only.
+
+- `conflicting_additions`: list of paths to `conventions-additions/M-*.md`
+  files that the orchestrator detected as semantically conflicting (only set
+  on `CONVENTION_CONFLICT` revisions). Resolve the conflict by writing a
+  single replacement section into your plan's conventions-additions output,
+  with a brief justification.
+
 ## Delivery Discipline
 
 Before producing any plan, read `skills/autoforge/delivery-discipline.md` (passed as `discipline_path` if available, otherwise read from the autoforge skill root). Your plan MUST reflect every applicable rule:
