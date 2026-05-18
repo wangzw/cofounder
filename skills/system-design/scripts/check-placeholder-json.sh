@@ -8,7 +8,14 @@
 #
 # Flags:
 #   --quiet   Suppress per-finding stdout output; only exit code communicates results.
-#   --strict  Exit 1 when findings are present (default: exit 0 even with findings).
+#   --strict  Accepted as a no-op for backward compatibility. Findings are
+#             emitted through the shared §9 emitter (sd_emit.sh →
+#             sd_lint.emit), which always exits 1 on any finding regardless
+#             of severity — there is no warning-only path for this rule, so
+#             the strict/non-strict distinction does not apply. Earlier
+#             versions of this header documented a strict-vs-default
+#             behaviour that never matched the implementation; the actual
+#             behaviour is unchanged from then to now.
 #
 # Forbidden tokens (case-insensitive) inside ```json blocks:
 #   TODO  FIXME  ...  <...>  XXX  PLACEHOLDER  TBD
@@ -16,8 +23,8 @@
 # Findings are emitted as JSON on stdout; run-checkers.sh writes per-finding issue files to .review/round-<N>/issues/<issue-id>.md.
 #
 # Exit codes:
-#   0  No findings (or findings present but --strict not set)
-#   1  Findings present AND --strict flag was passed
+#   0  No findings
+#   1  At least one finding (--strict is a no-op; see Flags above)
 #   2  Bad arguments (missing design-dir, dir not found)
 set -euo pipefail
 
