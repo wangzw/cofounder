@@ -502,7 +502,7 @@ Commit each file as it appears: `docs(plan): revision-{seq} {step}`.
 
 > **Load now:** `acceptance/tester-prompt.md`, `acceptance/report-template.md`
 
-After all phases complete, validate against the original PRD.
+After all modules are merged, validate against the original PRD.
 
 ### Acceptance Tester Role
 
@@ -845,7 +845,7 @@ system-design's evolution emits four file-level lists (`delete | modify | add | 
    | **added** | `modules/M-xxx-*.md` newly added | Plan from scratch, execute as a new module |
    | **revised (direct)** | `modules/M-xxx-*.md` modified, OR a consumed `api/*.md` modified, OR a Module Interaction Protocol section in the design README that names this module modified, OR a Tech Stack change forces this module to switch frameworks/libraries | Re-plan in place, re-execute in evolution mode |
    | **revised (downstream)** | M is in `closure(N)` for some `revised (direct)` or `added` N whose **public interface or data model** changed semantically | Same as direct revised |
-   | **kept** | None of the above | Plan unchanged; module code inherited from the parent feature-branch commit; participates in phase integration test + acceptance |
+   | **kept** | None of the above | Plan unchanged; module code inherited from the parent feature-branch commit; participates in neighborhood integration test + acceptance |
 
 2.5. **ID-collision check on `added` modules.** For each module classified `added` (a `modules/M-{id}-{slug}.md` file present at the target tag and absent at the baseline tag): if the plan dir already has a `plans/plan-M-{id}-*.md` file (regardless of whether it came from the original autoforge run or from the legacy E0.5 hotfix reconciliation), the design has reused an ID that the implementation already burned for unrelated work.
 
@@ -984,10 +984,10 @@ Standard Step 2 flow with two adjustments:
 
 1. **Module Agent receives `is_evolution: true`** — see "Evolution Mode in Module Agent" below. The agent starts from the existing module code (already present on the new feature branch via the parent commit) and applies the revised plan as a delta, not from scratch.
 2. **Unaffected `kept` modules are NOT spawned** — their code is inherited from the parent commit. They DO participate in:
-   - **Phase integration tests** — Integration Tester runs against the union of `revised + added + kept` modules in each phase; the integration test set itself may have been revised by Step E4 (the design's Test Strategy or interaction protocols changed)
+   - **Neighborhood integration tests** — Integration Tester runs against the neighborhood of each merged module (union of `revised + added + kept` modules within that module's neighborhood); the integration test set itself may have been revised by Step E4 (the design's Test Strategy or interaction protocols changed)
    - **Acceptance** — full PRD acceptance validates the assembled system
 
-   If a phase contains only `kept` modules (no revised, no added), skip module execution but still run the phase integration test (PRD acceptance criteria for that phase may have changed).
+   If all modules in a neighborhood are `kept` (no revised, no added), skip module execution but still run the neighborhood integration test (PRD acceptance criteria covering that neighborhood may have changed).
 
 3. **Worktree lifecycle** is unchanged — per-module worktrees are created only for `revised + added` modules. After their Module Agent returns APPROVE, the standard merge sequence applies.
 
@@ -1073,7 +1073,7 @@ When invoked with `--status docs/raw/plans/{plan-dir}/`:
 3. **Present summary**:
    - Phase progress: which phases complete, which in progress
    - Module status: per-module Dev/Test/Review state, retry counts
-   - Integration test results: per-phase pass/fail
+   - Integration test results: per-module pass/fail
    - Acceptance status: if reached, show pass rate
    - Decision requests: any modules waiting for human decision
    - Recent events: last 10 entries from execution log
@@ -1247,7 +1247,7 @@ Worktrees are managed by the Orchestrator:
 
 ## Status Tracking
 
-Plan README.md maintains a live status table (updated after each phase):
+Plan README.md maintains a live status table (updated after each module merges):
 
 ```markdown
 ## Module Status
@@ -1363,11 +1363,11 @@ If an Agent tool call fails due to infrastructure issues (timeout, context overf
 ## Key Principles
 
 - **Self-contained agents** — each agent receives all needed context; no agent needs to read prior conversation history
-- **Phased-parallel planning, parallel execution** — phases plan sequentially (so upstream plans are final before downstream starts), Planners within a phase run in parallel, and each Planner reads only its dependency-closure of prior plans; within each execution phase, modules run in parallel
+- **DAG-ordered planning, event-loop execution** — modules plan in topological dependency order (so upstream plans are final before downstream starts), Planners whose dependencies are already planned run in parallel, and each Planner reads only its dependency-closure of prior plans; execution proceeds via an event loop that dispatches all modules whose dependencies have merged
 - **Fail fast, fix targeted** — test failures and review rejections are addressed by the responsible Developer, not by re-running the entire pipeline
 - **Main stays clean** — all work happens on the feature branch; main is only touched at the very end after full acceptance
 - **Design is the contract** — module design specs are the source of truth; Reviewer checks code against design, not against subjective standards
-- **Status is visible** — plan README is updated after every phase; execution log records every decision and state change; design doc Impl columns reflect actual progress
+- **Status is visible** — plan README is updated after every module merge; execution log records every decision and state change; design doc Impl columns reflect actual progress
 - **Autonomous first** — continue iterating while progress is being made; when stalled, try alternative approaches before involving a human; request human decision only when reasonable options are exhausted and remaining choices involve quality trade-offs
 - **Human decides trade-offs, agent decides implementation** — when genuinely stuck, the agent presents concrete options for human choice, then continues with the chosen approach — never dumps unstructured problems or gives up prematurely
 - **In-place evolution mirrors system-design** — `--evolve` mutates the existing plan directory in place; per-delivery identity lives in `versions/<N>.md`, `CHANGELOG.md`, and the `autoforge-delivery-<N>-<slug>` annotated tag. Plan directories are 1:1 with design directories across all deliveries.
