@@ -417,6 +417,87 @@ Run `bash skills/autoforge/scripts/run-checkers.sh <plan-dir> --source-root <wor
 
 **Step 2 → Step 3 gate:** Loop terminated cleanly (no outstanding revision; `check-scheduler-state.sh` PASS).
 
+## Step 2.5 — Plan Revision Flow
+
+Triggered by any `PLAN_REVISION_NEEDED` return or `CONVENTION_CONFLICT`
+detection during Step 2. Implements the §5 revision-flow.
+
+### R1 — Freeze
+
+On revision trigger:
+```
+bash skills/autoforge/scripts/run-state-update.sh \
+     <plan-dir> freeze {revision-seq}
+```
+The main loop stops spawning new agents but continues to `await` completion notifications.
+
+### R2 — Cancel in-flight
+
+For each agent in `inflight.*`, wait for it to return naturally (the harness has no explicit cancel). On return:
+- **Planner**: keep the plan file on disk. `inflight-remove planners`.
+- **Module Agent**: treat any return as CANCELLED. `set-exec-status M-{id} cancelled`. Module branch is preserved (commits intact, not merged).
+- **Integration Tester**: archive its report to `reports/cancelled/integration-M-{id}-{rev-seq}.md`.
+
+When all inflight buckets empty, write `revisions/{seq}/cancelled-modules.json`:
+```json
+[
+  {
+    "module_id": "M-005",
+    "status_at_cancel": "running",
+    "commit_count": 3,
+    "worktree_path": "...",
+    "module_state_path": "module-state-M-005.json"
+  }
+]
+```
+
+### R3 — Re-plan
+
+Spawn Planner(s) per the same event-loop rules as Step 2, but every Planner receives the revision parameters:
+- `revision_trigger`: object with seq, source_module, issue_type, evidence path.
+- `cancelled_state_snapshot`: path to `revisions/{seq}/cancelled-modules.json`.
+- `merged_code_authority`: `true` — Planners read actual code for already-merged modules.
+- `conflicting_additions`: only on `CONVENTION_CONFLICT`.
+
+The Planner's task: re-evaluate ALL plans, marking affected ones `plan_status=revising` and untouched ones `plan_status=planned` (no change). For already-merged modules that need code changes, the Planner adds a `## Patch Steps (revision-{seq})` section to that module's plan and the Orchestrator will set its `exec_status=needs_patch`.
+
+### R4 — Human review (diff only)
+
+After all Planners return, write `revisions/{seq}/plan-diff.md` summarizing:
+- Plans changed semantically (signature, type, contract).
+- Plans changed cosmetically (prose only — no impact).
+- Already-merged modules now flagged `needs_patch`.
+- Cancelled modules and their recommended disposition (resume from commits / reset / restart fresh).
+
+Present this diff to the human. Wait for approval / edit / reject. On approval, commit `revisions/{seq}/human-decision.md` with the verdict.
+
+### R5 — Resume
+
+```
+bash skills/autoforge/scripts/run-state-update.sh <plan-dir> unfreeze
+```
+
+Apply cancelled-module dispositions:
+- "Resume from commits" → `set-exec-status M-{id} pending` (Module Agent reads `module-state-M-{id}.json` on next spawn to recover).
+- "Reset and restart" → reset the module's worktree to feature-branch HEAD, clear `module-state-M-{id}.json`, then `set-exec-status M-{id} pending`.
+
+Re-enter Step 2's event loop. The ready set automatically reflects the new state; `needs_patch` modules are highest priority.
+
+### Audit trail
+
+Each revision lives under `revisions/{seq}/`:
+```
+revisions/
+  001/
+    trigger.md
+    cancelled-modules.json
+    plan-diff.md
+    human-decision.md
+    resumed-at
+```
+
+Commit each file as it appears: `docs(plan): revision-{seq} {step}`.
+
 ## Step 3 — PRD Acceptance Validation
 
 > **Load now:** `acceptance/tester-prompt.md`, `acceptance/report-template.md`
