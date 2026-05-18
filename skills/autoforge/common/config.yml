@@ -46,6 +46,22 @@ escalation:
     to: heavy
     revert_after: "ambiguity resolved (PRD updated or AC re-scoped)"
 
+# Event-driven DAG scheduler caps (replaces phase-barrier model).
+# Bounds the number of concurrent background agents the orchestrator may
+# have in flight. Tier-1 Module Agents are typically the bottleneck;
+# raising max_modules above the typical DAG fan-out wastes the slot.
+# Cost scales linearly with max_modules (Sonnet) and ~5x linearly with
+# max_planners (Opus). Defaults chosen for a typical 20-30 module run.
+scheduler:
+  max_planners: 3
+  max_modules: 6
+  idle_timeout_minutes: 30
+  # Batched-commit cadence for run-status.md updates: commit every K
+  # transitions OR every T seconds, whichever comes first. Avoids commit
+  # storms while keeping the on-disk log fresh enough for GitHub views.
+  status_commit_every_k: 5
+  status_commit_every_seconds: 60
+
 # Cost note (informational; autoforge has no metric aggregator):
 # heavy is roughly 5x balanced on input and ~15x on cache_read. Use heavy only
 # for the targeted escalations above, not as a baseline.
