@@ -17,9 +17,15 @@ Skills are invoked by their slug, no namespace prefix: `/prd-analysis`, `/system
 ## Pipeline
 
 ```
+# Project startup (full-flow, sequential)
 Idea → /prd-analysis → /system-design → /autoforge → /go-to-market → Market-Ready Business
                                               ↑
                               /dev-conventions (standalone, run anytime)
+
+# Feature-level evolution (concurrent, per-feature)
+Feature change → /prd-analysis modify → /system-design delta → /autoforge --feature
+                                         ↓
+                    /evolve "F-NNN description" (unified, auto-complexity)
 ```
 
 Skills are chainable: `/system-design` reads PRD output, `/autoforge` reads system design output, `/go-to-market` can chain from PRD. `/dev-conventions` is standalone — run it at any point to generate repo scaffolding (issue/PR templates, CI lint workflows, git hooks, CONTRIBUTING.md). It is independent of the main pipeline and can be used before or after `/autoforge`.

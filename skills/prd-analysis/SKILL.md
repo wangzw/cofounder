@@ -1,7 +1,7 @@
 ---
 name: prd-analysis
 version: 1.1.0
-description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'."
+description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, evolve an existing PRD for a new iteration, or modify/add/deprecate individual features concurrently. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration', 'modify F-003', 'add feature', 'deprecate feature'."
 ---
 
 # prd-analysis — AI-Coding-Ready Product Requirements Documents
@@ -16,6 +16,10 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 |------|------|-------------|-----------|
 | generate (from scratch) | `/prd-analysis` or `/prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; the writer subagent's self-audit follows `generate/in-generate-review.md`, not loaded into orchestrator context) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
 | generate (new version) | `/prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand when running the evolve review checklist) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
+| **feature-modify** | `/prd-analysis modify <prd-dir> F-NNN "description"` | `feature/modify.md`, `common/output-discipline.md` | Modify a single feature file in-place by dispatching a writer with the change description; then update README index row and append CHANGELOG. Other feature files are untouched. |
+| **feature-add** | `/prd-analysis add <prd-dir> "description"` | `feature/add.md`, `common/output-discipline.md` | Add a single new feature file by dispatching a writer; assign next available ID; then update README index and append CHANGELOG. |
+| **feature-deprecate** | `/prd-analysis deprecate <prd-dir> F-NNN ["reason"]` | `feature/deprecate.md`, `common/output-discipline.md` | Deprecate a feature: create tombstone file, remove from README Feature Index and Roadmap, add to Deprecated Items index, append CHANGELOG. Does NOT dispatch a writer (mechanical operation). |
+| **feature-evolve** | `/evolve "F-NNN <description>" [--design\|--full]` | `feature/evolve.md`, `feature/modify.md`, `common/output-discipline.md` | Unified feature evolution: auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. `--design` forces design gate; `--full` forces dual-gate review. |
 | review | `/prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
 | compact | `/prd-analysis --compact <prd-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
@@ -151,10 +155,13 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 ## Input Modes (Summary)
 
 ```
+# Project startup
 /prd-analysis                                          # interactive mode (default)
 /prd-analysis path/to/notes.md                         # document-based mode
 /prd-analysis --output docs/raw/prd/my-project         # custom output dir
 /prd-analysis notes.md --output ./prd                  # both
+
+# Quality assurance
 /prd-analysis --review docs/raw/prd/xxx/               # review existing PRD (single round)
 /prd-analysis --review docs/raw/prd/xxx/ --auto        # auto-loop review↔revise until convergence
 /prd-analysis --revise docs/raw/prd/xxx/               # per-issue revise loop (state-machine: new → fixed/false-positive/deferred/superseded)
@@ -162,6 +169,16 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis --evolve docs/raw/prd/xxx/               # incremental PRD for new iteration
 /prd-analysis --evolve docs/raw/prd/xxx/ notes.md      # evolve with document input
 /prd-analysis --compact docs/raw/prd/xxx/              # retire intermediate review rounds before next stage
+
+# Feature-level operations (concurrent, single-feature scope)
+/prd-analysis modify <prd-dir> F-NNN "description"     # modify a single feature in-place
+/prd-analysis add <prd-dir> "description"              # add a new feature, auto-assign next ID
+/prd-analysis deprecate <prd-dir> F-NNN ["reason"]     # deprecate a feature (tombstone)
+
+# Unified evolution (cross-skill, adaptive gates)
+/evolve "F-NNN <description>"                          # auto-determine complexity, run full flow
+/evolve "F-NNN <description>" --design                 # force design review gate
+/evolve "F-NNN <description>" --full                   # force full triple-gate review
 ```
 
 ## Output Structure
@@ -423,6 +440,15 @@ Next steps:
 ```
 
 **Evolve mode** — use the cascade notification from the "Commit Message & Post-Commit Cascade" section of `generate/evolve-mode.md` instead.
+
+**Feature-level operations (modify/add/deprecate):**
+```
+After feature-level PRD change:
+
+  1. /system-design delta <design-dir> F-{NNN}   # compute affected modules
+  2. /autoforge --feature F-{NNN} <design-dir>    # implement the change
+  3. Verify regression tests pass
+```
 
 ## Configuration & Subagent Files
 

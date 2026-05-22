@@ -1,7 +1,7 @@
 ---
 name: autoforge
 version: 1.6.1
-description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve'."
+description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`, or implementing a single feature with `--feature F-NNN`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve', '--feature'."
 ---
 
 # Autoforge — Multi-Role Automated Development
@@ -21,6 +21,10 @@ Orchestrate agent teams to turn a system design into tested, PRD-validated code.
 /autoforge --evolve --fresh docs/raw/design/2026-04-09-agent-team/       # escape hatch: NEW plan dir instead of in-place evolve
 /autoforge --status docs/raw/plans/2026-04-09-agent-team-a3f1/      # show progress
 /autoforge --cleanup docs/raw/plans/2026-04-09-agent-team-a3f1/     # abandon run: remove worktrees, branches, optionally plans
+
+# Feature-scope mode (single feature implementation)
+/autoforge --feature F-NNN docs/raw/design/<dir>/                  # implement only the feature's affected modules
+/autoforge --feature F-NNN --plan-only docs/raw/design/<dir>/      # generate feature-scoped plans only
 ```
 
 ## Mode Routing
@@ -35,6 +39,7 @@ Detect the mode first. Read the routing files for that mode only — do not load
 | **Evolve** | `--evolve <design-dir>` | Load `--evolve Mode` section; same step files as Default but driven by Steps E0–E6 (planner + module-agent + execution prompts; same templates) |
 | **Evolve plan-only** | `--evolve --plan-only` | Same as Evolve — stops after Step E4 |
 | **Evolve fresh** | `--evolve --fresh` | Falls through to Default with a forced new plan directory; not the recommended path |
+| **Feature-scope** | `--feature F-NNN <design-dir>` | Load `feature-scope.md` (planner + module-agent prompts scoped to affected modules); uses `feature-module-map.yml` from the design directory |
 | **Status** | `--status <plan-dir>` | No additional files (read-only query) |
 | **Cleanup** | `--cleanup <plan-dir>` | No additional files |
 

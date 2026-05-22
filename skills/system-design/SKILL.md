@@ -1,7 +1,7 @@
 ---
 name: system-design
 version: 1.0.0
-description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, or review existing designs. Triggers: /system-design, 'system design', 'module design', 'technical design', 'design review'."
+description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, review existing designs, or compute feature-level delta analysis for single-feature changes. Triggers: /system-design, 'system design', 'module design', 'technical design', 'design review', 'system-design delta'."
 ---
 
 # system-design — AI-Coding-Ready Technical Design Documents
@@ -34,6 +34,9 @@ system-design generates technical design documents as a **multi-file directory**
 /system-design --evolve docs/raw/design/xxx/      # generate new version from an evolved PRD
 /system-design --evolve docs/raw/design/xxx/ notes.md  # supply explicit change notes
 /system-design --compact docs/raw/design/xxx/     # retire intermediate review rounds before next stage
+
+# Feature-level delta (single-feature scope)
+/system-design delta <design-dir> F-NNN           # compute affected modules for one feature change
 ```
 
 **Note on evolved PRDs:** When a PRD has been evolved (`/prd-analysis --evolve`),
@@ -48,6 +51,7 @@ state machine.
 |------|------|-------------|-----------|
 | generate (from scratch) | `/system-design "<description or prd-path>"` | `generate/from-scratch.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ `common/review-criteria.md` and `common/templates/*` are read by writer subagent at self-audit time, not loaded into orchestrator context) | New design from PRD/draft/interactive; domain-consultant clarifies intent, planner decomposes modules, writers fan-out (one per module + API + README); formal-review hard gate runs BEFORE semantic review |
 | generate (new version) | `/system-design --evolve <design-dir>` | `generate/new-version.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` (+ same on-demand reads as from-scratch) | Evolve existing design; planner emits delta plan (delete/modify/add/keep) |
+| **delta** | `/system-design delta <design-dir> F-NNN` | `generate/feature-delta.md`, `common/output-discipline.md` | Single-feature delta analysis: reads feature-module-map.yml, computes affected modules, updates module specs in-place, outputs affected module list and regression-test scope |
 | review | `/system-design --review <design-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/system-design --revise <design-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
 | compact | `/system-design --compact <design-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
