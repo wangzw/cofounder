@@ -1,6 +1,6 @@
 # feature/evolve.md — Unified Feature Evolution Orchestration
 
-Loaded by the orchestrator when `/evolve "F-NNN <description>" [flags]` is provided.
+Loaded by the orchestrator when `/evolve F-NNN "description" [flags]` is provided.
 This is the **unified entry point** for feature-level evolution. It orchestrates all three
 skills (prd-analysis → system-design → autoforge) in a single flow, with automatic
 complexity determination and adaptive approval gate insertion.
@@ -29,20 +29,21 @@ When `--prd-dir` and `--design-dir` are not specified, the orchestrator auto-dis
 
 ### Step 1 — Read feature-module map
 
-Read `{design-dir}/feature-module-map.yml`. Locate F-NNN's entry.
-If the design directory is not specified, auto-discover from the current project's
-`docs/raw/design/` directory (most recent by date).
+Read `{design-dir}/feature-module-map.yml` (resolved in Step 0).
+Locate F-NNN's entry.
 
-If F-NNN is not found, suggest using `/prd-analysis add` to create it first.
+If F-NNN is not found, exit with error:
+
+> F-{NNN} not found in feature-module-map.yml. If this is a new feature,
+> run `/prd-analysis add` to create it first, then `/system-design <prd-dir>`
+> to generate a full design with the feature-module mapping.
 
 ### Step 2 — Auto-determine complexity
-
-## Complexity Auto-Determination
 
 Before executing, the orchestrator analyzes the change to determine complexity level.
 The analysis runs AFTER reading the feature-module-map.yml to know the module scope.
 
-### Analysis Inputs
+**Analysis Inputs:**
 1. The user's change description (natural language)
 2. The target feature's `feature-module-map.yml` entry (writes/reads counts)
 3. Whether the change mentions: new data entities, state machine changes, API contract changes

@@ -107,24 +107,16 @@ Modules with dependencies must be dispatched sequentially (DAG order).
 
 ### Step 5 — Run F-NNN's tests
 
-After all module changes are complete, run the tests corresponding to F-NNN's acceptance criteria:
-
-```bash
-# Run feature-specific tests
-run_tests_for_feature F-NNN
-```
+After all module changes are complete, run the tests corresponding to F-NNN's
+acceptance criteria (dispatch tester agent(s) with the feature's ACs as test specs).
 
 All ACs must pass. If any AC fails, loop back to the relevant module agent(s) for fixes.
 
 ### Step 6 — Run regression tests
 
 Read the regression scope from the design's CHANGELOG (last `/system-design delta F-NNN`
-entry). Run existing tests for all features in the regression scope:
-
-```bash
-# Run regression tests for overlapping features
-run_tests_for_features F-001 F-004 F-007
-```
+entry). Dispatch tester agent(s) to run existing tests for all features in the
+regression scope.
 
 If any regression test fails, the merge is **blocked**. Report the failure with the
 offending feature and test. The user must decide:

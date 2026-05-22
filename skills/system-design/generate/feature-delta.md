@@ -38,9 +38,9 @@ Read `{design-dir}/feature-module-map.yml`. Locate the entry for F-NNN:
 
 ```yaml
 F-003:
+  name: "Payment Flow"
   writes: [M-001, M-005, M-007]
   reads: [M-006]
-  name: "Payment Flow"
 ```
 
 If F-NNN is not in the map, exit with error:
