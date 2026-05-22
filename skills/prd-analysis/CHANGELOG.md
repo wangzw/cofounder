@@ -13,9 +13,9 @@ instead of the full PRD bundle. Existing global modes unchanged.
   next available ID, update README index and CHANGELOG.
 - **`/prd-analysis deprecate <dir> F-NNN`** — create tombstone, remove from
   active index, warn about dependent features.
-- **`/evolve "F-NNN desc" [--design|--full]`** — unified cross-skill
+- **`/evolve F-NNN "desc" [--design-dir <dir>] [--prd-dir <dir>] [--design|--full]`** — unified cross-skill
   evolution with auto complexity determination (Trivial/Moderate/Complex)
-  and adaptive approval gates.
+  and adaptive approval gates. Directories auto-discovered if not specified.
 - **Concurrency-safe:** different features touch disjoint files and
   README rows — no file locking needed.
 - **New files:** `feature/modify.md`, `feature/add.md`, `feature/deprecate.md`,

@@ -19,7 +19,7 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 | **feature-modify** | `/prd-analysis modify <prd-dir> F-NNN "description"` | `feature/modify.md`, `common/output-discipline.md` | Modify a single feature file in-place by dispatching a writer with the change description; then update README index row and append CHANGELOG. Other feature files are untouched. |
 | **feature-add** | `/prd-analysis add <prd-dir> "description"` | `feature/add.md`, `common/output-discipline.md` | Add a single new feature file by dispatching a writer; assign next available ID; then update README index and append CHANGELOG. |
 | **feature-deprecate** | `/prd-analysis deprecate <prd-dir> F-NNN ["reason"]` | `feature/deprecate.md`, `common/output-discipline.md` | Deprecate a feature: create tombstone file, remove from README Feature Index and Roadmap, add to Deprecated Items index, append CHANGELOG. Does NOT dispatch a writer (mechanical operation). |
-| **feature-evolve** | `/evolve F-NNN "description" [--prd <dir>] [--design <dir>] [--design\|--full]` | `feature/evolve.md`, `feature/modify.md`, `common/output-discipline.md` | Unified feature evolution: auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. Directories auto-discovered if not specified. `--design` flag forces design gate; `--full` forces dual-gate review. |
+| **feature-evolve** | `/evolve F-NNN "description" [--prd-dir <dir>] [--design-dir <dir>] [--design\|--full]` | `feature/evolve.md`, `feature/modify.md`, `common/output-discipline.md` | Unified feature evolution: auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. Directories auto-discovered if not specified. `--design` flag forces design gate; `--full` forces dual-gate review. |
 | review | `/prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
 | compact | `/prd-analysis --compact <prd-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
@@ -176,9 +176,10 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis deprecate <prd-dir> F-NNN ["reason"]     # deprecate a feature (tombstone)
 
 # Unified evolution (cross-skill, adaptive gates)
-/evolve "F-NNN <description>"                          # auto-determine complexity, run full flow
-/evolve "F-NNN <description>" --design                 # force design review gate
-/evolve "F-NNN <description>" --full                   # force full triple-gate review
+/evolve F-NNN "description"                              # auto-determine complexity, run full flow
+/evolve F-NNN "description" --design                     # force design review gate
+/evolve F-NNN "description" --full                       # force full triple-gate review
+/evolve F-NNN "description" --prd-dir <dir> --design-dir <dir>  # explicit directories
 ```
 
 ## Output Structure

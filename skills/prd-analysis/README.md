@@ -56,9 +56,10 @@ records every dispatch, every issue, and every state transition.
 | `/prd-analysis modify <prd-dir> F-NNN "desc"` | Modify a single feature in-place. Only the target feature file, README index row, and CHANGELOG are touched. Other features untouched. |
 | `/prd-analysis add <prd-dir> "desc"` | Add a new feature. Auto-assigns next available ID. Creates feature file + updates README + CHANGELOG. |
 | `/prd-analysis deprecate <prd-dir> F-NNN ["reason"]` | Deprecate a feature. Creates tombstone file, moves feature to Deprecated Items index. Reports dependents for cascade update. |
-| `/evolve "F-NNN <desc>"` | Unified cross-skill evolution. Auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. |
-| `/evolve "F-NNN <desc>" --design` | Force design review gate insertion. |
-| `/evolve "F-NNN <desc>" --full` | Force full triple-gate (contract + design + summary). |
+| `/evolve F-NNN "desc"` | Unified cross-skill evolution. Auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. |
+| `/evolve F-NNN "desc" --design` | Force design review gate insertion. |
+| `/evolve F-NNN "desc" --full` | Force full triple-gate (contract + design + summary). |
+| `/evolve F-NNN "desc" --prd-dir <dir> --design-dir <dir>` | Explicit directories (auto-discovered otherwise). |
 
 Feature-level operations are **concurrency-safe**: concurrent modifies of different features
 touch disjoint feature files and disjoint README rows. No file locking needed.

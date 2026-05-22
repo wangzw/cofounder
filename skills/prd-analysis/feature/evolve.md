@@ -8,13 +8,13 @@ complexity determination and adaptive approval gate insertion.
 ## Command Syntax
 
 ```
-/evolve F-NNN "description"                              # auto-determine, auto-discover dirs
-/evolve F-NNN "description" --prd <dir> --design <dir>   # explicit directories
-/evolve F-NNN "description" --design                     # force Design review gate
-/evolve F-NNN "description" --full                       # force full triple-gate review
+/evolve F-NNN "description"                                     # auto-determine, auto-discover dirs
+/evolve F-NNN "description" --prd-dir <dir> --design-dir <dir>  # explicit directories
+/evolve F-NNN "description" --design                            # force Design review gate
+/evolve F-NNN "description" --full                              # force full triple-gate review
 ```
 
-When `<prd-dir>` and `<design-dir>` are not specified, the orchestrator auto-discovers:
+When `--prd-dir` and `--design-dir` are not specified, the orchestrator auto-discovers:
 1. **PRD directory**: read the design README's "Design Input" section → "Source" link (e.g. `../../prd/YYYY-MM-DD-slug/`)
 2. **Design directory**: most recent subdirectory under `docs/raw/design/` sorted by date prefix
 
@@ -22,9 +22,10 @@ When `<prd-dir>` and `<design-dir>` are not specified, the orchestrator auto-dis
 
 ### Step 0 — Resolve paths and parse input
 
-1. Resolve `<prd-dir>` and `<design-dir>` from CLI args or auto-discovery.
-2. Extract the F-ID and change description from the input string.
-3. Extract flags: `--design`, `--full`.
+1. Resolve `<prd-dir>` from `--prd-dir` flag, or auto-discover from the design README's "Design Input" → "Source" link.
+2. Resolve `<design-dir>` from `--design-dir` flag, or auto-discover from `docs/raw/design/` (most recent by date).
+3. Extract the F-ID and change description from the input string.
+4. Extract gate flags: `--design` (force design gate), `--full` (force dual gate).
 
 ### Step 1 — Read feature-module map
 
