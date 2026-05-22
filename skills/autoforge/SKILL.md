@@ -1,6 +1,6 @@
 ---
 name: autoforge
-version: 1.6.1
+version: 1.7.0
 description: "Use when the user has a finalized system design (system-design skill output) and wants to automatically implement it as working code, including evolving an already-implemented design after `system-design --evolve`, or implementing a single feature with `--feature F-NNN`. Triggers: /autoforge, 'implement the design', 'start development', 'auto implement', 'build the modules', 'evolve the implementation', '--evolve', '--feature'."
 ---
 

@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [1.2.0] — 2025-05-22
+
+**Feature-level delta analysis.** Add single-feature delta mode for
+computing module impact of one feature change.
+
+- **`/system-design delta <dir> F-NNN`** — reads `feature-module-map.yml`,
+  computes affected modules (writes ∪ reads), updates module specs,
+  outputs regression-test scope.
+- **`feature-module-map.yml`** — machine-readable mapping auto-generated
+  during global mode. Input for delta mode and autoforge feature-scope.
+- **New files:** `generate/feature-delta.md`.
+- **Template change:** `design-readme-template.md` now requires
+  `feature-module-map.yml` generation alongside the README.
+
 ## [1.1.0] — 2026-05-08
 
 **BREAKING — git tag rename.** The annotated tag created on converged

@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [1.3.0] — 2025-05-22
+
+**Feature-level concurrent pipeline.** Add single-feature operations
+(modify/add/deprecate/evolve) that operate on individual features
+instead of the full PRD bundle. Existing global modes unchanged.
+
+- **`/prd-analysis modify <dir> F-NNN "desc"`** — in-place edit of one
+  feature file + README index row + CHANGELOG entry. Other feature files
+  untouched.
+- **`/prd-analysis add <dir> "desc"`** — create single feature, auto-assign
+  next available ID, update README index and CHANGELOG.
+- **`/prd-analysis deprecate <dir> F-NNN`** — create tombstone, remove from
+  active index, warn about dependent features.
+- **`/evolve "F-NNN desc" [--design|--full]`** — unified cross-skill
+  evolution with auto complexity determination (Trivial/Moderate/Complex)
+  and adaptive approval gates.
+- **Concurrency-safe:** different features touch disjoint files and
+  README rows — no file locking needed.
+- **New files:** `feature/modify.md`, `feature/add.md`, `feature/deprecate.md`,
+  `feature/evolve.md`.
+
 ## [1.2.0] — 2026-05-08
 
 **BREAKING — git tag rename.** The annotated tag created on converged

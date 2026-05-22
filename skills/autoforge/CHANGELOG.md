@@ -28,15 +28,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **`SKILL.md`** Steps 0–4 rewritten (~1000 lines of prose changes).
-- **`integration/tester-prompt.md`** rewritten for neighborhood scope.
-- **`planning/planner-prompt.md`** adds 4 revision-flow input parameters.
-- **`module/agent-prompt.md`** adds `needs_patch` resumption and CANCELLED return path.
-- **`common/config.yml`** adds `scheduler` section (`max_planners`, `max_modules`, `idle_timeout_minutes`, batch-commit cadence).
+## [1.7.0] — 2025-05-22
 
-### Migration note
+**Feature-scope mode.** Add single-feature implementation that modifies
+only the modules affected by one feature, plus reverse alignment detection.
 
-Existing autoforge runs (in `docs/raw/plans/<old-plan-dir>/`) keep their on-disk artifacts and may be inspected. They cannot be resumed under the new scheduler. New runs use the new flow from Step 0.
+### Added
+
+- **`--feature F-NNN <dir>` mode** — scoped implementation: planner and
+  module agents limited to the feature's affected modules (writes ∪ reads).
+  Reads `feature-module-map.yml` from design directory.
+- **`--feature F-NNN --plan-only` mode** — feature-scoped plan generation only.
+- **Reverse alignment checksum** — after implementation, computes SHA-256 of
+  PRD feature file (stripping frontmatter/comments) and stores in
+  `.review/contract-checksums.yml`. Subsequent code changes that diverge
+  from contract checksum block merge.
+- **Regression test scope** — automatically runs tests for other features
+  whose modules overlap with the affected set.
+- **New files:** `feature-scope.md`, `README.md`.
 
 ## [1.6.1] — 2026-05-16
 

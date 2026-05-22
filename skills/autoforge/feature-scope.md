@@ -47,23 +47,20 @@ If F-NNN is not found, exit with error.
 
 The **implementation scope** = `writes ∪ reads`.
 
-### Step 2 — Read the PRD feature file
+### Step 2 — Locate the PRD feature file
 
-Read the PRD feature file for F-NNN (path from the design README's Design Input section).
-Extract:
-- Acceptance criteria (Given/When/Then)
-- API contracts
-- Component contracts
-- Data model changes
-- Edge cases
-
-These become the implementation requirements and test specifications.
+Read the design README's "Design Input" section to find the PRD directory path.
+Derive the feature file path: `{prd-dir}/features/F-{NNN}-*.md`.
+The orchestrator reads only the design README (an index file, permitted per
+the orchestrator dispatch contract). The PRD feature file itself is read
+by the planner sub-agent in Step 3.
 
 ### Step 3 — Dispatch scoped planner
 
 - Dispatch: a planner agent (reuse existing planner prompt but with scope constraint)
 - Inputs:
-  - F-NNN's feature spec (ACs, API contracts, component contracts)
+  - F-NNN's PRD feature file (the planner reads: ACs, API contracts, component
+    contracts, data model, edge cases)
   - The affected module specs (M-001, M-005, M-007, M-006)
   - The design's conventions and tech stack
 - Output: a **feature-scoped plan** containing:

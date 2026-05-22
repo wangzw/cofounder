@@ -1,6 +1,6 @@
 ---
 name: system-design
-version: 1.0.0
+version: 1.1.0
 description: "Use when the user needs to create system design documents from a PRD or requirements, perform module decomposition, define interfaces and data models, review existing designs, or compute feature-level delta analysis for single-feature changes. Triggers: /system-design, 'system design', 'module design', 'technical design', 'design review', 'system-design delta'."
 ---
 

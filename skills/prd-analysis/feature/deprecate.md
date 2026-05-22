@@ -50,7 +50,14 @@ If the F-ID is already in the Deprecated Items list, exit with error:
 
 ### Step 3 — Read the feature file for metadata
 
-Read the first ~20 lines of the feature file to extract:
+**Permitted read:** the orchestrator reads only the first ~20 lines (header + frontmatter)
+of the target feature file to extract metadata needed for tombstone construction
+(feature name, file slug). This is a mechanical metadata extraction, not content
+comprehension — consistent with the SKILL.md exception for "cross-file routing check
+requires spot-verification" applied to artifact leaves. No other feature file content
+is read.
+
+Extract:
 - Feature name (from the `# F-{NNN}: {Name}` header)
 - File slug (from the existing filename)
 

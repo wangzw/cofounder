@@ -8,10 +8,33 @@ complexity determination and adaptive approval gate insertion.
 ## Command Syntax
 
 ```
-/evolve "F-003 支付从两步改一步"           # AI auto-determines complexity
-/evolve "F-003 支付从两步改一步" --design  # force Design review gate
-/evolve "F-003 支付从两步改一步" --full    # force full triple-gate review
+/evolve F-NNN "description"                              # auto-determine, auto-discover dirs
+/evolve F-NNN "description" --prd <dir> --design <dir>   # explicit directories
+/evolve F-NNN "description" --design                     # force Design review gate
+/evolve F-NNN "description" --full                       # force full triple-gate review
 ```
+
+When `<prd-dir>` and `<design-dir>` are not specified, the orchestrator auto-discovers:
+1. **PRD directory**: read the design README's "Design Input" section → "Source" link (e.g. `../../prd/YYYY-MM-DD-slug/`)
+2. **Design directory**: most recent subdirectory under `docs/raw/design/` sorted by date prefix
+
+## Orchestration Sequence
+
+### Step 0 — Resolve paths and parse input
+
+1. Resolve `<prd-dir>` and `<design-dir>` from CLI args or auto-discovery.
+2. Extract the F-ID and change description from the input string.
+3. Extract flags: `--design`, `--full`.
+
+### Step 1 — Read feature-module map
+
+Read `{design-dir}/feature-module-map.yml`. Locate F-NNN's entry.
+If the design directory is not specified, auto-discover from the current project's
+`docs/raw/design/` directory (most recent by date).
+
+If F-NNN is not found, suggest using `/prd-analysis add` to create it first.
+
+### Step 2 — Auto-determine complexity
 
 ## Complexity Auto-Determination
 
@@ -47,34 +70,6 @@ Complexity: Moderate (auto-determined)
   Reason: writes 2 modules, minor API contract change
   Gates: 1 (after design delta)
   Override: /evolve "..." --full for triple-gate review
-```
-
-## Orchestration Sequence
-
-### Step 0 — Parse input
-
-Extract from the user's input string:
-- Feature ID: the F-NNN at the start
-- Change description: the remainder after F-NNN
-- Flags: `--design`, `--full` (if present)
-
-### Step 1 — Read feature-module map
-
-Read `{design-dir}/feature-module-map.yml`. Locate F-NNN's entry.
-If the design directory is not specified, auto-discover from the current project's
-`docs/raw/design/` directory (most recent by date).
-
-If F-NNN is not found, suggest using `/prd-analysis add` to create it first.
-
-### Step 2 — Auto-determine complexity
-
-Run the complexity analysis using the rules above. Present the result to the user.
-
-```
-Complexity: {Trivial|Moderate|Complex} ({auto-determined|user-override})
-  Reason: {specific criteria that triggered this level}
-  Gates: {count}
-  Flow: {description of gate positions}
 ```
 
 ### Step 3 — Execute contract update (always)
