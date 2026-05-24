@@ -650,6 +650,7 @@ a new per-artifact `check-*.sh` rule.
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: meta
 ```
 
 ---
@@ -670,6 +671,7 @@ a new substantive criterion.
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: meta
 ```
 
 ---
@@ -689,6 +691,7 @@ design defect: future changes will repeatedly couple unrelated diff scopes.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: module-boundary
 ```
 
 ---
@@ -708,6 +711,7 @@ prose. Unjustified inverted dependencies invite future refactors.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: module-boundary
 ```
 
 ---
@@ -728,6 +732,7 @@ substantive defects.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: module-boundary
 ```
 
 ---
@@ -747,6 +752,7 @@ views, etc.) MUST be called out explicitly.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: data-model
 ```
 
 ---
@@ -766,6 +772,7 @@ strategy implies frozen-forever APIs.
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: api-contract
 ```
 
 ---
@@ -784,6 +791,7 @@ response). A module without failure-mode documentation is unsafe to operate.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: failure-modes
 ```
 
 ---
@@ -802,6 +810,7 @@ with no observability story cannot be operated in production.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: observability
 ```
 
 ---
@@ -821,6 +830,7 @@ privilege, audit logging). Silent omission of security boundaries is a critical 
   conflicts_with: []
   priority: 1
   incremental_skip: full_scan
+  category: security
 ```
 
 ---
@@ -844,6 +854,7 @@ is the primary handoff signal between design and execution.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: ui-promotion
 ```
 
 ---
@@ -870,6 +881,7 @@ conventions.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: ui-promotion
 ```
 
 ---
@@ -895,6 +907,7 @@ become invisible to autoforge planning.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: ui-promotion
 ```
 
 ---
