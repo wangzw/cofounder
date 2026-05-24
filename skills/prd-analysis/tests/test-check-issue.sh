@@ -191,4 +191,80 @@ assert_exit 1 "$CHECK" "$FIXTURE"
 assert_stdout_contains "missing leading"
 teardown_fixture
 
+test_case "category missing emits non-fatal WARNING on legacy issue"
+setup_fixture
+write_file ".review/round-1/issues/I-001.md" '---
+id: I-001
+criterion_id: CR-PP06
+file: features/F-001.md
+severity: error
+state: new
+created_in_round: 1
+history:
+  - {round: 1, action: created}
+fix_history: []
+---
+
+## Description
+x
+
+## Suggested fix
+y
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "WARNING"
+assert_stdout_contains "category"
+teardown_fixture
+
+test_case "category present and valid passes cleanly"
+setup_fixture
+write_file ".review/round-1/issues/I-001.md" '---
+id: I-001
+criterion_id: CR-PP06
+category: traceability
+file: features/F-001.md
+severity: error
+state: new
+created_in_round: 1
+history:
+  - {round: 1, action: created}
+fix_history: []
+---
+
+## Description
+x
+
+## Suggested fix
+y
+'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
+test_case "category with invalid value fails"
+setup_fixture
+write_file ".review/round-1/issues/I-001.md" '---
+id: I-001
+criterion_id: CR-PP06
+category: not-a-real-category
+file: features/F-001.md
+severity: error
+state: new
+created_in_round: 1
+history:
+  - {round: 1, action: created}
+fix_history: []
+---
+
+## Description
+x
+
+## Suggested fix
+y
+'
+assert_exit 1 "$CHECK" "$FIXTURE"
+assert_stdout_contains "category"
+assert_stdout_contains "not-a-real-category"
+teardown_fixture
+
 end_tests
