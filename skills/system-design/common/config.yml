@@ -9,6 +9,18 @@ convergence:
   retriable_verdicts: [progressing]
   abort_verdicts: [oscillating, diverging, stalled]
 
+# Cluster sizing for criterion-centric batching (v1.4+). See
+# common/parallel-dispatch.md Rule 3.
+revise:
+  # Max issues per criterion-cluster. Each reviser dispatch handles ≤ this many
+  # state:new issues sharing the same criterion_id.
+  edit_cap: 8
+
+review:
+  # Max leaves per per-category reviewer cluster. If a category's in-scope leaf
+  # count exceeds this, the orchestrator splits into sub-clusters by leaf range.
+  cluster_leaf_cap: 25
+
 model_tier_defaults:
   orchestrator:      balanced
   domain_consultant: heavy
