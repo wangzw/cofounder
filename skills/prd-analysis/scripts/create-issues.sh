@@ -41,6 +41,9 @@ ARTIFACT_ROOT="${1:-}"
 ROUND_NUM="${2:-}"
 INPUT_MODE="from-dir"   # default
 DRY_RUN=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CRITERIA_PATH="$SKILL_ROOT/common/review-criteria.md"
 
 # Parse remaining flags (--dry-run, --stdin)
 shift 2 2>/dev/null || true
@@ -128,13 +131,34 @@ PYEOF
   fi
 fi
 
-DRY_RUN="$DRY_RUN" python3 - "$ARTIFACT_ROOT" "$ROUND_NUM" "$INPUT" <<'PYEOF'
+DRY_RUN="$DRY_RUN" python3 - "$ARTIFACT_ROOT" "$ROUND_NUM" "$INPUT" "$CRITERIA_PATH" <<'PYEOF'
 import os, sys, json, re
 
 artifact_root = sys.argv[1]
 round_num = int(sys.argv[2])
 raw = sys.argv[3]
+criteria_path = sys.argv[4]
 dry_run = os.environ.get('DRY_RUN', '0') == '1'
+
+# Build CR -> category map from review-criteria.md (LLM-type only)
+cr_to_category: dict[str, str] = {}
+if os.path.isfile(criteria_path):
+    crit_text = open(criteria_path).read()
+    for m in re.finditer(r"^- id:\s*(CR-[A-Za-z0-9-]+)$", crit_text, re.M):
+        crid = m.group(1)
+        rest = crit_text[m.end():m.end()+2000]
+        body_lines: list[str] = []
+        for line in rest.split("\n"):
+            if line.startswith("  ") or (line == "" and not body_lines):
+                body_lines.append(line)
+            else:
+                break
+        body = "\n".join(body_lines)
+        if "checker_type: llm" not in body:
+            continue
+        cat_m = re.search(r"^\s+category:\s*([a-z0-9-]+)\s*$", body, re.M)
+        if cat_m:
+            cr_to_category[crid] = cat_m.group(1)
 
 # ─── Parse and validate input schema ──────────────────────────────────
 try:
@@ -261,11 +285,16 @@ for it in issues_in:
     fm_lines = [
         f"id: {iid}",
         f"criterion_id: {it['criterion_id']}",
+    ]
+    cat = cr_to_category.get(it['criterion_id'])
+    if cat:
+        fm_lines.append(f"category: {cat}")
+    fm_lines.extend([
         f"file: {it.get('file', '')}",
         f"severity: {it['severity']}",
         "state: new",
         f"created_in_round: {round_num}",
-    ]
+    ])
     if rec_of:
         # Per guide §7.5.1, recurrence_count tracks how many times this signature has
         # surfaced after the original (count >= 2 triggers HITL). Look up the prior
