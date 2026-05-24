@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## [1.3.0] — 2026-05-24
+
+**Criterion-centric batching for review/revise.** Switch grouping from
+file-centric to criterion-centric so LLM sub-agents focus on one issue
+category at a time. Reviser uses `Edit`-only for concurrency safety.
+
+### Changed (BREAKING)
+
+- Review fan-out is now **per-category** (`common/criterion-categories.md`).
+  Each cross-reviewer dispatch is scoped to one criterion category, not one
+  artifact-class cluster. `review/index.md` Step 2 rewritten;
+  `cross-reviewer-subagent.md` prompt rewritten.
+- Revise grouping is now **per-criterion** (`criterion_id`). Each reviser
+  dispatch carries ≤8 issues sharing the same criterion across multiple
+  leaves. `revise/index.md` Step 2 rewritten;
+  `per-issue-reviser-subagent.md` prompt rewritten.
+- Reviser sub-agents are **`Edit`-only** on artifact leaves; `Write` is
+  forbidden. Concurrency safety follows from `Edit`'s unique-match.
+- `common/review-criteria.md` LLM-type CRs now carry a required `category:`
+  field (13 CRs annotated).
+- `.review/round-*/issues/*.md` files gain a required `category:` frontmatter
+  field (auto-derived by `create-issues.sh`; legacy files migrated via
+  `scripts/migrate-issues-add-category.sh`).
+- Reviewer output JSON gains a required `category_applied:` top-level field.
+- `common/parallel-dispatch.md` Rule 3/5/6 updated; Rule 5 renamed
+  "Per-Work-Unit Isolation".
+
+### Added
+
+- `common/criterion-categories.md` — single source of truth for the 7+meta
+  system-design categories.
+- `scripts/check-criteria-categories.sh` — criteria↔categories consistency check.
+- `scripts/migrate-issues-add-category.sh` — one-time legacy issue backfill.
+- `common/config.yml` `revise.edit_cap` (default 8) and
+  `review.cluster_leaf_cap` (default 25).
+
+### Migration
+
+- Existing system-design bundles: run
+  `scripts/migrate-issues-add-category.sh <design-dir>` once to backfill the
+  `category:` field on legacy issue files. `check-issue.sh` treats missing
+  category as a non-fatal WARNING during the migration window.
+
+---
+
 ## [1.2.0] — 2025-05-22
 
 **Feature-level delta analysis.** Add single-feature delta mode for
