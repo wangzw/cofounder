@@ -45,7 +45,13 @@ script_dir = sys.argv[2]
 # Discover every check-*.sh in scripts/, EXCLUDING phase-gate scripts which
 # operate on a different argument shape and are invoked at different times by
 # the orchestrator (review/index.md and revise/index.md), not by run-checkers.
-PHASE_GATES = {"check-review-readiness.sh", "check-revise-completeness.sh"}
+# Also exclude check-criteria-categories.sh — it verifies the skill catalog's
+# internal consistency (operates on <skill-root>/common, not on a PRD bundle).
+PHASE_GATES = {
+    "check-review-readiness.sh",
+    "check-revise-completeness.sh",
+    "check-criteria-categories.sh",
+}
 checkers: list[str] = sorted(
     f for f in os.listdir(script_dir)
     if f.startswith("check-") and f.endswith(".sh") and f not in PHASE_GATES
