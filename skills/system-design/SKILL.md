@@ -341,19 +341,20 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 - Analyzing issue priority
 - Writing business archives (issues / self-reviews / plan.md / verdict.yml / index.md / CHANGELOG)
 - **Dispatching one sub-agent that combines multiple work units the skill defines as separate.**
-  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry), per-leaf
-  reviser dispatch (one reviser per leaf with `state: new` issues, never one reviser for >1
-  leaf), and per-cluster reviewer dispatch (clusters sized per `common/parallel-dispatch.md`
-  Rule 3) are **contracts** — the orchestrator MAY NOT coalesce them into a single "mega"
-  dispatch. The temptation to "just write one big sub-agent that handles all N issues"
-  (observed in a sibling-skill 2026-05-15 session, where it also triggered an unrelated
-  skill-catalog mutation) is forbidden because it (a) defeats the per-leaf isolation contract
-  in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing limits in Rule 3,
-  (c) eliminates the parallel cache-read amortization that makes large bundles affordable, and
-  (d) gives the coalesced sub-agent the surface area to mutate things it would never touch
-  in a per-leaf scope. If you find yourself authoring a single Task prompt that lists >1 leaf
-  for a writer or reviser role, STOP — split into per-leaf dispatches and emit them as a
-  parallel batch per Rule 1.
+  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry),
+  per-criterion-cluster reviser dispatch (one reviser per criterion-cluster, ≤8 issues per
+  `revise.edit_cap`; multiple clusters per criterion when count exceeds cap), and per-category
+  reviewer dispatch (one cross-reviewer per criterion category active this round, see
+  `common/criterion-categories.md`) are **contracts** — the orchestrator MAY NOT coalesce them
+  into a single "mega" dispatch. The temptation to "just write one big sub-agent that handles
+  all N issues" (observed in a sibling-skill 2026-05-15 session, where it also triggered an
+  unrelated skill-catalog mutation) is forbidden because it (a) defeats the per-work-unit
+  isolation contract in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing
+  limits in Rule 3, (c) eliminates the parallel cache-read amortization that makes large
+  bundles affordable, and (d) gives the coalesced sub-agent the surface area to mutate things
+  it would never touch in a per-unit scope. If you find yourself authoring a single Task prompt
+  that lists >1 leaf for a writer, >1 criterion-cluster for a reviser, or >1 category for a
+  reviewer, STOP — split into per-unit dispatches and emit them as a parallel batch per Rule 1.
 
 ## `--diagnose` Mode
 
@@ -434,9 +435,10 @@ Next steps:
 
 ## Configuration & Subagent Files
 
-- **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions)
-- **Review criteria**: `common/review-criteria.md` (CR catalog: formal script-type CR-SD01..CR-SD19 + frontmatter CR-SDFM01..03 + LLM-type CR-SD-DESIGN01..11 + audit-artifact schema CRs + meta CRs)
-- **Issue schema**: `common/issue-schema.md` (issue-file frontmatter contract, state-machine transitions, history append-only invariants — read at runtime by `create-issues.sh`, `check-issue.sh`, and the reviser subagent)
+- **Config**: `common/config.yml` (all thresholds, model tiers, tool permissions; includes `revise.edit_cap` and `review.cluster_leaf_cap` for criterion-centric cluster sizing)
+- **Review criteria**: `common/review-criteria.md` (CR catalog: formal script-type CR-SD01..CR-SD19 + frontmatter CR-SDFM01..03 + LLM-type CR-SD-DESIGN01..11 + audit-artifact schema CRs + meta CRs; LLM entries carry `category:` matching `criterion-categories.md`)
+- **Criterion categories**: `common/criterion-categories.md` — single source of truth for LLM CR-to-category mapping (consumed by reviewer cluster fan-out + reviser category-context prompt)
+- **Issue schema**: `common/issue-schema.md` (issue-file frontmatter contract incl. v1.4+ `category:` field, state-machine transitions, history append-only invariants — read at runtime by `create-issues.sh`, `check-issue.sh`, and the reviser subagent)
 - **Domain glossary**: `common/domain-glossary.md` (system-design domain terms: module, API surface, Boundary Enforcement, Feature-Module mapping, etc.)
 - **Templates**:
   - `common/templates/design-readme-template.md`
@@ -495,6 +497,8 @@ Next steps:
   - `scripts/glossary-probe.sh` — Round-0 glossary probe (guide §6.2)
   - `scripts/synthesize-clarification.sh` — emit a minimal deferred-only clarification.yml
   - `scripts/git-precheck.sh` — bootstrap git-state precheck (guide §21.0 + §8.3)
+  - `scripts/check-criteria-categories.sh` — consistency check between `review-criteria.md` and `criterion-categories.md`
+  - `scripts/migrate-issues-add-category.sh` — one-time backfill for legacy issue files missing the `category:` frontmatter
 - **Diagnostic scripts**:
   - `scripts/metrics-aggregate.sh` — aggregate harness JSONL + dispatch-log into `.review/metrics/<scope>.metrics.yml`
 - **Compact scripts** (`--compact` mode):
