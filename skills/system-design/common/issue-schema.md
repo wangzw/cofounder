@@ -22,6 +22,7 @@ Each issue lives at `<artifact-root>/.review/round-<N>/issues/<id>.md`.
 ---
 id: I-NNN                      # Required. Stable per artifact root, monotonic. Format: I-<3+ digits>.
 criterion_id: CR-XXX           # Required. Must match an entry in common/review-criteria.md.
+category: module-boundary      # Required (since v1.4). One of the categories in common/criterion-categories.md. Auto-derived from criterion_id by create-issues.sh.
 file: relative/path.md         # Required. Path from artifact root. May be "" for repo-wide issues.
 severity: error                # Required. One of: critical | error | warning | info.
 state: new                     # Required. One of: new | fixed | false-positive | deferred | superseded.
@@ -58,6 +59,7 @@ fix_history: []                # Diff/notes for past fixes; consulted on recurre
 |-------|----------|-------|
 | `id` | Always | Format `I-\d{3,}`. Monotonic per artifact root. |
 | `criterion_id` | Always | Must match a CR id in `review-criteria.md`. |
+| `category` | Always (v1.4+) | One of the categories in `criterion-categories.md`. Auto-derived from `criterion_id` by `create-issues.sh`. Legacy issues without this field are treated as a non-fatal WARNING by `check-issue.sh`; use `scripts/migrate-issues-add-category.sh` to backfill. |
 | `file` | Always | Empty string allowed for repo-wide issues. |
 | `severity` | Always | `critical` / `error` / `warning` / `info`. |
 | `state` | Always | See state machine below. |
