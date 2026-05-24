@@ -355,19 +355,20 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 - Analyzing issue priority
 - Writing business archives (issues / self-reviews / plan.md / verdict.yml / index.md / CHANGELOG)
 - **Dispatching one sub-agent that combines multiple work units the skill defines as separate.**
-  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry), per-leaf
-  reviser dispatch (one reviser per leaf with `state: new` issues, never one reviser for >1
-  leaf), and per-cluster reviewer dispatch (clusters sized per `common/parallel-dispatch.md`
-  Rule 3) are **contracts** — the orchestrator MAY NOT coalesce them into a single "mega"
-  dispatch. The temptation to "just write one big sub-agent that handles all 38 issues"
-  (observed in delivery 4 of a 2026-05-15 session, where it also triggered an unrelated
-  skill-catalog mutation) is forbidden because it (a) defeats the per-leaf isolation contract
-  in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing limits in Rule 3,
-  (c) eliminates the parallel cache-read amortization that makes large bundles affordable, and
-  (d) gives the coalesced sub-agent the surface area to mutate things it would never touch
-  in a per-leaf scope. If you find yourself authoring a single Task prompt that lists >1 leaf
-  for a writer or reviser role, STOP — split into per-leaf dispatches and emit them as a
-  parallel batch per Rule 1.
+  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry),
+  per-criterion-cluster reviser dispatch (one reviser per criterion-cluster, ≤8 issues per
+  `revise.edit_cap`; multiple clusters per criterion when count exceeds cap), and per-category
+  reviewer dispatch (one cross-reviewer per criterion category active this round, see
+  `common/criterion-categories.md`) are **contracts** — the orchestrator MAY NOT coalesce them
+  into a single "mega" dispatch. The temptation to "just write one big sub-agent that handles
+  all 38 issues" (observed in delivery 4 of a 2026-05-15 session, where it also triggered an
+  unrelated skill-catalog mutation) is forbidden because it (a) defeats the per-work-unit
+  isolation contract in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing
+  limits in Rule 3, (c) eliminates the parallel cache-read amortization that makes large
+  bundles affordable, and (d) gives the coalesced sub-agent the surface area to mutate things
+  it would never touch in a per-unit scope. If you find yourself authoring a single Task prompt
+  that lists >1 leaf for a writer, >1 criterion-cluster for a reviser, or >1 category for a
+  reviewer, STOP — split into per-unit dispatches and emit them as a parallel batch per Rule 1.
 
 ## `--diagnose` Mode
 
@@ -453,9 +454,10 @@ After feature-level PRD change:
 
 ## Configuration & Subagent Files
 
-- **Config**: `common/config.yml`
-- **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; see guide §1)
-- **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format)
+- **Config**: `common/config.yml` (includes `revise.edit_cap` and `review.cluster_leaf_cap` for criterion-centric cluster sizing)
+- **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; LLM entries carry `category:` matching `criterion-categories.md`)
+- **Criterion categories**: `common/criterion-categories.md` — single source of truth for LLM CR-to-category mapping (consumed by reviewer cluster fan-out + reviser category-context prompt)
+- **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format; v1.4+ requires `category:` field)
 - **Domain glossary**: `common/domain-glossary.md`
 - **Formal-review scripts** — one per artifact type (guide §1.1 + §9 contract: 3-state returncode + stdout restates meaning + idempotent + agent-actionable):
   - `scripts/run-checkers.sh` — dispatcher; auto-discovers and invokes every `check-*.sh` (except phase gates), aggregates findings
@@ -480,10 +482,12 @@ After feature-level PRD change:
     - `scripts/check-review-readiness.sh`    no prior `state: new` issues (guide §7.3)
     - `scripts/check-revise-completeness.sh` no `state: new` in current round (guide §7.3)
   - Helpers:
-    - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1)
+    - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1); injects `category` from criterion_id
     - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
     - `scripts/synthesize-clarification.sh`  --no-consultant: synthesize deferred-only clarification.yml without violating orchestrator pure-dispatch contract
     - `scripts/compact-delivery.sh`          `--compact` mode: aggregates intermediate review rounds of the current delivery into `compacted-history.md` and deletes their `round-N/` + `traces/round-N/` trees
+    - `scripts/check-criteria-categories.sh` consistency check between `review-criteria.md` and `criterion-categories.md`
+    - `scripts/migrate-issues-add-category.sh` one-time backfill for legacy issue files missing the `category:` frontmatter
   - Pipeline-stage scripts (per audit-design guide §6):
     - `scripts/prepare-input.sh`             input-classification (CR-CL) → planner-input (CR-PL)
     - `scripts/commit-delivery.sh`           finalize a converged delivery (manifest snapshot + summary; invokes `prune-traces.sh`)
