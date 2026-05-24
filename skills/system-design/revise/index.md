@@ -54,48 +54,70 @@ invoked on an empty or mis-numbered round. The script makes the
 precondition unskippable — control cannot reach reviser dispatch
 without `verify-phase-entry` having exited 0.
 
-### Step 2 — Build Issue-Group Manifest (script)
+### Step 2 — Build Criterion-Cluster Manifest
 
-The orchestrator reads `<design-dir>/.review/round-<N>/issues/*.md` and groups
-them by `file:` field. Issues whose `state` is already in
-{fixed, false-positive, deferred, superseded} are skipped — only `state: new`
-needs work.
+The orchestrator reads `<design-dir>/.review/round-<N>/issues/*.md` and
+groups them **by `criterion_id:` field** (NOT by `file:` — that was the
+prior model). Issues whose `state` is already in
+{fixed, false-positive, deferred, superseded} are skipped — only
+`state: new` needs work.
 
 The grouping logic is mechanical (frontmatter-only inspection); the
-orchestrator does it inline rather than via a separate script. Output is
-held in `state.yml` as:
+orchestrator does it inline rather than via a separate script. Each
+cluster covers ONE `criterion_id` and AT MOST
+`common/config.yml revise.edit_cap` issues (default 8). When a criterion
+has more than `edit_cap` issues, the orchestrator splits it into multiple
+clusters; each cluster gets a distinct `cluster_id` (`R<round>-CC-<nnn>`).
+Output is held in `state.yml` as `revise_clusters:`:
 
 ```yaml
-revise_groups:
-  - leaf: modules/M-001-auth.md
-    issues: [I-007, I-012]
-  - leaf: api/API-002-checkout.md
-    issues: [I-008]
-  - leaf: README.md
-    issues: [I-014]
-  - leaf: ""    # repo-wide issues (no specific file)
-    issues: [I-019]
+revise_clusters:
+  - cluster_id: R3-CC-001
+    criterion_id: CR-SD-DESIGN01
+    category: module-boundary
+    issues: [I-007, I-019, I-024]
+    affected_leaves: [modules/M-001-auth.md, modules/M-004-billing.md, modules/M-007-notifications.md]
+  - cluster_id: R3-CC-002
+    criterion_id: CR-SD-DESIGN06
+    category: failure-modes
+    issues: [I-012, I-031]
+    affected_leaves: [modules/M-001-auth.md, modules/M-005-orders.md]
 ```
+
+It is **expected** that the same leaf appears in multiple clusters —
+different revisers will Edit different sections of that leaf, with `Edit`'s
+unique-match semantics providing the safety lock.
 
 (Step 1's `verify-phase-entry revise` already guarantees at least one
 `state: new` issue exists in the round, so the manifest is always
 non-empty when we reach Step 2.)
 
-### Step 3 — Fan-out Per-Issue-Reviser (parallel)
+### Step 3 — Fan-out Per-Criterion-Cluster Reviser (parallel)
 
-For each entry in `revise_groups`, dispatch one
-`revise/per-issue-reviser-subagent.md` with:
+For each entry in `revise_clusters`, dispatch one
+`revise/per-issue-reviser-subagent.md` in a single assistant response
+(`common/parallel-dispatch.md` Rule 1) with:
 
-- The leaf path
-- The full text of every issue in that group (from
+- `trace_id: R<round>-R-<NNN>`
+- The cluster's `criterion_id` and `category`
+- The full text of every issue in this cluster (from
   `<design-dir>/.review/round-<N>/issues/<id>.md`)
-- The current content of the leaf
+- The `affected_leaves` list (absolute paths from artifact root) — the
+  reviser reads each leaf at processing time, not in advance
 - `<design-dir>/.review/issues/summary.yml` — for any `recurrence_of`
   reference, the reviser reads `fix_history` to see how the prior
   attempt(s) failed (guide §7.5.1)
+- The relevant section of `common/criterion-categories.md` for this
+  category (typical fix pattern + anti-patterns)
 
-**Reviser is allowed to** edit the leaf, then transition each issue's
-`state:` field. Permitted state transitions (guide §7.2):
+The reviser **MUST use `Edit` only** (no `Write`) on artifact leaves.
+Concurrency safety follows from `Edit`'s requirement that `old_string` be
+unique; collisions surface as self-loop iterations in Step 4 rather than
+silent overwrites.
+
+**Reviser is allowed to** Edit any leaf listed in `affected_leaves`, then
+transition each issue's `state:` field. Permitted state transitions
+(guide §7.2, unchanged):
 
 | from | to | required metadata |
 |------|----|-------------------|
@@ -116,21 +138,30 @@ these blocks; it propagates them verbatim into `summary.yml`.
 
 ### Step 4 — Self-Verify Formal Pass (writer self-loop, no issues created)
 
-After each reviser finishes, the orchestrator re-runs
+After all revisers in this iteration ACK, the orchestrator re-runs
 
 ```bash
 scripts/run-checkers.sh <design-dir>
 ```
 
 Per guide §4 + §4.1, formal failures discovered here are NOT filed as new
-issues — the reviser is dispatched again on the affected leaf with the
-formal-checker's JSON output and is expected to fix the structural problem
-in place. This loop continues until either:
+issues. **Re-dispatch is by failing leaf, not by criterion** — formal
+problems often span multiple types, so leaf is the better re-dispatch unit
+for self-loop. Each re-dispatched reviser sees:
+
+- The failing leaf path
+- The formal-checker's JSON output (failure rows scoped to this leaf)
+- All (criterion, issue) pairs touching this leaf that have not yet reached
+  a terminal state
+
+The re-dispatched reviser **still uses `Edit`-only** (never `Write`). If a
+formal failure can only be repaired by integrated rewriting (rare), the
+reviser ACKs `FAIL trace_id=... reason=requires-write-not-edit` and the
+orchestrator escalates to HITL. This loop continues until either:
 
 - formal pass (exit 0) — proceed to Step 5
 - 3 consecutive formal failures on the same leaf — escalate to HITL with
-  the leaf path and the failing CR-IDs (per guide §4.1 last paragraph,
-  this is the only time a self-audit failure becomes a real issue).
+  the leaf path and the failing CR-IDs (per guide §4.1 last paragraph).
   Under `--auto`, the orchestrator instead appends an `auto_decision`
   block to `state.yml` with `verdict: formal_self_loop_exhausted`,
   `leaf`, and `failing_cr_ids` (schema in `review/index.md` Step 8),
