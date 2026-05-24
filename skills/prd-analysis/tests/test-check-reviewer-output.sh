@@ -104,4 +104,18 @@ assert_exit 1 "$CHECK" "$FIXTURE"
 assert_stdout_contains "category_applied"
 teardown_fixture
 
+test_case "adversarial reviewer output with category_applied: meta passes"
+setup_fixture
+write_file ".review/round-1/reviewer-output/R1-V-002.json" '{
+  "round": 1,
+  "reviewer_variant": "adversarial",
+  "trace_id": "R1-V-002",
+  "scope_applied": "incremental",
+  "category_applied": "meta",
+  "issues": []
+}'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
 end_tests

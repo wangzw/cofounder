@@ -74,14 +74,21 @@ with the same shape as cross-reviewer:
   "reviewer_variant": "adversarial",
   "trace_id": "R3-V-002",
   "scope_applied": "incremental",
+  "category_applied": "meta",
   "issues": [...]
 }
 ```
 
 The top-level `scope_applied` field is REQUIRED and MUST echo the `mode`
-you actually applied. Per-finding fields are identical. Fingerprint-matching
-rules are identical (guide §7.6). Set `criterion_id` to the closest matching
-CR in `common/review-criteria.md`; if no existing CR fits, use
+you actually applied. The top-level `category_applied` field is also
+REQUIRED (validated by `scripts/check-reviewer-output.sh`); always set it
+to **`meta`** — adversarial findings are cross-cutting by design and do
+not belong to a single category cluster, and the `meta` category in
+`common/criterion-categories.md` is the canonical bucket for
+`CR-META-mechanize` / `CR-META-adversarial`. Per-finding fields are
+identical to cross-reviewer's. Fingerprint-matching rules are identical
+(guide §7.6). Set `criterion_id` to the closest matching CR in
+`common/review-criteria.md`; if no existing CR fits, use
 `criterion_id: CR-META-adversarial` and explain in `description` what
 new criterion the finding suggests — the criteria-evolution loop (guide
 §8) will pick it up if the pattern recurs.
