@@ -1,15 +1,14 @@
 # Parallel Dispatch Protocol
 
 Shared dispatch rules for fan-out generation of module / API / README leaves (generation
-Step 8 writer fan-out) and per-issue reviser subagents (revise-mode Step 3 fan-out). These
-rules take precedence over any per-mode wording that conflicts.
+Step 8 writer fan-out), cross-reviewer subagents (review-mode Step 2 per-category fan-out),
+and per-criterion-cluster reviser subagents (revise-mode Step 3 fan-out). These rules take
+precedence over any per-mode wording that conflicts.
 
-> **Note on review phase.** system-design's review phase uses a single-shot cross-reviewer
-> plus a conditional adversarial-reviewer (`review/index.md` Step 2 + Step 3) — there is no
-> per-leaf reviewer fan-out, so the per-cluster sizing rule (Rule 3) does not apply to
-> reviewers. Rule 1 (single-response parallel emission) STILL applies whenever both the
-> cross- and adversarial-reviewer fire in the same round — emit them as a parallel pair, not
-> sequentially.
+> **Note on review phase.** system-design's review phase fans out one cross-reviewer per
+> criterion category (per `common/criterion-categories.md`). All cross-reviewer dispatches
+> in a round emit as a single parallel batch per Rule 1. The conditional adversarial-reviewer
+> (`review/index.md` Step 3) still fires once per round, after the cross-reviewer batch ACKs.
 
 ---
 
@@ -54,11 +53,22 @@ independent.
   listed in `plan.add` (and `plan.modify` for `--evolve`) in a single parallel emission. If
   the total leaf count exceeds 20, split into two emissions of ≤20; emit the second only
   after all ACKs from the first are collected (to stay within Agent-tool concurrency limits).
-- **Reviser subagents:** one subagent per leaf with `state: new` issues. A leaf with
-  **>8 issues** gets its own dispatch — large edit counts replay more cache_read per turn.
-  Otherwise batch all reviser dispatches in a single parallel emission.
-- No leaf appears in two reviser dispatches in the same round.
-- (Reviewer fan-out: not applicable; see top-of-file note.)
+- **Reviser subagents (revise fan-out):** grouping is by `criterion_id`, NOT by leaf. One
+  reviser per criterion-cluster. Each cluster carries ≤`common/config.yml revise.edit_cap`
+  issues (default 8). The leaf count in a cluster is emergent (depends on how the
+  criterion's issues are distributed across leaves) and is **not directly capped** — the
+  edit-count cap is the protection. If a single criterion has >`edit_cap` issues this round,
+  split into multiple clusters with monotonic `cluster_id`s (`R<round>-CC-<nnn>`); the same
+  criterion's clusters may run in parallel. The same leaf may appear in multiple clusters —
+  `Edit`'s unique-match semantics serialize sibling writes naturally (see Rule 6).
+- **Reviewer subagents (review fan-out):** grouping is by **criterion category**, not by
+  artifact class. One cross-reviewer per category active this round (see
+  `common/criterion-categories.md`). Each reviewer receives all in-scope leaves and ONLY
+  the CR-IDs in its category. If a single category's leaf set exceeds
+  `common/config.yml review.cluster_leaf_cap` (default 25), split into multiple sub-clusters
+  by leaf range; sub-clusters carry identical criteria and disjoint leaf subsets.
+- No leaf appears in two reviewer clusters; a leaf MAY appear in multiple reviser clusters
+  when different criteria touch it (this is expected with the criterion-centric model).
 
 ---
 
@@ -84,30 +94,47 @@ emitting the parallel Agent blocks (pre-registration prevents orphaned subagent 
 
 ---
 
-## Rule 5 — Per-Leaf Isolation Contract (MANDATORY)
+## Rule 5 — Per-Work-Unit Isolation Contract (MANDATORY)
 
-Each writer / reviser subagent owns exactly one leaf file. It MUST NOT:
+Each sub-agent owns exactly one work unit. The work-unit definition varies by role:
 
-- Read or write any leaf outside its assigned `<target-path>`.
-- Use Grep/Glob to discover sibling files — all context is pre-supplied in the dispatch
-  prompt.
-- Perform a post-write re-read of the file it just wrote.
-- Emit content in its Task return beyond the single-line ACK.
+- **Writer**: one leaf file. (Unchanged from prior contract.)
+- **Reviewer (cross / adversarial)**: one category cluster — all leaves listed in the
+  cluster + the cluster's CR-ID list. The reviewer MUST NOT apply CR-IDs outside the
+  cluster and MUST NOT emit findings for criteria from other categories.
+- **Reviser**: one criterion-cluster — ≤`revise.edit_cap` issues, all sharing the same
+  `criterion_id`, plus their `affected_leaves` list. The reviser MUST NOT Edit leaves
+  outside `affected_leaves`, MUST NOT touch issues outside its cluster, and MUST use `Edit`
+  only on artifact leaves (never `Write`).
 
-The dispatch prompt MUST supply the subagent with all context it needs inline (PRD feature
-text, data-model excerpts, sibling-module Public Interface excerpts, applicable conventions)
-so that no cross-file reads are needed. This is the mechanical enforcement of the
-self-contained-file principle.
+Common to all roles:
+
+- No Grep/Glob to discover sibling files — all target paths are pre-supplied in the
+  dispatch prompt.
+- No post-write re-read of files just written.
+- No Task return content beyond the single-line ACK.
+- The dispatch prompt MUST supply all inline context (criterion-category notes, PRD feature
+  text, data-model excerpts, sibling-module Public Interface excerpts, applicable
+  conventions) so cross-file reads outside the work unit are unnecessary. This is the
+  mechanical enforcement of the self-contained-file principle.
 
 ---
 
 ## Rule 6 — Tool Usage Inside Subagents (MANDATORY)
 
-- File with **1 edit** → use `Edit`.
-- File with **>1 edit on the same file** → Read the file once, merge every change in memory,
-  and emit a **single `Write`** that overwrites the leaf with the final content. Do NOT issue
-  multiple `Edit` calls on the same file in sequence — each Edit triggers a cache_read
-  replay of full conversation state.
+- **Revisers**: `Edit` only on artifact leaves. **Never `Write`.** Each issue corresponds
+  to one `Edit` call (one precision replacement). If multiple Edits hit the same leaf
+  within the same cluster, issue them sequentially within the sub-agent. Do NOT merge
+  multiple Edits into a single `Write` — `Write` would silently overwrite parallel
+  revisers' changes on the same leaf (one criterion's reviser cannot see another
+  criterion's reviser's work). The cache_read cost of multiple sequential Edits inside one
+  cluster is bounded by the `edit_cap` (default 8) and is a deliberate trade-off for
+  concurrency safety.
+- **Writers**: rule unchanged. File with 1 edit → `Edit`. File being created → single
+  `Write`. Multi-edit on the same file in a single dispatch → Read once, merge in memory,
+  single `Write` with final content.
+- **Reviewers**: read-only on artifact leaves (no `Edit`, no `Write`); single `Write` to
+  `reviewer-output/<trace_id>.json`. Rule unchanged.
 - No post-edit "verification re-read" of a file you just edited.
 - No Grep/Glob exploration inside subagents — all target paths are pre-listed in the dispatch
   prompt.
@@ -176,5 +203,6 @@ After all writer ACKs for a batch are collected, the orchestrator runs a reduce 
 5. Writers with `self_review_status: PARTIAL` are flagged for the cross-reviewer in the next
    review round — do not re-dispatch them now.
 
-See `review/index.md` Step 2/3 (single-shot reviewers) and `revise/index.md` Step 3 (fan-out
+See `review/index.md` Step 2 (per-category reviewer fan-out) and `revise/index.md` Step 2 +
+Step 3 (per-criterion reviser fan-out
 revisers) for the full integration.
