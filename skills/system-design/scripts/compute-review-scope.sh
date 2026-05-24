@@ -243,6 +243,47 @@ else:
     for p in unchanged:
         lines.append(f"  - {p}")
 
+# category_clusters: derived from common/review-criteria.md (LLM-type CRs only).
+# One cluster per category with CR-IDs and the in-scope leaves. Used by
+# review/index.md Step 2 to fan out one cross-reviewer per category.
+criteria_path = os.path.join(SCRIPT_DIR, "..", "common", "review-criteria.md")
+cat_to_crs: dict[str, list[str]] = {}
+if os.path.isfile(criteria_path):
+    crit_text = open(criteria_path, encoding="utf-8").read()
+    for m in re.finditer(r"^- id:\s*(CR-[A-Za-z0-9-]+)$", crit_text, re.M):
+        crid = m.group(1)
+        rest = crit_text[m.end():m.end()+2000]
+        body_lines: list[str] = []
+        for line in rest.split("\n"):
+            if line.startswith("  ") or (line == "" and not body_lines):
+                body_lines.append(line)
+            else:
+                break
+        body = "\n".join(body_lines)
+        if "checker_type: llm" not in body:
+            continue
+        cat_m = re.search(r"^\s+category:\s*([a-z0-9-]+)\s*$", body, re.M)
+        if not cat_m:
+            continue
+        cat_to_crs.setdefault(cat_m.group(1), []).append(crid)
+
+all_leaves = sorted(set(changed) | set(unchanged))
+
+lines.append("category_clusters:")
+if not cat_to_crs:
+    lines.append("  []")
+else:
+    for cat in sorted(cat_to_crs.keys()):
+        crs = sorted(cat_to_crs[cat])
+        lines.append(f"  - category: {cat}")
+        lines.append(f"    criteria: [{', '.join(crs)}]")
+        if not all_leaves:
+            lines.append("    leaves: []")
+        else:
+            lines.append("    leaves:")
+            for p in all_leaves:
+                lines.append(f"      - {p}")
+
 try:
     with open(SCOPE_PATH, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
