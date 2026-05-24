@@ -185,7 +185,7 @@ and one test runner. **~34 scripts / 23 test runners / 442 tests** (run
 |--------|------|
 | `commit-delivery.sh` | On-converge: stages, commits, creates annotated `system-design-delivery-<N>-<slug>` tag. |
 | `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
-| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
+| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`, and v1.4+ `category_clusters[]` — one entry per active LLM-criterion category for per-category reviewer fan-out); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |
 | `metrics-aggregate.sh` | `--diagnose` mode: JOINs harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`. |
 

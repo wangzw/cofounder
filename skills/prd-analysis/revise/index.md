@@ -242,7 +242,7 @@ non-converged terminal verdicts).
 ## Files in This Directory
 
 - [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) —
-  per-leaf reviser sub-agent prompt
+  per-criterion-cluster reviser sub-agent prompt
 - [revise-mode.md](revise-mode.md) — separate concern: interactive PRD
   change-management mode (e.g. add a feature to a delivered PRD); not
   loaded by `--revise` review-revise loop.

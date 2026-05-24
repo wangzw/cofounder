@@ -242,4 +242,4 @@ non-converged terminal verdicts).
 ## Files in This Directory
 
 - [per-issue-reviser-subagent.md](per-issue-reviser-subagent.md) —
-  per-leaf reviser sub-agent prompt
+  per-criterion-cluster reviser sub-agent prompt
