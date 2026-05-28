@@ -8,6 +8,7 @@ GOOD='{
   "round": 1,
   "reviewer_variant": "cross",
   "trace_id": "R1-V-001",
+  "category_applied": "traceability",
   "issues": [
     {
       "criterion_id": "CR-PP06",
@@ -63,6 +64,7 @@ teardown_fixture
 test_case "CR-RO02: invalid severity"
 setup_fixture
 write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
+  "category_applied": "traceability",
   "issues": [
     {
       "criterion_id": "CR-PP06",
@@ -75,6 +77,45 @@ write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
 }'
 assert_exit 1 "$CHECK" "$FIXTURE"
 assert_stdout_contains "huge"
+teardown_fixture
+
+test_case "category_applied present passes"
+setup_fixture
+write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
+  "round": 1,
+  "reviewer_variant": "cross",
+  "trace_id": "R1-V-001",
+  "category_applied": "traceability",
+  "issues": []
+}'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
+teardown_fixture
+
+test_case "category_applied missing fails CR-RO02"
+setup_fixture
+write_file ".review/round-1/reviewer-output/R1-V-001.json" '{
+  "round": 1,
+  "reviewer_variant": "cross",
+  "trace_id": "R1-V-001",
+  "issues": []
+}'
+assert_exit 1 "$CHECK" "$FIXTURE"
+assert_stdout_contains "category_applied"
+teardown_fixture
+
+test_case "adversarial reviewer output with category_applied: meta passes"
+setup_fixture
+write_file ".review/round-1/reviewer-output/R1-V-002.json" '{
+  "round": 1,
+  "reviewer_variant": "adversarial",
+  "trace_id": "R1-V-002",
+  "scope_applied": "incremental",
+  "category_applied": "meta",
+  "issues": []
+}'
+assert_exit 0 "$CHECK" "$FIXTURE"
+assert_stdout_contains "PASS"
 teardown_fixture
 
 end_tests

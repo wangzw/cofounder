@@ -93,44 +93,51 @@ Both Step 1.5 and Step 1.6 are **orchestration helpers**, not gates: a non-zero
 exit indicates a script error (HITL) rather than a content failure. Phase
 entry (Step 1) is the only gate.
 
-### Step 2 — Cross-Reviewer Dispatch (substantive only)
+### Step 2 — Cross-Reviewer Dispatch (per-category fan-out)
 
 Pre-conditions: Step 1 exit 0 (entry verification PASS) **and** there is meaningful
 work for the reviewer (artifact changed since last delivery, or prior-round
 issues are still open).
 
+Read `<prd-dir>/.review/round-<N>/review-scope.yml`. Its `category_clusters:`
+block (emitted by Step 1.6 `compute-review-scope.sh`) lists one entry per
+criterion category active this round — each entry has `category`, `criteria`,
+`leaves`. **For each entry, dispatch ONE `review/cross-reviewer-subagent.md`
+sub-agent, all in a single assistant response** (`common/parallel-dispatch.md`
+Rule 1). Each reviewer is scoped to a single category — never combine multiple
+categories into one dispatch (per "Forbidden Actions" in SKILL.md).
+
 ```
-Dispatch: review/cross-reviewer-subagent.md
+Dispatch: review/cross-reviewer-subagent.md  (× N categories, parallel)
 ```
 
-**Sub-agent inputs**:
+**Per-cluster dispatch prompt MUST include**:
 
-- The PRD bundle leaves
-- Writer self-review files at `<prd-dir>/.review/round-<N>/self-reviews/` (only present
-  for writers that ACKed `self_review_status: PARTIAL`; FULL_PASS writers leave no file —
-  see `generate/writer-subagent.md` Output Contract Write 2). Absence of a file for a given
-  trace_id is the canonical FULL_PASS signal — not a sign the writer skipped self-audit.
-- `<prd-dir>/.review/issues/summary.yml` — for fingerprint matching against
-  prior issues (guide §7.6). The reviewer MUST check each new finding
-  against this list before emitting it; matched findings get
-  `recurrence_of: <prior-id>` in the output.
-- `<prd-dir>/.review/round-<N>/review-scope.yml` (Step 1.6 output) — the
-  reviewer MUST honor `mode` and the `changed_leaves` / `unchanged_leaves`
-  partition: in `mode: incremental`, criteria with `incremental_skip: per_file`
-  apply only to leaves listed in `changed_leaves`; criteria with
-  `incremental_skip: full_scan` apply to all leaves regardless. The reviewer's
-  output JSON MUST include a top-level `scope_applied: full | incremental`
-  field for downstream audit.
-- `common/review-criteria.md` — every entry whose `checker_type: llm`
+- `trace_id: R<round>-V-<NNN>` (counter monotonic across all reviewer dispatches
+  this round)
+- The category name (e.g. `traceability`) and the cluster's CR-ID list
+- The leaves list (absolute paths from artifact root)
+- The PRD bundle root path (the reviewer reads leaves on demand)
+- Inline excerpt of `common/criterion-categories.md` for the cluster's category
+  (typical fix pattern + anti-patterns), so the reviewer's attention is pre-anchored
+- Standard reviewer inputs unchanged: `summary.yml` path, `review-scope.yml` path,
+  writer self-review files at `<prd-dir>/.review/round-<N>/self-reviews/`
 
 **Sub-agent output (one disk write)**: writes a JSON document to
 `<prd-dir>/.review/round-<N>/reviewer-output/<trace_id>.json`, conforming
-to the LLM raw-output schema in `common/issue-schema.md`. The reviewer
-NEVER writes issue files directly (guide §7.1) — `create-issues.sh`
-walks the `reviewer-output/` directory and materializes per-issue files
-in a later step.
+to the LLM raw-output schema in `common/issue-schema.md`. The output MUST
+include top-level `scope_applied` and `category_applied` fields (the latter
+matching the dispatch's category). The reviewer NEVER writes issue files
+directly (guide §7.1) — `create-issues.sh` walks the `reviewer-output/`
+directory and materializes per-issue files in Step 4.
 
-**Orchestrator action on ACK**: record the trace_id in `state.yml`. Do
+**Cluster cap protection**: if a category's `leaves` list exceeds
+`common/config.yml review.cluster_leaf_cap` (default 25), the orchestrator
+splits the cluster into multiple sub-clusters by leaf range; each sub-cluster
+carries identical `criteria` and a disjoint subset of `leaves`. Each sub-cluster
+gets its own trace_id and runs in parallel.
+
+**Orchestrator action on each ACK**: record the trace_id in `state.yml`. Do
 not yet materialize issues; that happens after Step 3 (so cross +
 adversarial reviewer outputs are merged in one create-issues pass).
 

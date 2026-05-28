@@ -415,6 +415,7 @@ before review entry).
   conflicts_with: []
   priority: 1
   incremental_skip: full_scan
+  category: traceability
 ```
 
 ---
@@ -435,6 +436,7 @@ adding a new per-artifact `check-*.sh` rule.
   severity: info
   conflicts_with: []
   priority: 3
+  category: meta
 ```
 
 ---
@@ -454,6 +456,7 @@ new substantive criterion.
   severity: warning
   conflicts_with: []
   priority: 3
+  category: meta
 ```
 
 ---
@@ -474,6 +477,7 @@ undiscoverable risks that block informed prioritization.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: evidence
 ```
 
 ---
@@ -493,6 +497,7 @@ Missing competitive context leaves the PRD unable to justify scope and roadmap p
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: evidence
 ```
 
 ---
@@ -513,6 +518,7 @@ evaluated at launch.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: evidence
 ```
 
 ---
@@ -532,6 +538,7 @@ Unmitigated risks leave the product launch with unknown critical blockers.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -552,6 +559,7 @@ explicit justification). Misaligned priorities cause sprint planning failures.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -571,6 +579,7 @@ leave security holes that system-design cannot close without backtracking to req
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: coherence
 ```
 
 ---
@@ -590,6 +599,7 @@ privacy coverage creates legal exposure discovered only after implementation.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: privacy-security
 ```
 
 ---
@@ -611,6 +621,7 @@ excerpt instead.
   conflicts_with: []
   priority: 1
   incremental_skip: per_file
+  category: risk-governance
 ```
 
 ---
@@ -658,6 +669,7 @@ unauthorized access.
   conflicts_with: []
   priority: 1
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -679,6 +691,7 @@ Feature. Missing E2E scenarios mean system-design cannot produce an integration 
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -699,6 +712,7 @@ paths, or generator API signatures is FORBIDDEN (over-specification creates main
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -720,6 +734,7 @@ inconsistent UI and blocks the frontend draft.
   conflicts_with: []
   priority: 1
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -740,6 +755,7 @@ omit this section. Incomplete form specs generate inconsistent validation UX acr
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -761,6 +777,7 @@ cannot be validated by design review.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -781,6 +798,7 @@ modes block interaction-design consistency checks.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -802,6 +820,7 @@ finding. This criterion is the primary guard against oscillation-induced infinit
   conflicts_with: []
   priority: 1
   incremental_skip: per_file
+  category: coherence
 ```
 
 ---
@@ -824,6 +843,7 @@ across features.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: interaction-design
 ```
 
 ---
@@ -844,6 +864,7 @@ undefined feedback make front-end engineers guess at transition behavior.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: coherence
 ```
 
 ---
@@ -865,6 +886,7 @@ forces refactoring during implementation.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: coherence
 ```
 
 ---
@@ -885,6 +907,7 @@ Inconsistent component contracts produce broken composition at integration time.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: coherence
 ```
 
 ---
@@ -913,6 +936,7 @@ semantic event-flow / payload mismatches that need contextual judgment.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: coherence
 ```
 
 ---
@@ -934,6 +958,7 @@ extends the baseline. Features without this section silently ship accessibility 
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: accessibility-i18n
 ```
 
 ---
@@ -954,6 +979,7 @@ systematic WCAG auditing.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: accessibility-i18n
 ```
 
 ---
@@ -977,6 +1003,7 @@ conventions.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: accessibility-i18n
 ```
 
 ---
@@ -997,6 +1024,7 @@ convention is stated — do NOT audit individual string keys.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: accessibility-i18n
 ```
 
 ---
@@ -1018,6 +1046,7 @@ permission, conflict, not_found) is sufficient — do NOT require a row per indi
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: accessibility-i18n
 ```
 
 ---
@@ -1038,6 +1067,7 @@ back-navigation breakage.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: interaction-design
 ```
 
 ---
@@ -1058,6 +1088,7 @@ produce janky UX and inconsistent loading state handling across features.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -1079,6 +1110,7 @@ non-standard viewports.
   conflicts_with: []
   priority: 2
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -1099,6 +1131,7 @@ push/email delivery across features.
   conflicts_with: []
   priority: 3
   incremental_skip: per_file
+  category: interaction-design
 ```
 
 ---
@@ -1122,6 +1155,7 @@ patterns are FORBIDDEN in architecture.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1144,6 +1178,7 @@ policy causes flaky tests in CI.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1165,6 +1200,7 @@ onboarding failures and CI/CD drift.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1187,6 +1223,7 @@ pentest.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: privacy-security
 ```
 
 ---
@@ -1208,6 +1245,7 @@ backward-compatibility policy causes unmanaged breaking changes in future iterat
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1228,6 +1266,7 @@ Missing git strategy causes inconsistent repository hygiene across the engineeri
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: privacy-security
 ```
 
 ---
@@ -1249,6 +1288,7 @@ quality non-deterministic.
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1270,6 +1310,7 @@ observability requirements cause production incidents with no diagnosis path.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1291,6 +1332,7 @@ cause regressions discovered in production.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1313,6 +1355,7 @@ enforced.
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1336,6 +1379,7 @@ deployment aspect. Missing deployment architecture leaves the launch plan incomp
   conflicts_with: []
   priority: 2
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---
@@ -1358,6 +1402,7 @@ Missing AI agent configuration causes coding agents to operate with incomplete c
   conflicts_with: []
   priority: 3
   incremental_skip: full_scan
+  category: risk-governance
 ```
 
 ---

@@ -1,5 +1,71 @@
 # CHANGELOG
 
+## [1.4.0] — 2026-05-24
+
+**Criterion-centric batching for review/revise.** Switch grouping from
+file-centric to criterion-centric so LLM sub-agents focus on one issue
+category at a time. Reviser uses `Edit`-only for concurrency safety.
+
+### Changed (BREAKING)
+
+- Review fan-out is now **per-category** (`common/criterion-categories.md`).
+  Each cross-reviewer dispatch is scoped to one criterion category, not one
+  artifact-class cluster. `review/index.md` Step 2 rewritten;
+  `cross-reviewer-subagent.md` prompt rewritten.
+- Revise grouping is now **per-criterion** (`criterion_id`). Each reviser
+  dispatch carries ≤8 issues sharing the same criterion across multiple
+  leaves. `revise/index.md` Step 2 rewritten;
+  `per-issue-reviser-subagent.md` prompt rewritten.
+- Reviser sub-agents are **`Edit`-only** on artifact leaves; `Write` is
+  forbidden. Concurrency safety follows from `Edit`'s unique-match.
+- `common/review-criteria.md` LLM-type CRs now carry a required `category:`
+  field (45 CRs annotated).
+- `.review/round-*/issues/*.md` files gain a required `category:` frontmatter
+  field (auto-derived by `create-issues.sh`; legacy files migrated via
+  `scripts/migrate-issues-add-category.sh`).
+- Reviewer output JSON gains a required `category_applied:` top-level field.
+- `common/parallel-dispatch.md` Rule 3/5/6 updated; Rule 5 renamed
+  "Per-Work-Unit Isolation".
+
+### Added
+
+- `common/criterion-categories.md` — single source of truth for the 7+meta
+  PRD-analysis categories.
+- `scripts/check-criteria-categories.sh` — criteria↔categories consistency check.
+- `scripts/migrate-issues-add-category.sh` — one-time legacy issue backfill.
+- `common/config.yml` `revise.edit_cap` (default 8) and
+  `review.cluster_leaf_cap` (default 25).
+
+### Migration
+
+- Existing PRD bundles: run
+  `scripts/migrate-issues-add-category.sh <prd-dir>` once to backfill the
+  `category:` field on legacy issue files. `check-issue.sh` treats missing
+  category as a non-fatal WARNING during the migration window.
+
+---
+
+## [1.3.0] — 2025-05-22
+
+**Feature-level concurrent pipeline.** Add single-feature operations
+(modify/add/deprecate/evolve) that operate on individual features
+instead of the full PRD bundle. Existing global modes unchanged.
+
+- **`/prd-analysis modify <dir> F-NNN "desc"`** — in-place edit of one
+  feature file + README index row + CHANGELOG entry. Other feature files
+  untouched.
+- **`/prd-analysis add <dir> "desc"`** — create single feature, auto-assign
+  next available ID, update README index and CHANGELOG.
+- **`/prd-analysis deprecate <dir> F-NNN`** — create tombstone, remove from
+  active index, warn about dependent features.
+- **`/evolve F-NNN "desc" [--design-dir <dir>] [--prd-dir <dir>] [--design|--full]`** — unified cross-skill
+  evolution with auto complexity determination (Trivial/Moderate/Complex)
+  and adaptive approval gates. Directories auto-discovered if not specified.
+- **Concurrency-safe:** different features touch disjoint files and
+  README rows — no file locking needed.
+- **New files:** `feature/modify.md`, `feature/add.md`, `feature/deprecate.md`,
+  `feature/evolve.md`.
+
 ## [1.2.0] — 2026-05-08
 
 **BREAKING — git tag rename.** The annotated tag created on converged

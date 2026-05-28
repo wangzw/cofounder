@@ -16,6 +16,24 @@ waste tokens on structural / format / id-uniqueness / frontmatter issues.
 
 ---
 
+## Scope: one category, all leaves
+
+Each cross-reviewer dispatch is scoped to a **single criterion category**
+(e.g. `module-boundary`, `data-model`, `failure-modes` — see
+`common/criterion-categories.md` for the canonical taxonomy). The
+orchestrator's dispatch message names the category you own and the CR-IDs
+in that category. You see the entire artifact bundle, but you only apply
+those CR-IDs. **Every other category is being reviewed in parallel by a
+sibling sub-agent.** Stay in lane: finding an issue that conceptually
+belongs to another category is NOT your job; that sibling will catch it.
+This discipline is what makes one-cluster-per-category cheaper than one
+reviewer that handles all criteria across all files.
+
+If the orchestrator's prompt does not name a category and CR-ID list,
+ACK `FAIL trace_id=... reason=missing-category-scope`.
+
+---
+
 ## What you do
 
 1. Read the design bundle at the artifact root (path passed as the first
@@ -42,19 +60,26 @@ waste tokens on structural / format / id-uniqueness / frontmatter issues.
    apply only to leaves listed in `changed_leaves`; criteria annotated
    `incremental_skip: full_scan` apply to every leaf regardless). If the
    file is missing or unparseable, treat it as `mode: full` and proceed.
-5. Apply every criterion in `common/review-criteria.md` whose
-   `checker_type: llm` (CR-SD-DESIGN01..11, CR-META-mechanize,
-   CR-META-adversarial), honoring the scope file from step 4. Do not
-   apply `checker_type: script` criteria — those were already enforced by
-   `scripts/run-checkers.sh` (which dispatches every per-artifact
-   `check-*.sh`) before you were dispatched.
+5. **Apply ONLY the CR-IDs in your dispatched cluster** (the orchestrator
+   names them in the prompt; you can cross-check by reading
+   `<artifact-root>/.review/round-<N>/review-scope.yml`'s
+   `category_clusters:` block and looking up your `category`). Do NOT
+   apply other LLM-type criteria — they are being reviewed in parallel by
+   sibling sub-agents. Honor the scope file's incremental/full mode:
+   criteria with `incremental_skip: per_file` apply only to leaves in
+   `changed_leaves`; criteria with `incremental_skip: full_scan` apply
+   to every leaf regardless. Do NOT apply `checker_type: script`
+   criteria — those were already enforced by `scripts/run-checkers.sh`
+   before you were dispatched.
 6. For each problem you find, decide if it is a **recurrence** of a
    prior issue (see "Fingerprint matching" below).
 7. Emit your findings as a single JSON document to a designated output
    file. **You do not write per-issue files** — that is the orchestrator's
    job via `scripts/create-issues.sh` (guide §7.1). The output JSON MUST
-   include a top-level `scope_applied: full | incremental` field that
-   echoes the `mode` you actually applied.
+   include two top-level fields: `scope_applied: full | incremental` (the
+   incremental mode you applied) and `category_applied: <name>` (the
+   single category you were scoped to). Both are validated by
+   `scripts/check-reviewer-output.sh`.
 
 ---
 
@@ -97,6 +122,7 @@ Format:
   "reviewer_variant": "cross",
   "trace_id": "R3-V-001",
   "scope_applied": "incremental",
+  "category_applied": "module-boundary",
   "issues": [
     {
       "criterion_id": "CR-SD-DESIGN01",
@@ -106,16 +132,22 @@ Format:
       "suggested_fix": "Split M-004 into M-004 (billing/invoicing — owns invoice + dunning) and a new M-NNN (payments — owns gateway client). Update README Module Index, Feature-Module mapping matrix, and any Module Interaction Protocols rows that pointed at M-004."
     },
     {
-      "criterion_id": "CR-SD-DESIGN06",
-      "file": "modules/M-002-auth.md",
+      "criterion_id": "CR-SD-DESIGN02",
+      "file": "modules/M-005-orders.md",
       "severity": "warning",
-      "description": "M-002 declares a dependency on the external identity-provider (IdP) over HTTPS but the Failure Modes section says nothing about IdP timeouts or 5xx responses — only auth-success and auth-rejected paths are documented.",
-      "suggested_fix": "Add a Failure Modes row for 'IdP timeout (>2s)' with action 'fall back to cached session token if present, else return 503 with Retry-After: 30'. Add a row for 'IdP 5xx' with the same fallback.",
+      "description": "M-005 depends on M-007 (notifications) AND M-007 depends on M-005 (it queries order status to compose summary emails) — circular dependency without a stated mediator.",
+      "suggested_fix": "Promote the cross-call to an event channel: M-005 publishes order-state-changed, M-007 subscribes. Update both modules' Dependencies tables.",
       "recurrence_of": "I-042"
     }
   ]
 }
 ```
+
+(Note: the example shows a single-category reviewer for `module-boundary`,
+so all findings carry CR-SD-DESIGN01/02/03. A reviewer with
+`category_applied: failure-modes` would report findings under
+CR-SD-DESIGN06 only. The orchestrator merges all reviewer outputs in
+`scripts/create-issues.sh`.)
 
 ### Top-level required fields
 
@@ -124,7 +156,15 @@ Format:
   field of the `review-scope.yml` you read in step 4. If you fall back
   to `full` because the scope file was missing or unparseable, set
   `scope_applied: full`.
-- `issues` — array of findings (may be empty).
+- `category_applied` — one of the categories defined in
+  `common/criterion-categories.md`. MUST equal the category your cluster
+  was scoped to (named in the orchestrator's dispatch prompt). If your
+  dispatch did not specify a category, ACK `FAIL trace_id=...
+  reason=missing-category-scope` instead of guessing. This field is
+  validated by `scripts/check-reviewer-output.sh`.
+- `issues` — array of findings (may be empty). Every finding's
+  `criterion_id` MUST be one of the CR-IDs in your cluster's
+  `criteria` list (from `review-scope.yml` category_clusters block).
 
 ### Per-finding required fields
 

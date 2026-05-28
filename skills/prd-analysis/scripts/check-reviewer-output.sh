@@ -87,6 +87,14 @@ for rel, full in files:
             suggested_fix="set reviewer_variant to 'cross' or 'adversarial'",
         ))
 
+    # category_applied is required (v1.4+)
+    if "category_applied" not in doc:
+        findings.append(Finding(
+            criterion_id="CR-RO02", file=rel, severity="error",
+            description="reviewer output missing required top-level field: category_applied",
+            suggested_fix="set 'category_applied' to the category your cluster was scoped to (per common/criterion-categories.md)",
+        ))
+
     issues = doc.get("issues", [])
     if not isinstance(issues, list):
         findings.append(Finding(

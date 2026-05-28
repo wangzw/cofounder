@@ -27,6 +27,11 @@ docs/raw/prd/YYYY-MM-DD-{product-slug}/
 └── architecture/{topic}.md  # tech-stack / design-tokens / security / …
 ```
 
+Each **feature file** is self-contained — data models, conventions, design tokens,
+and journey touchpoints are copied inline. A coding agent implements a feature
+by reading only its feature file. See `common/templates/feature-template.md` for
+the 17-section template.
+
 Plus a `.review/` audit trail (transient, not version-controlled) that
 records every dispatch, every issue, and every state transition.
 
@@ -41,8 +46,23 @@ records every dispatch, every issue, and every state transition.
 | `/prd-analysis --review <prd-dir>` | Read phase: cross-reviewer + judge |
 | `/prd-analysis --revise <prd-dir>` | Write phase: per-issue fix loop |
 | `/prd-analysis --evolve <prd-dir> [notes.md]` | Iterate to a new version |
-| `/prd-analysis --compact <prd-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
+| `/prd-analysis --compact <prd-dir>` | Retire intermediate review rounds |
 | `/prd-analysis --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
+
+### Feature-level operations (concurrent, single-feature scope)
+
+| Command | Mode |
+|---------|------|
+| `/prd-analysis modify <prd-dir> F-NNN "desc"` | Modify a single feature in-place. Only the target feature file, README index row, and CHANGELOG are touched. Other features untouched. |
+| `/prd-analysis add <prd-dir> "desc"` | Add a new feature. Auto-assigns next available ID. Creates feature file + updates README + CHANGELOG. |
+| `/prd-analysis deprecate <prd-dir> F-NNN ["reason"]` | Deprecate a feature. Creates tombstone file, moves feature to Deprecated Items index. Reports dependents for cascade update. |
+| `/evolve F-NNN "desc"` | Unified cross-skill evolution. Auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. |
+| `/evolve F-NNN "desc" --design` | Force design review gate insertion. |
+| `/evolve F-NNN "desc" --full` | Force full triple-gate (contract + design + summary). |
+| `/evolve F-NNN "desc" --prd-dir <dir> --design-dir <dir>` | Explicit directories (auto-discovered otherwise). |
+
+Feature-level operations are **concurrency-safe**: concurrent modifies of different features
+touch disjoint feature files and disjoint README rows. No file locking needed.
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
 
@@ -162,7 +182,7 @@ and one test runner. **29 scripts / 29 test runners / 470 tests** (run
 | `commit-delivery.sh` | On-converge: stages, commits, creates annotated `prd-analysis-delivery-<N>-<slug>` tag. |
 | `compact-delivery.sh` | `--compact` mode: aggregates current delivery's intermediate rounds into `compacted-history.md`, then deletes those `round-N/` + `traces/round-N/` trees. Gated on `verdict: converged`. |
 | `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
-| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
+| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`, and v1.4+ `category_clusters[]` — one entry per active LLM-criterion category for per-category reviewer fan-out); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |
 | `metrics-aggregate.sh` | `--diagnose` mode: JOINs harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`. |
 
@@ -274,7 +294,7 @@ downstream consumers will surface producer bugs.
 - **8 sub-agent prompts** (planner, writer, domain-consultant,
   cross-reviewer, adversarial-reviewer, per-issue-reviser,
   summarizer, judge)
-- **4 modes** + 1 diagnostic mode + `--evolve`
+- **4 modes** + 1 diagnostic mode + `--evolve` + 4 feature-level operations
 
 The redesign producing this state was 21 commits since `4bce546`,
 audited by three independent code-reviewer agent passes (25 findings

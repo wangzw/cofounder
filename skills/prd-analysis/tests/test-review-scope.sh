@@ -93,8 +93,9 @@ assert_stdout_contains "first-round-of-delivery"
 S="$FIXTURE/.review/round-1/review-scope.yml"
 grep -q "^mode: full$" "$S" && _record_pass || _record_fail "mode line missing"
 test_case "scope first-round changed_leaves = all current leaves"
-[ "$(grep -c '^  - ' "$S")" = "6" ] && _record_pass \
-    || _record_fail "expected 6 changed leaves"
+n=$(awk '/^changed_leaves:/{f=1;next} f && /^[a-z_]/{f=0} f && /^  - /' "$S" | wc -l | tr -d ' ')
+[ "$n" = "6" ] && _record_pass \
+    || _record_fail "expected 6 changed leaves, got $n"
 teardown_fixture
 
 test_case "scope --full forces full mode"
@@ -171,6 +172,20 @@ mv "$FIXTURE/.review/state.yml.new" "$FIXTURE/.review/state.yml"
 assert_exit 0 "$SCOPE" "$FIXTURE" 2
 assert_stdout_contains "mode=full"
 assert_stdout_contains "first-round-of-delivery"
+teardown_fixture
+
+test_case "scope file includes category_clusters with categories from criteria"
+setup_fixture
+build_bundle 1
+"$SNAP" "$FIXTURE" 1 >/dev/null
+assert_exit 0 "$SCOPE" "$FIXTURE" 1
+S="$FIXTURE/.review/round-1/review-scope.yml"
+grep -q "^category_clusters:" "$S" && _record_pass \
+    || _record_fail "category_clusters section missing"
+grep -q "category: traceability" "$S" && _record_pass \
+    || _record_fail "traceability category cluster missing"
+grep -q "CR-PP06" "$S" && _record_pass \
+    || _record_fail "CR-PP06 not listed in category_clusters criteria"
 teardown_fixture
 
 end_tests

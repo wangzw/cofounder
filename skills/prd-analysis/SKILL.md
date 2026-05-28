@@ -1,7 +1,7 @@
 ---
 name: prd-analysis
-version: 1.1.0
-description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, or evolve an existing PRD for a new iteration. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration'."
+version: 1.3.0
+description: "Use when the user needs to create a Product Requirements Document, perform product requirements analysis, convert brainstorming notes into structured specs, prepare requirements for AI coding agents, evolve an existing PRD for a new iteration, or modify/add/deprecate individual features concurrently. Triggers: /prd-analysis, 'write a PRD', 'product requirements', 'requirements analysis', 'evolve PRD', 'new iteration', 'modify F-003', 'add feature', 'deprecate feature'."
 ---
 
 # prd-analysis — AI-Coding-Ready Product Requirements Documents
@@ -16,6 +16,10 @@ prd-analysis generates PRDs as a **multi-file directory** — a pyramid-indexed 
 |------|------|-------------|-----------|
 | generate (from scratch) | `/prd-analysis` or `/prd-analysis path/to/notes.md` | `generate/questioning-phases.md`, `common/output-discipline.md` (+ `generate/document-mode.md` if document arg present; the writer subagent's self-audit follows `generate/in-generate-review.md`, not loaded into orchestrator context) | Interactive questioning (or document parsing) → PRD file generation → self-review → user review → commit |
 | generate (new version) | `/prd-analysis --evolve <prd-dir> [notes.md]` | `generate/evolve-mode.md`, `generate/questioning-phases.md`, `common/output-discipline.md` (+ `common/scope-reference.md` + `common/templates/review-checklist.md` on demand when running the evolve review checklist) | Diff-aware iteration on baseline PRD; ID-stable new/modified features + tombstones for deprecated items |
+| **feature-modify** | `/prd-analysis modify <prd-dir> F-NNN "description"` | `feature/modify.md`, `common/output-discipline.md` | Modify a single feature file in-place by dispatching a writer with the change description; then update README index row and append CHANGELOG. Other feature files are untouched. |
+| **feature-add** | `/prd-analysis add <prd-dir> "description"` | `feature/add.md`, `common/output-discipline.md` | Add a single new feature file by dispatching a writer; assign next available ID; then update README index and append CHANGELOG. |
+| **feature-deprecate** | `/prd-analysis deprecate <prd-dir> F-NNN ["reason"]` | `feature/deprecate.md`, `common/output-discipline.md` | Deprecate a feature: create tombstone file, remove from README Feature Index and Roadmap, add to Deprecated Items index, append CHANGELOG. Does NOT dispatch a writer (mechanical operation). |
+| **feature-evolve** | `/evolve F-NNN "description" [--prd-dir <dir>] [--design-dir <dir>] [--design\|--full]` | `feature/evolve.md`, `feature/modify.md`, `common/output-discipline.md` | Unified feature evolution: auto-determines complexity (Trivial/Moderate/Complex), runs contract update → design delta → implementation in one flow, with adaptive approval gates. Directories auto-discovered if not specified. `--design` flag forces design gate; `--full` forces dual-gate review. |
 | review | `/prd-analysis --review <prd-dir>` | `review/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Formal hard gate (scripts) → substantive LLM review → script-driven issue creation; issues filed under `.review/round-N/issues/` per `common/issue-schema.md` (read at runtime by `create-issues.sh` and `check-issue.sh`, not loaded into the orchestrator's prompt context). |
 | revise | `/prd-analysis --revise <prd-dir>` | `revise/index.md`, `common/parallel-dispatch.md`, `common/output-discipline.md` | Per-issue revise loop with state-machine transitions (new → fixed/false-positive/deferred/superseded); phase gate via `check-revise-completeness.sh`. Schema reference `common/issue-schema.md` is read at runtime by reviser subagent, not loaded by orchestrator. |
 | compact | `/prd-analysis --compact <prd-dir>` | `compact/index.md`, `common/output-discipline.md` | Pure-script mode (no sub-agent dispatch). Aggregates intermediate review rounds of the current delivery into a single `.review/round-<final>/compacted-history.md` and deletes the intermediate `round-N/` and `traces/round-N/` directories. Gated on `verdict: converged` for the current delivery's final round. |
@@ -151,10 +155,13 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 ## Input Modes (Summary)
 
 ```
+# Project startup
 /prd-analysis                                          # interactive mode (default)
 /prd-analysis path/to/notes.md                         # document-based mode
 /prd-analysis --output docs/raw/prd/my-project         # custom output dir
 /prd-analysis notes.md --output ./prd                  # both
+
+# Quality assurance
 /prd-analysis --review docs/raw/prd/xxx/               # review existing PRD (single round)
 /prd-analysis --review docs/raw/prd/xxx/ --auto        # auto-loop review↔revise until convergence
 /prd-analysis --revise docs/raw/prd/xxx/               # per-issue revise loop (state-machine: new → fixed/false-positive/deferred/superseded)
@@ -162,6 +169,17 @@ Every mode MUST call `scripts/git-precheck.sh` as the first action. On failure (
 /prd-analysis --evolve docs/raw/prd/xxx/               # incremental PRD for new iteration
 /prd-analysis --evolve docs/raw/prd/xxx/ notes.md      # evolve with document input
 /prd-analysis --compact docs/raw/prd/xxx/              # retire intermediate review rounds before next stage
+
+# Feature-level operations (concurrent, single-feature scope)
+/prd-analysis modify <prd-dir> F-NNN "description"     # modify a single feature in-place
+/prd-analysis add <prd-dir> "description"              # add a new feature, auto-assign next ID
+/prd-analysis deprecate <prd-dir> F-NNN ["reason"]     # deprecate a feature (tombstone)
+
+# Unified evolution (cross-skill, adaptive gates)
+/evolve F-NNN "description"                              # auto-determine complexity, run full flow
+/evolve F-NNN "description" --design                     # force design review gate
+/evolve F-NNN "description" --full                       # force full triple-gate review
+/evolve F-NNN "description" --prd-dir <dir> --design-dir <dir>  # explicit directories
 ```
 
 ## Output Structure
@@ -337,19 +355,20 @@ The orchestrator's ONLY write targets are `state.yml` and `dispatch-log.jsonl` (
 - Analyzing issue priority
 - Writing business archives (issues / self-reviews / plan.md / verdict.yml / index.md / CHANGELOG)
 - **Dispatching one sub-agent that combines multiple work units the skill defines as separate.**
-  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry), per-leaf
-  reviser dispatch (one reviser per leaf with `state: new` issues, never one reviser for >1
-  leaf), and per-cluster reviewer dispatch (clusters sized per `common/parallel-dispatch.md`
-  Rule 3) are **contracts** — the orchestrator MAY NOT coalesce them into a single "mega"
-  dispatch. The temptation to "just write one big sub-agent that handles all 38 issues"
-  (observed in delivery 4 of a 2026-05-15 session, where it also triggered an unrelated
-  skill-catalog mutation) is forbidden because it (a) defeats the per-leaf isolation contract
-  in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing limits in Rule 3,
-  (c) eliminates the parallel cache-read amortization that makes large bundles affordable, and
-  (d) gives the coalesced sub-agent the surface area to mutate things it would never touch
-  in a per-leaf scope. If you find yourself authoring a single Task prompt that lists >1 leaf
-  for a writer or reviser role, STOP — split into per-leaf dispatches and emit them as a
-  parallel batch per Rule 1.
+  Per-leaf writer dispatch (one writer per `plan.add[]` / `plan.modify[]` entry),
+  per-criterion-cluster reviser dispatch (one reviser per criterion-cluster, ≤8 issues per
+  `revise.edit_cap`; multiple clusters per criterion when count exceeds cap), and per-category
+  reviewer dispatch (one cross-reviewer per criterion category active this round, see
+  `common/criterion-categories.md`) are **contracts** — the orchestrator MAY NOT coalesce them
+  into a single "mega" dispatch. The temptation to "just write one big sub-agent that handles
+  all 38 issues" (observed in delivery 4 of a 2026-05-15 session, where it also triggered an
+  unrelated skill-catalog mutation) is forbidden because it (a) defeats the per-work-unit
+  isolation contract in `common/parallel-dispatch.md` Rule 5, (b) blows past the cluster-sizing
+  limits in Rule 3, (c) eliminates the parallel cache-read amortization that makes large
+  bundles affordable, and (d) gives the coalesced sub-agent the surface area to mutate things
+  it would never touch in a per-unit scope. If you find yourself authoring a single Task prompt
+  that lists >1 leaf for a writer, >1 criterion-cluster for a reviser, or >1 category for a
+  reviewer, STOP — split into per-unit dispatches and emit them as a parallel batch per Rule 1.
 
 ## `--diagnose` Mode
 
@@ -424,11 +443,21 @@ Next steps:
 
 **Evolve mode** — use the cascade notification from the "Commit Message & Post-Commit Cascade" section of `generate/evolve-mode.md` instead.
 
+**Feature-level operations (modify/add/deprecate):**
+```
+After feature-level PRD change:
+
+  1. /system-design delta <design-dir> F-{NNN}   # compute affected modules
+  2. /autoforge --feature F-{NNN} <design-dir>    # implement the change
+  3. Verify regression tests pass
+```
+
 ## Configuration & Subagent Files
 
-- **Config**: `common/config.yml`
-- **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; see guide §1)
-- **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format)
+- **Config**: `common/config.yml` (includes `revise.edit_cap` and `review.cluster_leaf_cap` for criterion-centric cluster sizing)
+- **Review criteria**: `common/review-criteria.md` (script-tier and LLM-tier criteria; LLM entries carry `category:` matching `criterion-categories.md`)
+- **Criterion categories**: `common/criterion-categories.md` — single source of truth for LLM CR-to-category mapping (consumed by reviewer cluster fan-out + reviser category-context prompt)
+- **Issue schema**: `common/issue-schema.md` (on-disk issue format + LLM raw-output format + summary.yml format; v1.4+ requires `category:` field)
 - **Domain glossary**: `common/domain-glossary.md`
 - **Formal-review scripts** — one per artifact type (guide §1.1 + §9 contract: 3-state returncode + stdout restates meaning + idempotent + agent-actionable):
   - `scripts/run-checkers.sh` — dispatcher; auto-discovers and invokes every `check-*.sh` (except phase gates), aggregates findings
@@ -453,10 +482,12 @@ Next steps:
     - `scripts/check-review-readiness.sh`    no prior `state: new` issues (guide §7.3)
     - `scripts/check-revise-completeness.sh` no `state: new` in current round (guide §7.3)
   - Helpers:
-    - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1)
+    - `scripts/create-issues.sh`             script-driven issue creation from LLM raw JSON (guide §7.1); injects `category` from criterion_id
     - `scripts/update-summary.sh`            cross-round fingerprint summary (guide §7.6)
     - `scripts/synthesize-clarification.sh`  --no-consultant: synthesize deferred-only clarification.yml without violating orchestrator pure-dispatch contract
     - `scripts/compact-delivery.sh`          `--compact` mode: aggregates intermediate review rounds of the current delivery into `compacted-history.md` and deletes their `round-N/` + `traces/round-N/` trees
+    - `scripts/check-criteria-categories.sh` consistency check between `review-criteria.md` and `criterion-categories.md`
+    - `scripts/migrate-issues-add-category.sh` one-time backfill for legacy issue files missing the `category:` frontmatter
   - Pipeline-stage scripts (per audit-design guide §6):
     - `scripts/prepare-input.sh`             input-classification (CR-CL) → planner-input (CR-PL)
     - `scripts/commit-delivery.sh`           finalize a converged delivery (manifest snapshot + summary; invokes `prune-traces.sh`)

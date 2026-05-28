@@ -21,9 +21,14 @@ docs/raw/design/YYYY-MM-DD-{product-slug}/
 ├── README.md                       # design overview, module index, feature-module mapping
 ├── REVISIONS.md                    # version history (after first --revise)
 ├── CHANGELOG.md                    # human-readable delivery summary
+├── feature-module-map.yml          # machine-readable feature→module mapping (input for delta mode)
 ├── modules/M-NNN-{slug}.md         # per-module specs (responsibility, deps, contracts, failure modes)
 └── api/API-NNN-{slug}.md           # per-API specs (endpoints, versioning, schemas)
 ```
+
+The **feature-module-map.yml** is auto-generated during global mode and consumed
+by `/system-design delta` and `/autoforge --feature`. It maps each PRD `F-NNN`
+to its `writes` (✦) and `reads` (△) module sets in YAML format.
 
 Plus a `.review/` audit trail (transient, not version-controlled) that
 records every dispatch, every issue, and every state transition.
@@ -45,8 +50,14 @@ marks read-only support.
 | `/system-design --review <design-dir>` | Read phase: cross-reviewer + judge |
 | `/system-design --revise <design-dir>` | Write phase: per-issue fix loop |
 | `/system-design --evolve <design-dir> [<prd-dir>]` | Iterate to a new version |
-| `/system-design --compact <design-dir>` | Retire intermediate review rounds of the current delivery before the next pipeline stage |
+| `/system-design --compact <design-dir>` | Retire intermediate review rounds |
 | `/system-design --diagnose [--round N \| --delivery N]` | Aggregate metrics from harness JSONL |
+
+### Feature-level delta
+
+| Command | Mode |
+|---------|------|
+| `/system-design delta <design-dir> F-NNN` | Single-feature delta analysis. Reads `feature-module-map.yml`, computes affected modules (writes ∪ reads), updates module specs in-place. Outputs affected module list + regression-test scope. |
 
 `SKILL.md` "Mode Routing" has the full per-mode loaded-files map.
 
@@ -174,7 +185,7 @@ and one test runner. **~34 scripts / 23 test runners / 442 tests** (run
 |--------|------|
 | `commit-delivery.sh` | On-converge: stages, commits, creates annotated `system-design-delivery-<N>-<slug>` tag. |
 | `snapshot-leaves.sh` | At read-phase entry (review/index.md Step 1.5): writes `round-<N>/leaves-manifest.yml` (sha256 per leaf) for the next round's incremental-scope diff. |
-| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`); honors a single-shot `--full` flag forwarded from the orchestrator. |
+| `compute-review-scope.sh` | At read-phase entry (review/index.md Step 1.6): emits `round-<N>/review-scope.yml` (`mode: full` or `mode: incremental` plus `changed_leaves[]`, and v1.4+ `category_clusters[]` — one entry per active LLM-criterion category for per-category reviewer fan-out); honors a single-shot `--full` flag forwarded from the orchestrator. |
 | `prune-traces.sh` | Retention policy on `.review/traces/round-N/*.yml` (audit `.jsonl` preserved). |
 | `metrics-aggregate.sh` | `--diagnose` mode: JOINs harness JSONL + dispatch-log → `.review/metrics/<scope>.metrics.yml`. |
 
@@ -290,7 +301,7 @@ downstream consumers will surface producer bugs.
 - **8 sub-agent prompts** (planner, writer, domain-consultant,
   cross-reviewer, adversarial-reviewer, per-issue-reviser,
   summarizer, judge)
-- **4 modes** + 1 diagnostic mode + `--evolve`
+- **4 modes** + 1 diagnostic mode + `--evolve` + delta mode
 
 The redesign that produced this state ports the prd-analysis Phase
 Contract, formal-vs-substantive split, and IPC `Direct Write + ACK`

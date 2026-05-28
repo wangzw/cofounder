@@ -13,6 +13,24 @@ issues.
 
 ---
 
+## Scope: one category, all leaves
+
+Each cross-reviewer dispatch is scoped to a **single criterion category**
+(e.g. `traceability`, `coherence`, `accessibility-i18n` — see
+`common/criterion-categories.md` for the canonical taxonomy). The
+orchestrator's dispatch message names the category you own and the CR-IDs
+in that category. You see the entire artifact bundle, but you only apply
+those CR-IDs. **Every other category is being reviewed in parallel by a
+sibling sub-agent.** Stay in lane: finding an issue that conceptually
+belongs to another category is NOT your job; that sibling will catch it.
+This discipline is what makes one-cluster-per-category cheaper than one
+reviewer that handles all criteria across all files.
+
+If the orchestrator's prompt does not name a category and CR-ID list,
+ACK `FAIL trace_id=... reason=missing-category-scope`.
+
+---
+
 ## What you do
 
 1. Read the PRD bundle at the artifact root (path passed as the first
@@ -40,18 +58,26 @@ issues.
    apply only to leaves listed in `changed_leaves`; criteria annotated
    `incremental_skip: full_scan` apply to every leaf regardless). If the
    file is missing or unparseable, treat it as `mode: full` and proceed.
-5. Apply every criterion in `common/review-criteria.md` whose
-   `checker_type: llm`, honoring the scope file from step 4. Do not
-   apply `checker_type: script` criteria — those were already enforced
-   by `scripts/run-checkers.sh` (which dispatches every per-artifact
-   `check-*.sh`) before you were dispatched.
+5. **Apply ONLY the CR-IDs in your dispatched cluster** (the orchestrator
+   names them in the prompt; you can cross-check by reading
+   `<artifact-root>/.review/round-<N>/review-scope.yml`'s
+   `category_clusters:` block and looking up your `category`). Do NOT
+   apply other LLM-type criteria — they are being reviewed in parallel by
+   sibling sub-agents. Honor the scope file's incremental/full mode:
+   criteria with `incremental_skip: per_file` apply only to leaves in
+   `changed_leaves`; criteria with `incremental_skip: full_scan` apply
+   to every leaf regardless. Do NOT apply `checker_type: script`
+   criteria — those were already enforced by `scripts/run-checkers.sh`
+   before you were dispatched.
 6. For each problem you find, decide if it is a **recurrence** of a
    prior issue (see "Fingerprint matching" below).
 7. Emit your findings as a single JSON document to a designated output
    file. **You do not write per-issue files** — that is the orchestrator's
    job via `scripts/create-issues.sh` (guide §7.1). The output JSON MUST
-   include a top-level `scope_applied: full | incremental` field that
-   echoes the `mode` you actually applied.
+   include two top-level fields: `scope_applied: full | incremental` (the
+   incremental mode you applied) and `category_applied: <name>` (the
+   single category you were scoped to). Both are validated by
+   `scripts/check-reviewer-output.sh`.
 
 ---
 
@@ -94,6 +120,7 @@ Format:
   "reviewer_variant": "cross",
   "trace_id": "R3-V-001",
   "scope_applied": "incremental",
+  "category_applied": "traceability",
   "issues": [
     {
       "criterion_id": "CR-PP06",
@@ -101,18 +128,15 @@ Format:
       "severity": "error",
       "description": "Acceptance Criteria #2 references the 'guest-checkout' touchpoint, but the J-002-onboarding journey lists no such touchpoint — there is no upstream user path that triggers AC#2.",
       "suggested_fix": "Either add a 'guest-checkout' touchpoint to journeys/J-002-onboarding.md (Stage 'Browse and Add to Cart'), or rewrite F-007 AC#2 to reference an existing touchpoint."
-    },
-    {
-      "criterion_id": "CR-PP24",
-      "file": "features/F-009-cart.md",
-      "severity": "warning",
-      "description": "State machine in F-009 has a transition 'reserved → expired' but no transition into 'reserved' is documented.",
-      "suggested_fix": "Add the entry transition (likely 'cart-empty → reserved' triggered by 'add-item' event) to the state-machine table.",
-      "recurrence_of": "I-042"
     }
   ]
 }
 ```
+
+(Note: the example shows a single-category reviewer for `traceability`,
+so all findings carry CR-PP06. A different reviewer with `category_applied: coherence` would
+report findings under CR-PP12/22/24/25/26/27 instead. The orchestrator merges
+all reviewer outputs in `scripts/create-issues.sh`.)
 
 ### Top-level required fields
 
@@ -121,7 +145,15 @@ Format:
   field of the `review-scope.yml` you read in step 4. If you fall back
   to `full` because the scope file was missing or unparseable, set
   `scope_applied: full`.
-- `issues` — array of findings (may be empty).
+- `category_applied` — one of the categories defined in
+  `common/criterion-categories.md`. MUST equal the category your cluster
+  was scoped to (named in the orchestrator's dispatch prompt). If your
+  dispatch did not specify a category, ACK `FAIL trace_id=...
+  reason=missing-category-scope` instead of guessing. This field is
+  validated by `scripts/check-reviewer-output.sh`.
+- `issues` — array of findings (may be empty). Every finding's
+  `criterion_id` MUST be one of the CR-IDs in your cluster's
+  `criteria` list (from `review-scope.yml` category_clusters block).
 
 ### Per-finding required fields
 

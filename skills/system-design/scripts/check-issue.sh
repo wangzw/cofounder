@@ -49,6 +49,10 @@ from sd_lint import (
 
 VALID_SEV = {"critical", "error", "warning", "info"}
 VALID_STATES = {"new", "fixed", "false-positive", "deferred", "superseded"}
+VALID_CATEGORIES = {
+    "module-boundary", "data-model", "api-contract", "failure-modes",
+    "observability", "security", "ui-promotion", "meta",
+}
 REQUIRED = ("id", "criterion_id", "file", "severity", "state", "created_in_round")
 ROUND_NUM_RE = re.compile(r"^\d+$")
 
@@ -86,6 +90,7 @@ for _, full in issue_files:
 
 # Second pass: validate each
 findings: list[Finding] = []
+warnings: list[str] = []
 for rel, full in issue_files:
     text = read_text(full)
     if text is None:
@@ -139,6 +144,17 @@ for rel, full in issue_files:
              f"unknown criterion {fm['criterion_id']!r} (not declared in review-criteria.md)",
              "add this criterion to common/review-criteria.md or correct the id")
 
+    # category field (v1.4+) — missing is non-fatal WARNING; invalid is FAIL
+    cat = fm.get("category", "")
+    if not cat:
+        warnings.append(
+            f"WARNING: {rel}: missing category field (legacy issue; "
+            f"run scripts/migrate-issues-add-category.sh to backfill)")
+    elif cat not in VALID_CATEGORIES:
+        fail("category",
+             f"unknown category {cat!r} (must be one of {sorted(VALID_CATEGORIES)})",
+             "set category to one of the canonical category names defined in common/criterion-categories.md")
+
     # State-conditional fields
     if state == "fixed" and not fm.get("fixed_in_round"):
         fail("fixed_in_round", "required when state=fixed",
@@ -185,6 +201,9 @@ for rel, full in issue_files:
     if "## suggested fix" not in body_l:
         fail("body", "missing '## Suggested fix' section",
              "add a '## Suggested fix' section with one concrete change")
+
+for w in warnings:
+    print(w)
 
 scope = f"({len(issue_files)} issue file(s))"
 emit(findings, scope_label=scope)

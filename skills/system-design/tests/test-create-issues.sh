@@ -207,4 +207,18 @@ run_with_stdin "$GOOD_JSON" "$CHECK" "$FIXTURE" "1" --stdin "--dry-run"
 [ ! -d "$FIXTURE/.review/round-1/issues" ] && _record_pass || _record_fail "files were written despite --dry-run"
 teardown_fixture
 
+test_case "category injected from criterion_id"
+setup_fixture
+run_with_stdin '{"issues":[{"criterion_id":"CR-SD-DESIGN01","file":"modules/M-001.md","severity":"error","description":"module cohesion","suggested_fix":"split it"}]}' "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected exit 0, got $LAST_EXIT"
+grep -q "^category: module-boundary$" "$FIXTURE/.review/round-1/issues/I-001.md" && _record_pass || _record_fail "category line not injected"
+teardown_fixture
+
+test_case "unknown criterion_id produces issue without category (legacy-safe)"
+setup_fixture
+run_with_stdin '{"issues":[{"criterion_id":"CR-UNKNOWN","file":"x.md","severity":"error","description":"some issue","suggested_fix":"do something"}]}' "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected exit 0"
+! grep -q "^category:" "$FIXTURE/.review/round-1/issues/I-001.md" && _record_pass || _record_fail "category was injected for unknown CR"
+teardown_fixture
+
 end_tests

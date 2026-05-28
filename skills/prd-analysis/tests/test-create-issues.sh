@@ -207,4 +207,19 @@ run_with_stdin "$GOOD_JSON" "$CHECK" "$FIXTURE" "1" --stdin "--dry-run"
 [ ! -d "$FIXTURE/.review/round-1/issues" ] && _record_pass || _record_fail "files were written despite --dry-run"
 teardown_fixture
 
+test_case "category injected from criterion_id"
+setup_fixture
+run_with_stdin '{"issues":[{"criterion_id":"CR-PP06","file":"features/F-001.md","severity":"error","description":"broken trace","suggested_fix":"fix it now"}]}' "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected exit 0, got $LAST_EXIT"
+grep -q "^category: traceability$" "$FIXTURE/.review/round-1/issues/I-001.md" && _record_pass || _record_fail "category line not injected"
+teardown_fixture
+
+test_case "unknown criterion_id produces issue without category (legacy-safe)"
+setup_fixture
+run_with_stdin '{"issues":[{"criterion_id":"CR-UNKNOWN","file":"x.md","severity":"error","description":"some issue","suggested_fix":"do something"}]}' "$CHECK" "$FIXTURE" "1" --stdin
+[ "$LAST_EXIT" = "0" ] && _record_pass || _record_fail "expected exit 0"
+# Should not have a category line — this is a legacy/unknown CR
+! grep -q "^category:" "$FIXTURE/.review/round-1/issues/I-001.md" && _record_pass || _record_fail "category was injected for unknown CR"
+teardown_fixture
+
 end_tests
